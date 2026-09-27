@@ -11,7 +11,7 @@
 <style>
 :root,[data-theme="light"]{
   --navy:#1e3a5f; --navy2:#2c5282; --navy3:#3b6aa8; --navy-soft:#eef3f9;
-  --gold:#d4a017; --gold2:#b8860b; --gold-soft:#fbf3df;
+  --gold:#e6b422; --gold2:#c9941a; --gold-soft:#fbf3df;
   --bg:#f4f6f9; --card:#ffffff; --text:#1f2a37; --muted:#6b7684;
   --border:#e2e7ee; --green:#16a34a; --red:#dc2626; --blue:#2563eb;
   --purple:#7c3aed; --orange:#ea580c; --gray:#6b7280;
@@ -282,9 +282,12 @@ table.tbl tr:hover td{background:#fafbfd}
 @media (max-width:900px){.menu-toggle{display:inline-flex}}
 .sync-tag{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--gold-soft);color:var(--gold2);font-weight:600}
 .marquee{background:linear-gradient(90deg,var(--navy2),var(--navy3));color:#fff;font-size:12.5px;padding:5px 0;overflow:hidden;white-space:nowrap;flex-shrink:0}
-.marquee span{display:inline-block;padding-left:100%;animation:marquee 28s linear infinite;font-weight:600}
+.marquee span{display:inline-block;padding-left:100%;animation:marquee 55s linear infinite;font-weight:600}
 .marquee span b{color:#ffd964}
 @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+.qr-mini{width:66px;height:66px;border-radius:10px;background:#fff;padding:4px;border:1px solid var(--border);flex-shrink:0;cursor:pointer}
+.qr-wrap{display:flex;align-items:center;gap:8px;margin-left:auto}
+.qr-wrap small{font-size:10px;color:var(--muted);max-width:60px;line-height:1.3}
 .debtor-cards{display:flex;flex-direction:column;gap:14px}
 .debtor-card{width:100%}
 .debtor-card table{min-width:640px}
@@ -294,6 +297,7 @@ table.tbl tr:hover td{background:#fafbfd}
 .status-tag.warn{background:#fef3c7;color:#92400e}
 .status-tag.err{background:#fee2e2;color:#b91c1c}
 .status-tag.info{background:#dbeafe;color:#1d4ed8}
+@media print{.no-print{display:none!important}body{background:#fff}}
 </style>
 </head>
 <body>
@@ -335,7 +339,7 @@ table.tbl tr:hover td{background:#fafbfd}
     </div>
   </aside>
   <div class="main">
-    <div class="marquee"><span><b>โรงน้ำดื่ม เฟรชชี่ วอเตอร์</b> · กำลังทดสอบระบบจัดการลูกหนี้เวอร์ชั่น v1.0 ประจำเดือนกันยายน 2569 · ข้อมูลอัปเดตแบบเรียลไทม์ · ระบบป้องกันข้อมูลส่วนบุคคล</span></div>
+    <div class="marquee"><span>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ทดสอบระบบจัดการลูกหนี้เวอร์ชัน v.1.0 ประจำเดือนกันยายน พุทธศักราช 2569 · ข้อมูลอัปเดตลูกหนี้แบบเรียลไทม์ · ปกป้องข้อมูลส่วนบุคคลตามกฎหมาย &nbsp;✦&nbsp; โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ทดสอบระบบจัดการลูกหนี้เวอร์ชัน v.1.0 ประจำเดือนกันยายน พุทธศักราช 2569 · ข้อมูลอัปเดตลูกหนี้แบบเรียลไทม์ · ปกป้องข้อมูลส่วนบุคคลตามกฎหมาย &nbsp;✦&nbsp;</span></div>
     <header class="topbar">
       <button class="menu-toggle" id="menuToggle"><i data-lucide="menu"></i></button>
       <div class="page-title" id="pageTitle"><i data-lucide="layout-dashboard"></i> ภาพรวมระบบ</div>

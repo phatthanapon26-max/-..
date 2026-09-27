@@ -287,15 +287,18 @@ function renderDebtors(area){
     const tj=list.reduce((s,d)=>s+(d.jugs||0),0), tp=list.reduce((s,d)=>s+(d.packs||0),0), tt=list.reduce((s,d)=>s+d.total,0);
     const latest=list.reduce((a,b)=>String(a.createdAt)>String(b.createdAt)?a:b);
     const creator=(DB.employees.find(e=>e.id===latest.createdBy)||{}).name||'-';
+    const qrUrl=location.href.split('?')[0]+'?qr='+cid;
+    const qrImg='https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=4&data='+encodeURIComponent(qrUrl);
     let rowsHtml='';
     list.forEach(d=>{
-      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="ce">${d.jugs||0}</td><td class="ce">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce"><button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button></td></tr>`;
+      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce"><button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button></td></tr>`;
     });
     const meta=area==='nai'?('หมู่ที่ '+(c.moo||list[0].moo||'-')):(c.village||list[0].village||'-');
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
-      <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button></div>
-      <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="ce">ถัง</th><th class="ce">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+      <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
+      <div class="qr-wrap"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" onclick="window.open('${qrUrl}','_blank')" title="สแกนดูรายงานลูกหนี้"><small>สแกน<br>ดูรายงาน</small></div></div>
+      <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
   });
@@ -705,6 +708,46 @@ function printEmployeeReport(empId){
   $('#printArea').innerHTML='<div class="doc-page">'+body+'</div>';
   setTimeout(()=>window.print(),200);
 }
+function renderPublicQrReport(cid){
+  const c=DB.customers.find(x=>x.id===cid);
+  if(!c){document.body.innerHTML='<div style="padding:40px;font-family:Sarabun,sans-serif"><h2>ไม่พบข้อมูลลูกหนี้</h2><p>รหัสลูกหนี้ไม่ถูกต้อง</p></div>';return;}
+  const debts=DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid').sort((a,b)=>a.debtDate<b.debtDate?-1:1);
+  const first=debts[0]||{};
+  const emp=DB.employees.find(e=>e.id===first.createdBy)||{};
+  const docNo=nextDocNo(DB.settings.docPrefix.debtor);
+  const qrUrl=location.href.split('?')[0]+'?qr='+cid;
+  const qrImg='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data='+encodeURIComponent(qrUrl);
+  const cs=creditStatus(cid);
+  const total=debts.reduce((s,d)=>s+d.total,0);
+  const days=(iso)=>Math.max(0,Math.floor((new Date()-new Date(iso))/86400000));
+  let rows='';
+  debts.forEach((d,i)=>{rows+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td class="num">${days(d.debtDate)}</td><td>${cs.txt}</td><td class="num">${d.jugs||0}</td><td class="num">${fmtN(d.jugAmount||0)}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.packAmount||0)}</td><td class="num">${fmtN(d.total)}</td></tr>`;});
+  const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
+  document.body.innerHTML=`
+  <div style="max-width:820px;margin:0 auto;padding:16px;font-family:'Sarabun',sans-serif">
+    <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button onclick="window.print()" style="padding:9px 18px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">พิมพ์ / บันทึกเป็น PDF</button><button onclick="location.href=location.pathname" style="padding:9px 18px;background:#6b7280;color:#fff;border:none;border-radius:8px;cursor:pointer">กลับเข้าระบบ</button></div>
+    <div style="background:#fff;padding:32px;color:#1f2a37;border:1px solid #e2e7ee;border-radius:10px">
+      <div style="text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:12px;margin-bottom:14px">
+        <div style="font-size:20px;font-weight:800;color:#1e3a5f">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>
+        <div style="font-size:12px;color:#6b7684">นครราชสีมา · โทร. 08X-XXX-XXXX</div>
+        <div style="font-size:16px;font-weight:700;margin-top:8px;color:#b8860b">รายงานประวัติลูกหนี้ (สแกน QR Code)</div>
+      </div>
+      <table style="width:100%;font-size:13px;margin-bottom:12px;border-collapse:collapse">
+        <tr><td style="padding:4px;width:25%"><b>เลขที่เอกสาร:</b> ${docNo}</td><td style="padding:4px;width:25%"><b>วันที่สแกน:</b> ${thDateTimeSec(new Date().toISOString())}</td><td style="padding:4px;width:25%"><b>รหัสลูกหนี้:</b> ${esc(c.code)}</td><td style="padding:4px;width:25%"><b>ชื่อลูกหนี้:</b> ${esc(c.name)}</td></tr>
+        <tr><td style="padding:4px"><b>พนักงานที่กรอก:</b> ${esc(emp.name||'-')}</td><td style="padding:4px"><b>ตำแหน่ง:</b> ${emp.role==='admin'?'แอดมิน':'พนักงาน'}</td><td style="padding:4px"><b>จำนวนค้าง:</b> ${debts.length} รายการ</td><td style="padding:4px"><b>เครดิต:</b> ${cs.txt}</td></tr>
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#eef3f9"><th style="border:1px solid #cbd5e1;padding:6px">ลำดับ</th><th style="border:1px solid #cbd5e1;padding:6px">วันที่ค้าง</th><th style="border:1px solid #cbd5e1;padding:6px">ค้างมา (วัน)</th><th style="border:1px solid #cbd5e1;padding:6px">เครดิต</th><th style="border:1px solid #cbd5e1;padding:6px">ถัง</th><th style="border:1px solid #cbd5e1;padding:6px">เงินน้ำถัง</th><th style="border:1px solid #cbd5e1;padding:6px">แพ็ค</th><th style="border:1px solid #cbd5e1;padding:6px">เงินน้ำแพ็ค</th><th style="border:1px solid #cbd5e1;padding:6px">รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;padding:12px;border:1px solid #cbd5e1">ไม่มีรายการค้าง</td></tr>'}</tbody>
+      <tfoot><tr style="background:#fbf3df;font-weight:700"><td colspan="8" style="text-align:right;padding:8px;border:1px solid #cbd5e1">ยอดค้างรวมทั้งหมด</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:right">${fmtN(total)} บาท</td></tr></tfoot></table>
+      <div style="display:flex;gap:16px;align-items:flex-end;margin-top:20px">
+        <div style="flex:1;font-size:11px;color:#6b7684">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์<br>เลขที่เอกสาร: <b>${docNo}</b></div>
+        <img src="${qrImg}" style="width:110px;height:110px;border:1px solid #ddd;padding:4px;background:#fff">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:24px;font-size:12px">
+        ${sign('ผู้จัดการข้อมูล')}${sign('ผู้กรอกข้อมูล')}${sign('ผู้ออก QR Code')}${sign('ผู้ตรวจสอบ')}${sign('หัวหน้า / ผู้บริหาร')}
+      </div>
+    </div>
+  </div>`;
+}
 function renderAudit(){
   const rows=DB.audit.slice().sort((a,b)=>a.ts<b.ts?1:-1).slice(0,200);
   let html=rows.map(a=>`<div class="audit-item"><span class="ts">${thDateTime(a.ts)}</span><span class="who">${esc(a.userName)}</span><span>${esc(a.action)} — ${esc(a.detail||'')}</span></div>`).join('');
@@ -741,10 +784,8 @@ function renderSettings(){
     <button class="btn btn-primary" id="saveHeader" style="margin-top:8px"><i data-lucide="save"></i> บันทึก</button></div></div>`;
   else if(settingTab==='db')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="database"></i> การเชื่อมต่อฐานข้อมูล Google Sheets</h3></div><div class="panel-body">
     <div class="field"><label>โหมดฐานข้อมูล</label><select id="d_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="demo" ${s.db.mode==='demo'?'selected':''}>โหมดสาธิต (บันทึกในเบราว์เซอร์)</option><option value="sheets" ${s.db.mode==='sheets'?'selected':''}>Google Sheets (ผ่าน API)</option></select></div>
-    <div class="field"><label>ลิงก์ Google Sheets</label><input id="d_url" value="${esc(s.db.sheetUrl)}" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
-    <div class="field"><label>Sheet ID</label><input id="d_id" value="${esc(s.db.sheetId)}"></div>
-    <div class="field"><label>API Key (สำหรับอ่าน)</label><input id="d_key" value="${esc(s.db.apiKey)}"></div>
-    <div class="field"><label>Service Account Email (สำหรับเขียน)</label><input id="d_sa" value="${esc(s.db.serviceEmail)}"></div>
+    <div class="field full"><label>ลิงก์ Google Sheets (วางได้เลย ระบบจะดึง Sheet ID อัตโนมัติ)</label><input id="d_url" value="${esc(s.db.sheetUrl)}" placeholder="https://docs.google.com/spreadsheets/d/XXXXXXXXXXXX/edit"></div>
+    <div class="field"><label>Service Account Email (สำหรับเขียนชีต)</label><input id="d_sa" value="${esc(s.db.serviceEmail)}" placeholder="xxx@xxx.iam.gserviceaccount.com"></div>
     <div class="field full"><label>Service Account Private Key</label><textarea id="d_sk" rows="3" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px">${esc(s.db.serviceKey)}</textarea></div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">ระบบจะแยกข้อมูลจ่ายแล้ว/ค้างชำระ และบ้านนาไฮ/บ้านอื่น อัตโนมัติ (คนละชีต คนละบ้าน) รองรับ 600-1,000 บรรทัด ข้อมูลทุกอย่างบันทึกลง Sheets และดึงมาแสดงแบบ real time</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -818,7 +859,7 @@ function renderSettings(){
   bind('#saveBiz',()=>{Object.assign(s.business,{name:$('#b_name').value,address:$('#b_addr').value,taxId:$('#b_tax').value,commercialId:$('#b_com').value,phone:$('#b_phone').value,email:$('#b_email').value,menuName:$('#b_menu').value});dbSave();toast('บันทึกข้อมูลสถานประกอบการแล้ว','success');});
   bind('#resetBiz',()=>{s.business=defaultSettings().business;dbSave();renderSettings();toast('รีเซ็ตแล้ว','success');});
   bind('#saveHeader',()=>{Object.assign(s.header,{showLogo:$('#h_logo').checked,showName:$('#h_name').checked,logoDataUrl:$('#h_logoUrl').value});dbSave();toast('บันทึกแล้ว','success');});
-  bind('#saveDb',()=>{Object.assign(s.db,{mode:$('#d_mode').value,sheetUrl:$('#d_url').value,sheetId:$('#d_id').value,apiKey:$('#d_key').value,serviceEmail:$('#d_sa').value,serviceKey:$('#d_sk').value});dbSave();setStatus(s.db.mode==='sheets'?'เชื่อมต่อฐานข้อมูลจริง':'โหมดสาธิต',s.db.mode==='sheets'?'ok':'info');toast('บันทึกการเชื่อมต่อฐานข้อมูลแล้ว','success');});
+  bind('#saveDb',()=>{const url=$('#d_url').value.trim();const m=url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);const sid=m?m[1]:(s.db.sheetId||'');Object.assign(s.db,{mode:$('#d_mode').value,sheetUrl:url,sheetId:sid,serviceEmail:$('#d_sa').value,serviceKey:$('#d_sk').value});dbSave();setStatus(s.db.mode==='sheets'?'เชื่อมต่อฐานข้อมูลจริง':'โหมดสาธิต',s.db.mode==='sheets'?'ok':'info');toast('บันทึกการเชื่อมต่อฐานข้อมูลแล้ว'+(sid?' (Sheet ID: '+sid.slice(0,8)+'...)':'')+' กดทดสอบการเชื่อมต่อเพื่อยืนยัน','success');});
   bind('#testDbBtn',()=>{
     const st=$('#testDbStatus');if(!st)return;st.textContent='กำลังทดสอบการเชื่อมต่อ...';st.style.color='var(--orange)';
     fetch('api/sheets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'test',config:s.db})})
@@ -1091,6 +1132,8 @@ const tbtn=$('#themeToggle');if(tbtn)tbtn.addEventListener('click',cycleTheme);
     history.replaceState(null,'',location.pathname);
   }
 })();
+const _qr=new URLSearchParams(location.search).get('qr');
+if(_qr){renderPublicQrReport(_qr);return;}
 try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
 if(session&&DB.employees.find(e=>e.id===session.empId)){enterApp();}
 if(window.lucide)lucide.createIcons();
