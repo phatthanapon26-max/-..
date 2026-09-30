@@ -157,7 +157,9 @@ function supabaseFetch(){const cfg=supaCfg();if(!cfg)return Promise.resolve();
     let changed=false;
     rows.forEach(r=>{
       if(r.key==='settings'&&r.value&&typeof r.value==='object'&&!Array.isArray(r.value)){
-        DB.settings=Object.assign({},DB.settings,r.value,{db:Object.assign({},r.value.db||{},DB.settings.db)});changed=true;
+        const _ldb=DB.settings.db||{};const _sdb=r.value.db||{};
+        const _mdb=(_ldb.mode==='supabase')?Object.assign({},_sdb,_ldb):Object.assign({},_ldb,_sdb);
+        DB.settings=Object.assign({},DB.settings,r.value,{db:_mdb});changed=true;
       } else if(SUPA_COLS.includes(r.key)&&Array.isArray(r.value)){if(JSON.stringify(DB[r.key])!==JSON.stringify(r.value)){DB[r.key]=r.value;changed=true;}}
     });
     if(changed){localStorage.setItem(DBKEY,JSON.stringify(DB));renderPage();}
