@@ -298,6 +298,39 @@ table.tbl tr:hover td{background:#fafbfd}
 .status-tag.err{background:#fee2e2;color:#b91c1c}
 .status-tag.info{background:#dbeafe;color:#1d4ed8}
 @media print{.no-print{display:none!important}body{background:#fff}}
+@media (max-width:600px){
+  body{font-size:13px}
+  .topbar{padding:8px 10px;gap:6px;flex-wrap:nowrap;overflow:hidden}
+  .page-title{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;flex:0 1 auto}
+  .page-title i{display:none}
+  .menu-toggle{flex-shrink:0}
+  #themeLabel{display:none}
+  #rtText{display:none}
+  .rt-dot .dot{margin:0}
+  .status-tag{font-size:10px;padding:3px 6px;max-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+  .spacer{display:none}
+  .panel-body{padding:12px}
+  .btn{padding:8px 12px;font-size:12px}
+  .btn-sm{padding:5px 9px;font-size:11px}
+  .stat-card .value{font-size:20px}
+  .stat-card{padding:12px}
+  .debtor-card table{font-size:11px;min-width:500px}
+  .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .debtor-card .cname{font-size:14px}
+  .qr-mini{width:54px;height:54px}
+  input,select,textarea{font-size:14px!important}
+  .modal{padding:12px}
+  .modal-body{padding:14px}
+  .form-grid{grid-template-columns:1fr}
+  .tbl{font-size:12px}
+  .page-head h2{font-size:16px}
+  .chip{padding:4px 10px;font-size:11px}
+  .login-card{width:92%;padding:22px}
+  .login-card h1{font-size:16px}
+  .marquee span{font-size:10.5px}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl{min-width:520px}
+}
 </style>
 </head>
 <body>
@@ -503,9 +536,50 @@ function seed(){
 function dbLoad(){
   try{DB=JSON.parse(localStorage.getItem(DBKEY));}catch(e){DB=null;}
   if(!DB||!DB.settings){DB=seed();dbSave();}
+  try{const bk=JSON.parse(localStorage.getItem('freshywater_dbconfig_v1'));if(bk&&bk.mode==='supabase'&&bk.supabaseUrl&&DB.settings.db.mode!=='supabase'){DB.settings.db=Object.assign({},DB.settings.db,bk);dbSave();}}catch(e){}
   if(!DB.audit)DB.audit=[]; if(!DB.approvals)DB.approvals=[]; if(!DB.sentEmails)DB.sentEmails=[]; if(!DB.doccounters)DB.settings.doccounters={};
 }
-function dbSave(){localStorage.setItem(DBKEY,JSON.stringify(DB));}
+/* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
+const SUPA_COLS=['settings','employees','products','villages','customers','debtors','cashsales','audit','approvals','sentEmails'];
+const SUPA_SQL=`-- รันใน Supabase → SQL Editor แล้วกด Run
+create table if not exists freshy_store (
+  key text primary key,
+  value jsonb not null default '[]'::jsonb,
+  updated_at timestamptz default now()
+);
+alter table freshy_store enable row level security;
+drop policy if exists "anon read" on freshy_store;
+drop policy if exists "anon write" on freshy_store;
+drop policy if exists "anon update" on freshy_store;
+create policy "anon read" on freshy_store for select using (true);
+create policy "anon write" on freshy_store for insert with check (true);
+create policy "anon update" on freshy_store for update using (true);`;
+function supaCfg(){const d=DB.settings.db;return (d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey)?{url:String(d.supabaseUrl).replace(/\/$/,''),key:d.supabaseKey}:null;}
+function supaHeaders(cfg){return {'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json'};}
+function supabaseFetch(){const cfg=supaCfg();if(!cfg)return Promise.resolve();
+  return fetch(cfg.url+'/rest/v1/freshy_store?select=*',{headers:supaHeaders(cfg)}).then(r=>r.json()).then(rows=>{
+    if(!Array.isArray(rows))return;
+    const srvSet=rows.find(r=>r.key==='settings');
+    const srvEmpty=!srvSet||rows.every(r=>!r.value||(Array.isArray(r.value)&&r.value.length===0));
+    if(srvEmpty){supabasePush();setStatus('ฐานข้อมูลว่าง — บันทึกข้อมูลปัจจุบันขึ้นฐานข้อมูลแล้ว','ok');return;}
+    let changed=false;
+    rows.forEach(r=>{
+      if(r.key==='settings'&&r.value&&typeof r.value==='object'&&!Array.isArray(r.value)){
+        DB.settings=Object.assign({},DB.settings,r.value,{db:Object.assign({},r.value.db||{},DB.settings.db)});changed=true;
+      } else if(SUPA_COLS.includes(r.key)&&Array.isArray(r.value)){if(JSON.stringify(DB[r.key])!==JSON.stringify(r.value)){DB[r.key]=r.value;changed=true;}}
+    });
+    if(changed){localStorage.setItem(DBKEY,JSON.stringify(DB));renderPage();}
+  }).catch(()=>{});
+}
+let supaPushTimer=null;
+function supabasePush(){const cfg=supaCfg();if(!cfg)return;
+  clearTimeout(supaPushTimer);supaPushTimer=setTimeout(()=>{
+    const body=SUPA_COLS.map(k=>({key:k,value:DB[k]||[]}));
+    fetch(cfg.url+'/rest/v1/freshy_store',{method:'POST',headers:Object.assign({'Prefer':'resolution=merge-duplicates,return=minimal'},supaHeaders(cfg)),body:JSON.stringify(body)}).catch(()=>{});
+  },800);
+}
+function supabaseTest(cfg){return fetch(cfg.url+'/rest/v1/freshy_store?select=key&limit=1',{headers:supaHeaders(cfg)}).then(r=>r.ok?{ok:true}:{ok:false,error:'HTTP '+r.status+' (ตรวจสอบ URL, Anon Key, และรัน SQL สร้างตารางแล้ว)'}).catch(e=>({ok:false,error:e.message||'ไม่สามารถเชื่อมต่อได้'}));}
+function dbSave(){localStorage.setItem(DBKEY,JSON.stringify(DB));if(DB.settings&&DB.settings.db)localStorage.setItem('freshywater_dbconfig_v1',JSON.stringify(DB.settings.db));supabasePush();}
 function dbAdd(col,doc){doc.id=doc.id||uid();DB[col].push(doc);dbSave();return doc;}
 function dbUpdate(col,id,patch){const i=DB[col].findIndex(x=>x.id===id);if(i>=0){Object.assign(DB[col][i],patch);dbSave();return DB[col][i];}return null;}
 function dbRemove(col,id){DB[col]=DB[col].filter(x=>x.id!==id);dbSave();}
@@ -1099,6 +1173,7 @@ function renderPublicQrReport(cid){
   debts.forEach((d,i)=>{rows+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td class="num">${days(d.debtDate)}</td><td>${cs.txt}</td><td class="num">${d.jugs||0}</td><td class="num">${fmtN(d.jugAmount||0)}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.packAmount||0)}</td><td class="num">${fmtN(d.total)}</td></tr>`;});
   const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
   document.body.innerHTML=`
+  <style>@media print{body *{visibility:visible!important}.no-print{display:none!important}body{background:#fff!important}@page{size:A4;margin:14mm 12mm}}</style>
   <div style="max-width:820px;margin:0 auto;padding:16px;font-family:'Sarabun',sans-serif">
     <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button onclick="window.print()" style="padding:9px 18px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">พิมพ์ / บันทึกเป็น PDF</button><button onclick="location.href=location.pathname" style="padding:9px 18px;background:#6b7280;color:#fff;border:none;border-radius:8px;cursor:pointer">กลับเข้าระบบ</button></div>
     <div style="background:#fff;padding:32px;color:#1f2a37;border:1px solid #e2e7ee;border-radius:10px">
@@ -1158,19 +1233,18 @@ function renderSettings(){
     <div class="field" style="margin-top:12px"><label>โลโก้ (วาง URL หรือ data URL)</label><input id="h_logoUrl" value="${esc(s.header.logoDataUrl||'')}"></div>
     <button class="btn btn-primary" id="saveHeader" style="margin-top:8px"><i data-lucide="save"></i> บันทึก</button></div></div>`;
   else if(settingTab==='db')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="database"></i> การเชื่อมต่อฐานข้อมูล Google Sheets</h3></div><div class="panel-body">
-    <div class="field"><label>โหมดฐานข้อมูล</label><select id="d_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="demo" ${s.db.mode==='demo'?'selected':''}>โหมดสาธิต (บันทึกในเบราว์เซอร์)</option><option value="sheets" ${s.db.mode==='sheets'?'selected':''}>Google Sheets (ผ่าน API)</option></select></div>
-    <div class="field full"><label>ลิงก์ Google Sheets (วางได้เลย ระบบจะดึง Sheet ID อัตโนมัติ)</label><input id="d_url" value="${esc(s.db.sheetUrl)}" placeholder="https://docs.google.com/spreadsheets/d/XXXXXXXXXXXX/edit"></div>
-    <div class="field"><label>Service Account Email (สำหรับเขียนชีต)</label><input id="d_sa" value="${esc(s.db.serviceEmail)}" placeholder="xxx@xxx.iam.gserviceaccount.com"></div>
-    <div class="field full"><label>Service Account Private Key</label><textarea id="d_sk" rows="3" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px">${esc(s.db.serviceKey)}</textarea></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">ระบบจะแยกข้อมูลจ่ายแล้ว/ค้างชำระ และบ้านนาไฮ/บ้านอื่น อัตโนมัติ (คนละชีต คนละบ้าน) รองรับ 600-1,000 บรรทัด ข้อมูลทุกอย่างบันทึกลง Sheets และดึงมาแสดงแบบ real time</p>
+    <div class="field"><label>โหมดฐานข้อมูล</label><select id="d_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="demo" ${s.db.mode==='demo'?'selected':''}>โหมดสาธิต (บันทึกในเบราว์เซอร์)</option><option value="supabase" ${s.db.mode==='supabase'?'selected':''}>Supabase (ฐานข้อมูลออนไลน์ แนะนำ)</option></select></div>
+    <div class="field full"><label>Supabase Project URL</label><input id="d_url" value="${esc(s.db.supabaseUrl||'')}" placeholder="https://xxxxxx.supabase.co"></div>
+    <div class="field full"><label>Supabase Anon Key (public — คัดจากหน้า Project Settings → API)</label><textarea id="d_sk" rows="2" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">${esc(s.db.supabaseKey||'')}</textarea></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">ฐานข้อมูล Supabase บันทึกข้อมูลทุกอย่าง (ลูกหนี้/ประวัติชำระ/ลูกค้า/พนักงาน/ฯลฯ) ลงคลาวด์ ดึงมาแสดงแบบ real time ใช้งานได้ทุกเครื่อง ไม่เสียเงินสำหรับปริมาณปกติ</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-primary" id="saveDb"><i data-lucide="save"></i> บันทึกการเชื่อมต่อ</button>
       <button class="btn btn-navy" id="testDbBtn"><i data-lucide="wifi"></i> ทดสอบการเชื่อมต่อ</button>
       <span id="testDbStatus" style="font-size:12.5px"></span>
     </div>
     <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
-      <p style="font-size:12.5px;color:var(--muted);margin-bottom:8px"><b>สร้างชีต/คอลัมน์อัตโนมัติ:</b> ถ้ายังไม่อยากสร้างชีตเอง คัดโค้ดด้านล่างไปวางใน Google Apps Script (เมนู Extensions → Apps Script) แล้วกด Run ระบบจะสร้างแท็บและคอลัมน์ให้เอง (ลูกหนี้/ประวัติรับชำระ แยกคนละชีต คนละบ้าน) จากนั้นนำลิงก์/Sheet ID มาวางด้านบน</p>
-      <textarea readonly rows="10" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:11px;font-family:monospace;white-space:pre;overflow:auto">${esc(GS_CODE)}</textarea>
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:8px"><b>สร้างตารางฐานข้อมูลครั้งแรก:</b> เปิด Supabase → เมนู SQL Editor → กด New query → คัดโค้ดด้านล่างไปวาง → กด Run (ระบบจะสร้างตารางเก็บข้อมูลให้เอง) จากนั้นนำ Project URL + Anon Key มาวางด้านบน</p>
+      <textarea readonly rows="10" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:11px;font-family:monospace;white-space:pre;overflow:auto">${esc(SUPA_SQL)}</textarea>
       <button class="btn btn-ghost btn-sm" id="copyGsBtn" style="margin-top:8px"><i data-lucide="copy"></i> คัดลอกโค้ด Apps Script</button>
     </div></div></div>`;
   else if(settingTab==='products'){
@@ -1234,16 +1308,18 @@ function renderSettings(){
   bind('#saveBiz',()=>{Object.assign(s.business,{name:$('#b_name').value,address:$('#b_addr').value,taxId:$('#b_tax').value,commercialId:$('#b_com').value,phone:$('#b_phone').value,email:$('#b_email').value,menuName:$('#b_menu').value});dbSave();toast('บันทึกข้อมูลสถานประกอบการแล้ว','success');});
   bind('#resetBiz',()=>{s.business=defaultSettings().business;dbSave();renderSettings();toast('รีเซ็ตแล้ว','success');});
   bind('#saveHeader',()=>{Object.assign(s.header,{showLogo:$('#h_logo').checked,showName:$('#h_name').checked,logoDataUrl:$('#h_logoUrl').value});dbSave();toast('บันทึกแล้ว','success');});
-  bind('#saveDb',()=>{const url=$('#d_url').value.trim();const m=url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);const sid=m?m[1]:(s.db.sheetId||'');Object.assign(s.db,{mode:$('#d_mode').value,sheetUrl:url,sheetId:sid,serviceEmail:$('#d_sa').value,serviceKey:$('#d_sk').value});dbSave();setStatus(s.db.mode==='sheets'?'เชื่อมต่อฐานข้อมูลจริง':'โหมดสาธิต',s.db.mode==='sheets'?'ok':'info');toast('บันทึกการเชื่อมต่อฐานข้อมูลแล้ว'+(sid?' (Sheet ID: '+sid.slice(0,8)+'...)':'')+' กดทดสอบการเชื่อมต่อเพื่อยืนยัน','success');});
+  bind('#saveDb',()=>{const url=$('#d_url').value.trim();const key=$('#d_sk').value.trim();Object.assign(s.db,{mode:$('#d_mode').value,supabaseUrl:url,supabaseKey:key});dbSave();setStatus(s.db.mode==='supabase'?'เชื่อมต่อฐานข้อมูล Supabase':'โหมดสาธิต',s.db.mode==='supabase'?'ok':'info');toast('บันทึกการตั้งค่าฐานข้อมูลแล้ว กดทดสอบการเชื่อมต่อเพื่อยืนยัน','success');if(s.db.mode==='supabase')supabaseFetch();});
   bind('#testDbBtn',()=>{
-    const st=$('#testDbStatus');if(!st)return;st.textContent='กำลังทดสอบการเชื่อมต่อ...';st.style.color='var(--orange)';
-    fetch('api/sheets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'test',config:s.db})})
-      .then(r=>r.json()).then(j=>{
-        if(j.ok){st.textContent='✓ เชื่อมต่อฐานข้อมูลสำเร็จ';st.style.color='var(--green)';setStatus('เชื่อมต่อฐานข้อมูลจริง','ok');}
-        else{st.textContent='✗ ไม่สำเร็จ: '+(j.error||'ไม่ทราบสาเหตุ');st.style.color='var(--red)';}
-      }).catch(()=>{st.textContent='✗ ไม่สามารถทดสอบได้ (ต้องอัปโหลดขึ้น Vercel ก่อน หรือยังไม่มีเน็ต)';st.style.color='var(--red)';});
+    const st=$('#testDbStatus');if(!st)return;
+    const url=($('#d_url').value||'').trim().replace(/\/$/,'');const key=($('#d_sk').value||'').trim();
+    if(!url||!key){st.textContent='✗ กรุณากรอก Supabase Project URL และ Anon Key ให้ครบ';st.style.color='var(--red)';return;}
+    st.textContent='กำลังทดสอบการเชื่อมต่อ...';st.style.color='var(--orange)';
+    supabaseTest({url,key}).then(j=>{
+      if(j.ok){Object.assign(s.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key});dbSave();st.textContent='✓ เชื่อมต่อฐานข้อมูล Supabase สำเร็จ (บันทึกแล้ว)';st.style.color='var(--green)';setStatus('เชื่อมต่อฐานข้อมูล Supabase','ok');supabaseFetch();}
+      else{st.textContent='✗ ไม่สำเร็จ: '+(j.error||'ไม่ทราบสาเหตุ');st.style.color='var(--red)';}
+    });
   });
-  bind('#copyGsBtn',()=>{const ta=document.querySelector('#pageContent textarea[readonly]');if(!ta)return;if(navigator.clipboard)navigator.clipboard.writeText(ta.value).then(()=>toast('คัดลอกโค้ดแล้ว วางใน Google Apps Script แล้วกด Run','success')).catch(()=>toast('คัดลอกโค้ดแล้ว','success'));else{ta.select();document.execCommand('copy');toast('คัดลอกโค้ดแล้ว','success');}});
+  bind('#copyGsBtn',()=>{const ta=document.querySelector('#pageContent textarea[readonly]');if(!ta)return;if(navigator.clipboard)navigator.clipboard.writeText(ta.value).then(()=>toast('คัดลอก SQL แล้ว วางใน Supabase → SQL Editor แล้วกด Run','success')).catch(()=>toast('คัดลอก SQL แล้ว','success'));else{ta.select();document.execCommand('copy');toast('คัดลอก SQL แล้ว','success');}});
   bind('#addProd',()=>{DB.products.push({id:uid(),code:'NEW',name:'สินค้าใหม่',price:0,returnable:false});dbSave();renderSettings();});
   bind('#saveProd',()=>{
     $('#prodList').querySelectorAll('.p_code').forEach((el,i)=>{
@@ -1434,7 +1510,7 @@ function enterApp(){
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
   refreshUserChip();
-  setStatus(DB.settings.db.mode==='sheets'?'เชื่อมต่อฐานข้อมูลจริง':'โหมดสาธิต', DB.settings.db.mode==='sheets'?'ok':'info');
+  const _m=DB.settings.db.mode;setStatus(_m==='supabase'?'เชื่อมต่อฐานข้อมูล Supabase':'โหมดสาธิต', _m==='supabase'?'ok':'info');
   navigate('dashboard');
 }
 $('#logoutBtn').addEventListener('click',()=>{
@@ -1463,8 +1539,8 @@ setInterval(()=>{
   if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
 },5000);
-if(DB&&DB.settings.db.mode==='sheets'){
-  setInterval(()=>{fetch('api/sheets?action=sync').catch(()=>{});},15000);
+if(DB&&DB.settings.db.mode==='supabase'){
+  setInterval(()=>{supabaseFetch();},10000);
 }
 
 /* ============================================================
@@ -1483,10 +1559,22 @@ function cycleTheme(){const cur=localStorage.getItem(THEMEKEY)||'auto';const nex
 applyTheme();
 if(window.matchMedia)window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 function setStatus(text,cls){const el=$('#modeTag');if(!el)return;el.className='status-tag '+(cls||'info');const t=$('#modeTagText');if(t)t.textContent=text;}
-window.addEventListener('online',()=>setStatus(DB.settings.db.mode==='sheets'?'เชื่อมต่อฐานข้อมูลจริง':'โหมดสาธิต','ok'));
+window.addEventListener('online',()=>setStatus(DB.settings.db.mode==='supabase'?'เชื่อมต่อฐานข้อมูล Supabase':'โหมดสาธิต','ok'));
 window.addEventListener('offline',()=>setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต ไม่สามารถบันทึกได้','err'));
 if(!navigator.onLine)setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต','err');
+if(DB.settings.db.mode==='supabase'){setStatus('กำลังโหลดข้อมูลจากฐานข้อมูล...','warn');supabaseFetch().then(()=>setStatus('เชื่อมต่อฐานข้อมูล Supabase','ok'));}
 const tbtn=$('#themeToggle');if(tbtn)tbtn.addEventListener('click',cycleTheme);
+/* กด Enter บนหน้าลูกหนี้ = เปิดฟอร์มเพิ่มรายการลูกหนี้ทันที (หลังบันทึกเสร็จ กด Enter อีกครั้ง = เพิ่มรายต่อไป) */
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  if(currentPage!=='debtorsNai'&&currentPage!=='debtorsOther')return;
+  if(document.querySelector('#modalBox:not(.hidden)'))return;
+  const t=e.target;
+  if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'||t.tagName==='BUTTON'))return;
+  e.preventDefault();
+  const b=document.querySelector('#addDebtorBtn');
+  if(b)b.click();
+});
 // จัดการลิงก์อนุมัติ/ไม่อนุมัติจากอีเมล (ไม่ต้องล็อกอิน)
 (function(){
   const sp=new URLSearchParams(location.search);
