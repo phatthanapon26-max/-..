@@ -1,0 +1,8 @@
+Sarabun font: SIL Open Font License 1.1.
+https://github.com/cadsondemak/Sarabun
+
+Supabase JS 2.117.2: MIT.
+https://github.com/supabase/supabase-js
+
+Lucide icons: ISC.
+https://github.com/lucide-icons/lucide

@@ -1,0 +1,10 @@
+{
+  "name": "freshy-water-debtor-system",
+  "version": "1.0.0",
+  "description": "ระบบจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์ — เชื่อมต่อ Google Sheets, รันบน Vercel",
+  "private": true,
+  "dependencies": {
+    "googleapis": "^134.0.0",
+    "nodemailer": "^6.9.13"
+  }
+}

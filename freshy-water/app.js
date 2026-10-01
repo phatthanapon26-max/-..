@@ -1,6 +1,6 @@
 /* ============================================================
    ระบบจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์ — app.js
-   - ฐานข้อมูล: Supabase Auth + protected RPC หรือโหมดสาธิต localStorage
+   - ฐานข้อมูล: Google Sheets (ผ่าน /api/sheets) หรือ โหมดสาธิต localStorage
    - real time polling, แยกจ่ายแล้ว/ค้างชำระ, แยกบ้านนาไฮ/บ้านอื่น
    ============================================================ */
 (function(){
@@ -62,7 +62,7 @@ function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox')
 $('#modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal();});
 
 /* ============================================================
-   ฐานข้อมูล (DB) — สาธิตในเครื่อง; ออนไลน์ใช้ Supabase Auth และ RPC
+   ฐานข้อมูล (DB) — โหมดสาธิตใช้ localStorage; โหมด Sheets ผ่าน /api/sheets
    ============================================================ */
 const DBKEY='freshywater_db_v1';
 const SESSKEY='freshywater_session_v1';
@@ -72,7 +72,7 @@ function defaultSettings(){
   return {
     business:{name:'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',address:'บ้านนาไฮ ตำบลบ้านนาไฮ อำเภอเมือง จังหวัดนครราชสีมา',taxId:'',commercialId:'',phone:'08x-xxx-xxxx',email:'freshywater@example.com',menuName:'ระบบจัดการลูกหนี้'},
     header:{showLogo:true,showName:true,logoDataUrl:''},
-    db:Object.assign({mode:'demo',sheetUrl:'',sheetId:'',apiKey:'',serviceEmail:'',serviceKey:'',supabaseUrl:'',supabaseKey:'',adminEmail:''},window.FRESHY_CONFIG||{}),
+    db:{mode:'demo',sheetUrl:'',sheetId:'',apiKey:'',serviceEmail:'',serviceKey:''},
     email:{enabled:false,adminEmail:'',provider:'resend',apiKey:'',smtpHost:'',smtpPort:'587',smtpUser:'',smtpPass:'',alerts:{login:true,logout:true,addDebtor:true,undoRequest:true}},
     docPrefix:{debtor:'FWD',cash:'CSH',customer:'CUS'},
     doccounters:{}
@@ -116,7 +116,7 @@ function seed(){
   debt('c007','other','','บ้านโนนเสลา',6,3,2,'emp_s2','paid');
   function cash(ccode,name,vill,moo,ago,jugs,packs,by){
     const ja=jugs*20,pa=packs*30;
-    s.cashsales.push({id:uid(),customerCode:ccode,customerName:name,village:vill,moo:moo,deliveryDate:daysAgo(ago),createdBy:by,createdByName:(s.employees.find(e=>e.id===by)||{}).name||'ระบบ',dbSource:'สาธิต',responsibleBy:by,jugs,packs,jugAmount:ja,packAmount:pa,createdAt:new Date(Date.now()-ago*86400000).toISOString(),editHistory:[]});
+    s.cashsales.push({id:uid(),customerCode:ccode,customerName:name,village:vill,moo:moo,deliveryDate:daysAgo(ago),createdBy:by,createdByName:(s.employees.find(e=>e.id===by)||{}).name||'ระบบ',dbSource:'Google Sheets',responsibleBy:by,jugs,packs,jugAmount:ja,packAmount:pa,createdAt:new Date(Date.now()-ago*86400000).toISOString(),editHistory:[]});
   }
   cash('C001','นายสมศรี ใจดี','บ้านนาไฮ','7',0,5,2,'emp_s1');
   cash('C005','นายกิตติ ทองสุข','บ้านดอนนกเอี้ยงเก่า','',0,3,1,'emp_s2');
@@ -126,150 +126,54 @@ function seed(){
   return s;
 }
 function dbLoad(){
-  let backup=null;
-  try{backup=JSON.parse(localStorage.getItem('freshywater_dbconfig_v1'));}catch(e){}
   try{DB=JSON.parse(localStorage.getItem(DBKEY));}catch(e){DB=null;}
-  if(!DB||!DB.settings)DB=seed();
-  // Deployment config is applied last so stale browser data cannot switch production back to demo.
-  DB.settings.db=Object.assign({},seed().settings.db,DB.settings.db||{},backup||{},window.FRESHY_CONFIG||{});
-  if(!DB.audit)DB.audit=[]; if(!DB.approvals)DB.approvals=[]; if(!DB.sentEmails)DB.sentEmails=[];
-  if(!DB.settings.doccounters)DB.settings.doccounters={};
-  if(DB.settings.db.mode!=='supabase')localStorage.setItem(DBKEY,JSON.stringify(DB));
+  if(!DB||!DB.settings){DB=seed();dbSave();}
+  try{const bk=JSON.parse(localStorage.getItem('freshywater_dbconfig_v1'));if(bk&&bk.mode==='supabase'&&bk.supabaseUrl&&DB.settings.db.mode!=='supabase'){DB.settings.db=Object.assign({},DB.settings.db,bk);dbSave();}}catch(e){}
+  if(!DB.audit)DB.audit=[]; if(!DB.approvals)DB.approvals=[]; if(!DB.sentEmails)DB.sentEmails=[]; if(!DB.doccounters)DB.settings.doccounters={};
 }
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
-const SUPA_COLS=FreshySync.collections;
-const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
-let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncBlocked=false;
-function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
-function authFor(cfg){
- if(!window.supabase)throw Error('โหลดระบบล็อกอินไม่สำเร็จ');
- if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(cfg.url))throw Error('กรอก URL โครงการ Supabase แบบ https://ชื่อโครงการ.supabase.co');
- if(!authClient||authClient._freshyUrl!==cfg.url||authClient._freshyKey!==cfg.key){
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(20000)}))}});
-  authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
- }
- return authClient;
+const SUPA_COLS=['settings','employees','products','villages','customers','debtors','cashsales','audit','approvals','sentEmails'];
+const SUPA_SQL=`-- รันใน Supabase → SQL Editor แล้วกด Run
+create table if not exists freshy_store (
+  key text primary key,
+  value jsonb not null default '[]'::jsonb,
+  updated_at timestamptz default now()
+);
+alter table freshy_store enable row level security;
+drop policy if exists "anon read" on freshy_store;
+drop policy if exists "anon write" on freshy_store;
+drop policy if exists "anon update" on freshy_store;
+create policy "anon read" on freshy_store for select using (true);
+create policy "anon write" on freshy_store for insert with check (true);
+create policy "anon update" on freshy_store for update using (true);`;
+function supaCfg(){const d=DB.settings.db;return (d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey)?{url:String(d.supabaseUrl).replace(/\/$/,''),key:d.supabaseKey}:null;}
+function supaHeaders(cfg){return {'apikey':cfg.key,'Authorization':'Bearer '+cfg.key,'Content-Type':'application/json'};}
+function supabaseFetch(){const cfg=supaCfg();if(!cfg)return Promise.resolve();
+  return fetch(cfg.url+'/rest/v1/freshy_store?select=*',{headers:supaHeaders(cfg)}).then(r=>r.json()).then(rows=>{
+    if(!Array.isArray(rows))return;
+    const srvSet=rows.find(r=>r.key==='settings');
+    const srvEmpty=!srvSet||rows.every(r=>!r.value||(Array.isArray(r.value)&&r.value.length===0));
+    if(srvEmpty){supabasePush();setStatus('ฐานข้อมูลว่าง — บันทึกข้อมูลปัจจุบันขึ้นฐานข้อมูลแล้ว','ok');return;}
+    let changed=false;
+    rows.forEach(r=>{
+      if(r.key==='settings'&&r.value&&typeof r.value==='object'&&!Array.isArray(r.value)){
+        const _ldb=DB.settings.db||{};const _sdb=r.value.db||{};
+        const _mdb=(_ldb.mode==='supabase')?Object.assign({},_sdb,_ldb):Object.assign({},_ldb,_sdb);
+        DB.settings=Object.assign({},DB.settings,r.value,{db:_mdb});changed=true;
+      } else if(SUPA_COLS.includes(r.key)&&Array.isArray(r.value)){if(JSON.stringify(DB[r.key])!==JSON.stringify(r.value)){DB[r.key]=r.value;changed=true;}}
+    });
+    if(changed){localStorage.setItem(DBKEY,JSON.stringify(DB));renderPage();}
+  }).catch(()=>{});
 }
-function safeCache(){
- const config=DB.settings.db;
- localStorage.setItem('freshywater_dbconfig_v1',JSON.stringify(config));
- if(config.mode!=='supabase'){localStorage.setItem(DBKEY,JSON.stringify(DB));return;}
- if(authIdentity&&remoteBase)localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,data:FreshySync.shared(DB)}));
+let supaPushTimer=null;
+function supabasePush(){const cfg=supaCfg();if(!cfg)return;
+  clearTimeout(supaPushTimer);supaPushTimer=setTimeout(()=>{
+    const body=SUPA_COLS.map(k=>({key:k,value:DB[k]||[]}));
+    fetch(cfg.url+'/rest/v1/freshy_store',{method:'POST',headers:Object.assign({'Prefer':'resolution=merge-duplicates,return=minimal'},supaHeaders(cfg)),body:JSON.stringify(body)}).catch(()=>{});
+  },800);
 }
-function draftKey(){return 'freshy_draft_v2_'+authIdentity.id+'_'+supaCfg().url;}
-function installRemote(payload,preserve){
- if(!payload||!payload.actor||!payload.data)throw Error('รูปแบบข้อมูลออนไลน์ไม่ถูกต้อง');
- const cfg=DB.settings.db;
- const defaults=defaultSettings();delete defaults.db;
- const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
- data.settings=Object.assign(defaults,data.settings||{});
- remoteBase=FreshySync.clone(data);
- const merged=FreshySync.overlay(data,preserve||[]);
- for(const k of SUPA_COLS){if(k==='settings')Object.assign(DB.settings,merged[k]);else DB[k]=merged[k];}
- DB.settings.db=cfg;
- if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
- session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
- safeCache();
-}
-async function rpc(name,body){
- const cfg=supaCfg();if(!cfg||!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');
- const client=authFor(cfg);
- const {data,error}=await client.rpc(name,body||{});
- if(error)throw Error(error.message||'คำขอฐานข้อมูลล้มเหลว');
- return data;
-}
-async function supabaseFetch(){
- if(!supaCfg()||!authIdentity||syncBusy||syncBlocked)return false;
- if(currentPage==='settings'||document.querySelector('#modalBox:not(.hidden)'))return false;
- if(remoteBase&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)return flushOnline();
- syncBusy=true;
- try{
-  const snapshot=FreshySync.shared(DB);
-  const payload=await rpc('freshy_read');
-  const edits=remoteBase?FreshySync.diff(snapshot,FreshySync.shared(DB)):[];
-  installRemote(payload,edits);
-  setStatus('เชื่อมต่อออนไลน์ · อัปเดตข้อมูลแล้ว','ok');
-  if(session){refreshUserChip();if(currentPage!=='settings'&&!document.querySelector('#modalBox:not(.hidden)')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
-  return true;
- }catch(e){setStatus('เชื่อมต่อไม่สำเร็จ · '+e.message,'err');return false;}
- finally{syncBusy=false;}
-}
-async function flushOnline(){
- if(!authIdentity||!remoteBase||syncBusy||syncBlocked)return false;
- const snapshot=FreshySync.shared(DB),changes=FreshySync.diff(remoteBase,snapshot);
- if(!changes.length)return true;
- syncBusy=true;setStatus('กำลังบันทึกออนไลน์ '+changes.length+' รายการ','warn');
- try{
-  const payload=await rpc('freshy_apply',{changes});
-  const edits=FreshySync.diff(snapshot,FreshySync.shared(DB));
-  installRemote(payload,edits);setStatus('บันทึกออนไลน์แล้ว','ok');
-  if(edits.length)supabasePush();
-  return true;
- }catch(e){
-  syncBlocked=/CONFLICT|FORBIDDEN|ONLY|REQUIRED|IMMUTABLE|INVALID|CLOSED|DUPLICATE|PGRST202|MEMBER_NOT_FOUND/.test(e.message);
-  safeCache();setStatus('ยังไม่บันทึกออนไลน์ · '+e.message,'err');
-  if(syncBlocked)toast('บันทึกถูกปฏิเสธ ข้อมูลรอส่งยังอยู่ในเครื่อง กดปุ่มจัดการข้อมูลรอส่ง','error');
-  return false;
- }finally{syncBusy=false;}
-}
-function supabasePush(){if(!authIdentity||!remoteBase)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>flushOnline(),350);}
-async function supabaseTest(cfg){
- try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
- if(!data.session)return {ok:false,error:'บันทึก URL/Key แล้ว ออกจากระบบสาธิตและเข้าสู่ระบบด้วยอีเมล/รหัสผ่านจริง'};
- const result=await client.rpc('freshy_read');if(result.error)throw result.error;return {ok:true};
- }catch(e){return {ok:false,error:e.message};}
-}
-function dbSave(){
- for(const k of SUPA_COLS)if(k!=='settings'&&Array.isArray(DB[k]))DB[k].forEach(x=>{if(!x.id)x.id=uid();});
- safeCache();supabasePush();
-}
-async function resolvePending(){
- if(!authIdentity||!remoteBase){toast('เข้าสู่ระบบออนไลน์ก่อน','error');return;}
- const changes=FreshySync.diff(remoteBase,FreshySync.shared(DB));
- openModal(`<div class="modal-head"><h3>ข้อมูลรอส่ง ${changes.length} รายการ</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>เมื่อรายการถูกแก้จากเครื่องอื่นหรือสิทธิ์ไม่อนุญาต ระบบจะหยุดเพื่อให้ตรวจสอบ คุณสามารถเก็บสำเนาข้อมูลรอส่งก่อนเลือกใช้ข้อมูลออนไลน์</p></div><div class="modal-foot"><button class="btn btn-ghost" id="exportPending">ดาวน์โหลดสำเนา</button><button class="btn btn-primary" id="retryPending">ลองส่งอีกครั้ง</button><button class="btn btn-danger" id="discardPending">ใช้ข้อมูลออนไลน์</button></div>`);
- $('#exportPending').onclick=()=>{const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),changes},null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='freshy-pending.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
- $('#retryPending').onclick=()=>{syncBlocked=false;closeModal();flushOnline();};
- $('#discardPending').onclick=async()=>{if(!confirm('ยืนยันใช้ข้อมูลออนไลน์แทนรายการรอส่งในเครื่องนี้? ควรดาวน์โหลดสำเนาก่อน'))return;try{const payload=await rpc('freshy_read');installRemote(payload,[]);syncBlocked=false;closeModal();renderPage();setStatus('ใช้ข้อมูลออนไลน์แล้ว','ok');}catch(e){toast(e.message,'error');}};
-}
-window.resolvePending=resolvePending;
-function configureLogin(){
- const online=DB.settings.db.mode==='supabase';
- const deploymentLocked=!!(window.FRESHY_CONFIG&&window.FRESHY_CONFIG.mode==='supabase');
- $('#onlineLogin').classList.toggle('hidden',!online);
- $('#demoLoginField').classList.toggle('hidden',online);
- $('#useDemo').classList.toggle('hidden',deploymentLocked);
- $('#loginPreviewNote').textContent=online?'โหมดออนไลน์ · ยืนยันบัญชีจริงผ่าน Supabase':'โหมดสาธิต · ข้อมูลตัวอย่างในเครื่องนี้';
- $('#connectUrl').value=DB.settings.db.supabaseUrl||'';$('#connectKey').value=DB.settings.db.supabaseKey||'';
- $('#connectAdmin').value=DB.settings.db.adminEmail||'';
-}
-async function startOnline(email,password){
- const cfg=supaCfg();if(!cfg)throw Error('ตั้งค่า URL และ Publishable/Anon Key ก่อน');
- const client=authFor(cfg);
- const {data,error}=await client.auth.signInWithPassword({email,password});
- if(error)throw error;
- authIdentity=data.user;
- try{await hydrateOnline();}catch(e){await client.auth.signOut();authIdentity=null;session=null;throw e;}
-}
-async function hydrateOnline(){
- const payload=await rpc('freshy_read');
- let cached=null;try{cached=JSON.parse(localStorage.getItem(draftKey()));}catch(e){}
- if(cached&&cached.base&&cached.data&&FreshySync.diff(cached.base,cached.data).length){
-  const cfg=DB.settings.db;for(const k of SUPA_COLS)DB[k]=cached.data[k]||payload.data[k]||(k==='settings'?defaultSettings():[]);
-  DB.settings.db=cfg;remoteBase=cached.base;
-  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
-  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
-  await flushOnline();
- }else installRemote(payload,[]);
- enterApp();
-}
-async function resumeOnline(){
- const cfg=supaCfg();if(!cfg)return;
- try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
- if(!data.session)return;
- const verified=await client.auth.getUser();if(verified.error)throw verified.error;
- authIdentity=verified.data.user;await hydrateOnline();
- }catch(e){authIdentity=null;session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('เข้าสู่ระบบใหม่: '+e.message,'error');}
-}
+function supabaseTest(cfg){return fetch(cfg.url+'/rest/v1/freshy_store?select=key&limit=1',{headers:supaHeaders(cfg)}).then(r=>r.ok?{ok:true}:{ok:false,error:'HTTP '+r.status+' (ตรวจสอบ URL, Anon Key, และรัน SQL สร้างตารางแล้ว)'}).catch(e=>({ok:false,error:e.message||'ไม่สามารถเชื่อมต่อได้'}));}
+function dbSave(){localStorage.setItem(DBKEY,JSON.stringify(DB));if(DB.settings&&DB.settings.db)localStorage.setItem('freshywater_dbconfig_v1',JSON.stringify(DB.settings.db));supabasePush();}
 function dbAdd(col,doc){doc.id=doc.id||uid();DB[col].push(doc);dbSave();return doc;}
 function dbUpdate(col,id,patch){const i=DB[col].findIndex(x=>x.id===id);if(i>=0){Object.assign(DB[col][i],patch);dbSave();return DB[col][i];}return null;}
 function dbRemove(col,id){DB[col]=DB[col].filter(x=>x.id!==id);dbSave();}
@@ -284,18 +188,13 @@ function canEmail(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.c
 function scopeRows(rows){if(isAdmin())return rows;const id=me().id;return rows.filter(r=>r.createdBy===id||r.responsibleBy===id||r.paidBy===id);}
 
 /* ---------- email alerts (ส่งผ่าน /api/email ถ้าตั้งค่าไว้ มิฉะนั้นบันทึก log) ---------- */
-async function sendAlert(type,subject,bodyHtml,toOverride){
- const em=DB.settings.email;
- const entry={id:uid(),createdBy:(me()||{}).id||'demo',ts:new Date().toISOString(),type,to:toOverride||em.adminEmail||'',subject,body:bodyHtml,status:em.enabled&&em.adminEmail?'กำลังส่ง':'ร่าง (ยังไม่เปิดอีเมล)'};
- DB.sentEmails.unshift(entry);dbSave();
- if(!em.enabled||!entry.to)return false;
- if(!authIdentity){entry.status='ไม่ได้ส่ง — ต้องเข้าสู่ระบบออนไลน์';dbSave();return false;}
- try{
-  const {data,error}=await authFor(supaCfg()).auth.getSession();if(error||!data.session)throw Error('เซสชันหมดอายุ');
-  const r=await fetch('/api/email',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({type,to:entry.to,subject,html:bodyHtml,project:supaCfg()}),signal:AbortSignal.timeout(25000)});
-  const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'HTTP '+r.status);
-  Object.assign(DB.sentEmails.find(x=>x.id===entry.id)||entry,{status:'ผู้ให้บริการรับอีเมลแล้ว',providerId:j.id||''});dbSave();return true;
- }catch(e){(DB.sentEmails.find(x=>x.id===entry.id)||entry).status='ส่งไม่สำเร็จ: '+e.message;dbSave();toast('อีเมลส่งไม่สำเร็จ: '+e.message,'error');return false;}
+function sendAlert(type,subject,bodyHtml){
+  const em=DB.settings.email;
+  const entry={ts:new Date().toISOString(),type,to:em.adminEmail||'(ยังไม่ตั้งค่าอีเมลแอดมิน)',subject,body:bodyHtml,status:em.enabled&&em.adminEmail?'ส่งแล้ว':'บันทึกเป็นร่าง (ยังไม่ตั้งค่าอีเมล)'};
+  DB.sentEmails.unshift(entry);dbSave();
+  if(em.enabled&&em.adminEmail){
+    fetch('api/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:em.adminEmail,subject,html:bodyHtml,config:em})}).catch(()=>{});
+  }
 }
 
 /* ============================================================
@@ -381,10 +280,6 @@ function renderDashboard(){
   const maxTotal=Math.max(paidTotal,unpaidTotal,1);
   $('#pageContent').innerHTML=`
   <div class="page-head"><h2>ภาพรวมประจำวัน ${thDate(today)}</h2><span class="desc">ข้อมูลอัปเดตแบบเรียลไทม์ จากฐานข้อมูล</span></div>
-  <div class="command-bar">
-    <div><b><i data-lucide="zap"></i> เมนูทำงานด่วน</b><span>เลือกงานที่ใช้ประจำโดยไม่ต้องค้นหาเมนู</span></div>
-    <div class="command-actions"><button class="btn btn-primary btn-sm" id="quickDebt"><i data-lucide="plus-circle"></i> เพิ่มลูกหนี้</button><button class="btn btn-success btn-sm" id="quickCash"><i data-lucide="banknote"></i> ลงยอดเงินสด</button><button class="btn btn-ghost btn-sm" id="quickCustomer"><i data-lucide="user-plus"></i> เพิ่มลูกค้า</button></div>
-  </div>
   <div class="stats-grid">
     <div class="stat-card green"><div class="label"><i data-lucide="banknote"></i> ยอดขายเงินสดวันนี้</div><div class="value">${fmtN(cashTotal)} <span style="font-size:14px">บาท</span></div><div class="sub">จาก ${cash.length} รายการ</div></div>
     <div class="stat-card red"><div class="label"><i data-lucide="alert-triangle"></i> ลูกหนี้ค้างจ่ายวันนี้</div><div class="value">${fmtN(debtToday)} <span style="font-size:14px">บาท</span></div><div class="sub">ยอดค้างใหม่วันนี้</div></div>
@@ -405,11 +300,7 @@ function renderDashboard(){
       <div class="stat-card blue"><div class="label"><i data-lucide="package"></i> จำนวนถังคงค้าง</div><div class="value">${fmtN(unpaidJugs)} <span style="font-size:14px">ถัง</span></div></div>
     </div>
   </div></div>
-  <div class="report-schedule"><div class="report-clock"><i data-lucide="clock-3"></i></div><div><b>รายงานอัตโนมัติสำหรับผู้บริหาร</b><p>รอบเช้า 08:00 น. และรอบเย็น 18:00 น. · อ่านสรุปในอีเมลได้ทันที พร้อมแนบรายงาน PDF</p></div><span class="status-tag ok">ตั้งเวลาพร้อมใช้งาน</span></div>
   <style>@media(max-width:900px){.dash-grid{grid-template-columns:1fr !important}}</style>`;
-  $('#quickDebt').onclick=()=>navigate('debtorsNai');
-  $('#quickCash').onclick=()=>navigate('cashsales');
-  $('#quickCustomer').onclick=()=>navigate('customersNai');
 }
 
 /* ---------- DEBTORS (nai / other) ---------- */
@@ -565,7 +456,7 @@ function openAddDebtor(area){
     audit('เพิ่มลูกหนี้',c.name+' ค้าง '+fmtN(d.total)+' บาท');
     if(DB.settings.email.alerts.addDebtor)sendAlert('addDebtor','[แจ้งเตือน] พนักงานเพิ่มรายการลูกหนี้',
       `<p>พนักงาน <b>${esc(me().name)}</b> เพิ่มรายการลูกหนี้</p><ul><li>ชื่อลูกหนี้: ${esc(c.name)} (${esc(c.code)})</li><li>หมู่บ้าน/หมู่ที่: ${esc(area==='nai'?'บ้านนาไฮ หมู่ที่ '+moo:village)}</li><li>วันที่ค้าง: ${thDate(d.debtDate)}</li><li>จำนวนถังค้าง: ${jugs} ถัง</li><li>จำนวนแพ็คค้าง: ${packs} แพ็ค</li><li>เงินค้างน้ำแพ็ค: ${fmtN(pa)} บาท</li><li>ยอดค้างรวม: ${fmtN(d.total)} บาท</li></ul>`);
-    closeModal();toast('เพิ่มรายการลูกหนี้แล้ว (รหัส '+c.code+') · ตรวจสถานะอีเมลในประวัติ','success');renderPage();
+    closeModal();toast('เพิ่มรายการลูกหนี้แล้ว (รหัส '+c.code+') และส่งอีเมลแจ้งแอดมิน','success');renderPage();
   });
 }
 
@@ -613,9 +504,9 @@ function requestUndo(id,area){
       if(DB.settings.email.alerts.undoRequest){
         const base=location.origin+location.pathname;
         sendAlert('undo','[คำขออนุมัติ] พนักงานขอยกเลิกกลับไปค้างชำระ',
-          `<p>พนักงาน <b>${esc(me().name)}</b> ต้องการจัดการข้อมูลในหน้าประวัติรับชำระ (${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'})</p><p>ต้องการให้รายการ <b>${esc(d.customerName)}</b> (${fmtN(d.total)} บาท) กลับไปค้างชำระ เนื่องจากเหตุผล: <b>${esc(reason)}</b></p><p>เข้าสู่ระบบแอดมินเพื่อตัดสินใจ:<br><br><a href="${base}?approval=${appr.id}&token=${token}&action=approve" style="display:inline-block;background:#16a34a;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;margin-right:10px;font-weight:700">อนุมัติ (กลับไปค้าง)</a> <a href="${base}?approval=${appr.id}&token=${token}&action=reject" style="display:inline-block;background:#dc2626;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:700">ไม่อนุมัติ</a></p><p style="margin-top:10px">หรือเข้าระบบที่หน้า คำขออนุมัติ เพื่อตัดสินใจ</p>`);
+          `<p>พนักงาน <b>${esc(me().name)}</b> ต้องการจัดการข้อมูลในหน้าประวัติรับชำระ (${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'})</p><p>ต้องการให้รายการ <b>${esc(d.customerName)}</b> (${fmtN(d.total)} บาท) กลับไปค้างชำระ เนื่องจากเหตุผล: <b>${esc(reason)}</b></p><p>กดลิงก์ได้เลยเพื่อตัดสินใจ (ไม่ต้องล็อกอิน):<br><br><a href="${base}?approval=${appr.id}&token=${token}&action=approve" style="display:inline-block;background:#16a34a;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;margin-right:10px;font-weight:700">อนุมัติ (กลับไปค้าง)</a> <a href="${base}?approval=${appr.id}&token=${token}&action=reject" style="display:inline-block;background:#dc2626;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:700">ไม่อนุมัติ</a></p><p style="margin-top:10px">หรือเข้าระบบที่หน้า คำขออนุมัติ เพื่อตัดสินใจ</p>`);
       }
-      closeModal();toast('บันทึกคำขอแล้ว · ตรวจสถานะการซิงก์และอีเมล','success');renderPage();
+      closeModal();toast('ส่งคำขอให้แอดมินเรียบร้อยแล้ว','success');renderPage();
     });
   }
 }
@@ -773,7 +664,7 @@ function openAddCash(){
   $('#saveCash').addEventListener('click',()=>{
     const cid=$('#cs_cust').value;if(!cid){toast('กรุณาเลือกลูกค้า','error');return;}
     const c=DB.customers.find(x=>x.id===cid);
-    dbAdd('cashsales',{customerCode:c.code,customerName:c.name,village:c.village||'บ้านนาไฮ',moo:c.moo||'',deliveryDate:$('#cs_date').value,createdBy:me().id,createdByName:me().name,dbSource:DB.settings.db.mode==='supabase'?'Supabase':'สาธิต',responsibleBy:me().id,jugs:+$('#cs_jugs').value||0,packs:+$('#cs_packs').value||0,jugAmount:+$('#cs_ja').value||0,packAmount:+$('#cs_pa').value||0,createdAt:new Date().toISOString(),editHistory:[]});
+    dbAdd('cashsales',{customerCode:c.code,customerName:c.name,village:c.village||'บ้านนาไฮ',moo:c.moo||'',deliveryDate:$('#cs_date').value,createdBy:me().id,createdByName:me().name,dbSource:'Google Sheets',responsibleBy:me().id,jugs:+$('#cs_jugs').value||0,packs:+$('#cs_packs').value||0,jugAmount:+$('#cs_ja').value||0,packAmount:+$('#cs_pa').value||0,createdAt:new Date().toISOString(),editHistory:[]});
     audit('เพิ่มลูกค้าจ่ายสด',c.name);closeModal();toast('บันทึกรายการจ่ายสดแล้ว','success');renderPage();
   });
 }
@@ -824,7 +715,7 @@ function openEditEmp(id){
   <div class="modal-body"><div class="form-grid">
     <div class="field"><label>ชื่อพนักงาน (จริง)</label><input id="e_name" value="${esc(e.name)}"></div>
     <div class="field"><label>รหัสพนักงาน (รหัสล็อกอิน)</label><input id="e_code" value="${esc(e.code)}"></div>
-    <div class="field"><label>อีเมลบัญชีจริง (สร้างใน Supabase Authentication ก่อน)</label><input id="e_email" value="${esc(e.email||'')}"></div>
+    <div class="field"><label>อีเมล</label><input id="e_email" value="${esc(e.email||'')}"></div>
     <div class="field"><label>บทบาท</label><select id="e_role" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="staff" ${e.role==='staff'?'selected':''}>พนักงาน</option><option value="admin" ${e.role==='admin'?'selected':''}>แอดมิน</option></select></div>
     <div class="field full"><label>สิทธิ์การเข้าถึงแต่ละหน้า</label><div class="perm-grid">${pagePerms}</div></div>
     <label class="perm-item"><input type="checkbox" id="e_print" ${e.permissions.canPrint?'checked':''}> อนุญาตให้ปริ้นรายงาน</label>
@@ -918,7 +809,7 @@ function renderSettings(){
   if(settingTab==='profile')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="user"></i> ข้อมูลผู้ใช้และโปรไฟล์</h3></div><div class="panel-body"><div class="form-grid">
     <div class="field"><label>ชื่อผู้ใช้ (ชื่อจริง แสดงในรายงาน)</label><input id="s_name" value="${esc(u.name)}"></div>
     <div class="field"><label>รหัสพนักงาน</label><input id="s_code" value="${esc(u.code)}"></div>
-    <div class="field"><label>อีเมล</label><input id="s_email" ${!isAdmin()&&authIdentity?'readonly':''} value="${esc(u.email||'')}"></div>
+    <div class="field"><label>อีเมล</label><input id="s_email" value="${esc(u.email||'')}"></div>
     <div class="field"><label>รูปโปรไฟล์ URL (เว้นว่างใช้ตัวอักษร)</label><input id="s_avatar" value="${esc(u.avatarUrl||'')}"></div>
   </div><button class="btn btn-primary" id="saveProfile"><i data-lucide="save"></i> บันทึกโปรไฟล์</button></div></div>`;
   else if(settingTab==='business')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="building-2"></i> ข้อมูลสถานประกอบการ</h3></div><div class="panel-body"><div class="form-grid">
@@ -935,11 +826,11 @@ function renderSettings(){
     <label class="perm-item" style="margin-top:8px"><input type="checkbox" id="h_name" ${s.header.showName?'checked':''}> แสดงชื่อร้านตอนพิมพ์</label>
     <div class="field" style="margin-top:12px"><label>โลโก้ (วาง URL หรือ data URL)</label><input id="h_logoUrl" value="${esc(s.header.logoDataUrl||'')}"></div>
     <button class="btn btn-primary" id="saveHeader" style="margin-top:8px"><i data-lucide="save"></i> บันทึก</button></div></div>`;
-  else if(settingTab==='db')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="database"></i> การเชื่อมต่อฐานข้อมูล Supabase</h3></div><div class="panel-body">
+  else if(settingTab==='db')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="database"></i> การเชื่อมต่อฐานข้อมูล Google Sheets</h3></div><div class="panel-body">
     <div class="field"><label>โหมดฐานข้อมูล</label><select id="d_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="demo" ${s.db.mode==='demo'?'selected':''}>โหมดสาธิต (บันทึกในเบราว์เซอร์)</option><option value="supabase" ${s.db.mode==='supabase'?'selected':''}>Supabase (ฐานข้อมูลออนไลน์ แนะนำ)</option></select></div>
     <div class="field full"><label>Supabase Project URL</label><input id="d_url" value="${esc(s.db.supabaseUrl||'')}" placeholder="https://xxxxxx.supabase.co"></div>
-    <div class="field full"><label>Supabase Publishable / Anon Key (ห้ามใช้ Service Role Key)</label><textarea id="d_sk" rows="2" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">${esc(s.db.supabaseKey||'')}</textarea></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">โหมดออนไลน์ต้องรัน SQL ฉบับใหม่และมีบัญชีใน Supabase Authentication ก่อน ล็อกอินด้วยอีเมลและรหัสผ่าน ระบบจะไม่ส่งข้อมูลตัวอย่างขึ้นฐานข้อมูลโดยอัตโนมัติ</p>
+    <div class="field full"><label>Supabase Anon Key (public — คัดจากหน้า Project Settings → API)</label><textarea id="d_sk" rows="2" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">${esc(s.db.supabaseKey||'')}</textarea></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">ฐานข้อมูล Supabase บันทึกข้อมูลทุกอย่าง (ลูกหนี้/ประวัติชำระ/ลูกค้า/พนักงาน/ฯลฯ) ลงคลาวด์ ดึงมาแสดงแบบ real time ใช้งานได้ทุกเครื่อง ไม่เสียเงินสำหรับปริมาณปกติ</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-primary" id="saveDb"><i data-lucide="save"></i> บันทึกการเชื่อมต่อ</button>
       <button class="btn btn-navy" id="testDbBtn"><i data-lucide="wifi"></i> ทดสอบการเชื่อมต่อ</button>
@@ -948,7 +839,7 @@ function renderSettings(){
     <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
       <p style="font-size:12.5px;color:var(--muted);margin-bottom:8px"><b>สร้างตารางฐานข้อมูลครั้งแรก:</b> เปิด Supabase → เมนู SQL Editor → กด New query → คัดโค้ดด้านล่างไปวาง → กด Run (ระบบจะสร้างตารางเก็บข้อมูลให้เอง) จากนั้นนำ Project URL + Anon Key มาวางด้านบน</p>
       <textarea readonly rows="10" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:11px;font-family:monospace;white-space:pre;overflow:auto">${esc(SUPA_SQL)}</textarea>
-      <button class="btn btn-ghost btn-sm" id="copyGsBtn" style="margin-top:8px"><i data-lucide="copy"></i> คัดลอก SQL</button>
+      <button class="btn btn-ghost btn-sm" id="copyGsBtn" style="margin-top:8px"><i data-lucide="copy"></i> คัดลอกโค้ด Apps Script</button>
     </div></div></div>`;
   else if(settingTab==='products'){
     const phtml=DB.products.map((p,i)=>`<div class="panel" style="margin-bottom:10px"><div class="panel-body" style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:center">
@@ -968,9 +859,9 @@ function renderSettings(){
   else if(settingTab==='email')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="mail"></i> การตั้งค่าอีเมลแจ้งเตือน</h3></div><div class="panel-body"><div class="form-grid">
     <label class="perm-item full"><input type="checkbox" id="em_en" ${s.email.enabled?'checked':''}> เปิดใช้งานการส่งอีเมลแจ้งเตือน</label>
     <div class="field full"><label>อีเมลแอดมินสำหรับรับการแจ้งเตือน</label><input id="em_to" value="${esc(s.email.adminEmail)}"></div>
-    <div class="field"><label>ผู้ให้บริการ</label><select id="em_prov" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="resend" ${s.email.provider==='resend'?'selected':''}>Resend API</option><option value="smtp" ${s.email.provider==='smtp'?'selected':''}>SMTP</option></select></div>
+    <div class="field"><label>ผู้ให้บริการ</label><select id="em_prov" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="resend">Resend API</option><option value="smtp">SMTP</option></select></div>
     <div class="field"><label>API Key / SMTP Password</label><input type="password" id="em_key" value="${esc(s.email.apiKey)}"></div>
-    <div class="field full"><label>อีเมลผู้ส่ง (โดเมนยืนยันกับ Resend)</label><input id="em_from" value="${esc(s.email.fromEmail||'')}"></div><div class="field"><label>SMTP Host (ตั้งค่าที่เซิร์ฟเวอร์)</label><input id="em_host" value="${esc(s.email.smtpHost)}"></div>
+    <div class="field"><label>SMTP Host</label><input id="em_host" value="${esc(s.email.smtpHost)}"></div>
     <div class="field"><label>SMTP Port</label><input id="em_port" value="${esc(s.email.smtpPort)}"></div>
     <div class="field"><label>SMTP User</label><input id="em_user" value="${esc(s.email.smtpUser)}"></div>
     <div class="field full" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1007,27 +898,18 @@ function renderSettings(){
   $('#pageContent').querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{settingTab=t.dataset.t;renderSettings();}));
   // save handlers
   const bind=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
-  bind('#saveProfile',()=>{const oldName=u.name;const newName=$('#s_name').value.trim();dbUpdate('employees',u.id,{name:newName,code:$('#s_code').value.trim(),email:$('#s_email').value.trim(),avatarUrl:$('#s_avatar').value.trim()});if(newName&&newName!==oldName)sendAlert('profile','[แจ้งเตือน] ผู้ใช้เปลี่ยนชื่อโปรไฟล์','<p>ผู้ใช้รหัส '+esc(u.code)+' ได้เปลี่ยนชื่อจาก <b>'+esc(oldName)+'</b> เป็น <b>'+esc(newName)+'</b></p>');toast('บันทึกโปรไฟล์แล้ว'+(newName!==oldName?' · ตรวจผลอีเมลในประวัติ':''),'success');refreshUserChip();});
+  bind('#saveProfile',()=>{const oldName=u.name;const newName=$('#s_name').value.trim();dbUpdate('employees',u.id,{name:newName,code:$('#s_code').value.trim(),email:$('#s_email').value.trim(),avatarUrl:$('#s_avatar').value.trim()});if(newName&&newName!==oldName)sendAlert('profile','[แจ้งเตือน] ผู้ใช้เปลี่ยนชื่อโปรไฟล์','<p>ผู้ใช้รหัส '+esc(u.code)+' ได้เปลี่ยนชื่อจาก <b>'+esc(oldName)+'</b> เป็น <b>'+esc(newName)+'</b></p>');toast('บันทึกโปรไฟล์แล้ว'+(newName!==oldName?' และส่งอีเมลแจ้งแอดมิน':''),'success');refreshUserChip();});
   bind('#saveBiz',()=>{Object.assign(s.business,{name:$('#b_name').value,address:$('#b_addr').value,taxId:$('#b_tax').value,commercialId:$('#b_com').value,phone:$('#b_phone').value,email:$('#b_email').value,menuName:$('#b_menu').value});dbSave();toast('บันทึกข้อมูลสถานประกอบการแล้ว','success');});
   bind('#resetBiz',()=>{s.business=defaultSettings().business;dbSave();renderSettings();toast('รีเซ็ตแล้ว','success');});
   bind('#saveHeader',()=>{Object.assign(s.header,{showLogo:$('#h_logo').checked,showName:$('#h_name').checked,logoDataUrl:$('#h_logoUrl').value});dbSave();toast('บันทึกแล้ว','success');});
-  bind('#saveDb',async()=>{
-    const mode=$('#d_mode').value,url=$('#d_url').value.trim().replace(/\/$/,''),key=$('#d_sk').value.trim();
-    if(mode==='supabase'&&(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key)){toast('กรอก Project URL และ Publishable/Anon Key ให้ครบ','error');return;}
-    if(key.startsWith('sb_secret_')){toast('ห้ามใช้ Secret Key ในหน้าเว็บ','error');return;}
-    try{const part=key.split('.')[1];if(part&&JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'){toast('ห้ามใช้ Service Role Key','error');return;}}catch(e){}
-    if(authIdentity){if(FreshySync.diff(remoteBase,FreshySync.shared(DB)).length&&!(await flushOnline())){toast('จัดการข้อมูลรอส่งก่อนเปลี่ยนการเชื่อมต่อ','error');return;}await authFor(supaCfg()).auth.signOut();}
-    authIdentity=null;remoteBase=null;syncBlocked=false;session=null;localStorage.removeItem(SESSKEY);
-    Object.assign(DB.settings.db,{mode,supabaseUrl:url,supabaseKey:key});safeCache();configureLogin();
-    $('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');toast('บันทึกแล้ว กรุณาเข้าสู่ระบบอีกครั้ง','success');
-  });
+  bind('#saveDb',()=>{const url=$('#d_url').value.trim();const key=$('#d_sk').value.trim();Object.assign(s.db,{mode:$('#d_mode').value,supabaseUrl:url,supabaseKey:key});dbSave();setStatus(s.db.mode==='supabase'?'เชื่อมต่อฐานข้อมูล Supabase':'โหมดสาธิต',s.db.mode==='supabase'?'ok':'info');toast('บันทึกการตั้งค่าฐานข้อมูลแล้ว กดทดสอบการเชื่อมต่อเพื่อยืนยัน','success');if(s.db.mode==='supabase')supabaseFetch();});
   bind('#testDbBtn',()=>{
     const st=$('#testDbStatus');if(!st)return;
     const url=($('#d_url').value||'').trim().replace(/\/$/,'');const key=($('#d_sk').value||'').trim();
     if(!url||!key){st.textContent='✗ กรุณากรอก Supabase Project URL และ Anon Key ให้ครบ';st.style.color='var(--red)';return;}
     st.textContent='กำลังทดสอบการเชื่อมต่อ...';st.style.color='var(--orange)';
     supabaseTest({url,key}).then(j=>{
-      if(j.ok){Object.assign(DB.settings.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key});safeCache();st.textContent='✓ เชื่อมต่อฐานข้อมูล Supabase สำเร็จ (บันทึกแล้ว)';st.style.color='var(--green)';setStatus('เชื่อมต่อฐานข้อมูล Supabase','ok');supabaseFetch();}
+      if(j.ok){Object.assign(s.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key});dbSave();st.textContent='✓ เชื่อมต่อฐานข้อมูล Supabase สำเร็จ (บันทึกแล้ว)';st.style.color='var(--green)';setStatus('เชื่อมต่อฐานข้อมูล Supabase','ok');supabaseFetch();}
       else{st.textContent='✗ ไม่สำเร็จ: '+(j.error||'ไม่ทราบสาเหตุ');st.style.color='var(--red)';}
     });
   });
@@ -1043,7 +925,7 @@ function renderSettings(){
   });
   bind('#addVillage',()=>{const name=$('#v_name').value.trim();if(!name)return;if(DB.villages.some(v=>v.name===name)){toast('ชื่อหมู่บ้านนี้มีอยู่แล้ว','error');return;}dbAdd('villages',{name});toast('เพิ่มหมู่บ้านแล้ว','success');renderSettings();});
   $('#pageContent').querySelectorAll('.delV').forEach(b=>b.addEventListener('click',()=>{dbRemove('villages',b.dataset.id);renderSettings();}));
-  bind('#saveEmail',()=>{Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value,provider:$('#em_prov').value,apiKey:$('#em_key').value,fromEmail:$('#em_from').value.trim(),smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked}});dbSave();toast('บันทึกการตั้งค่าอีเมลแล้ว','success');});
+  bind('#saveEmail',()=>{Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value,provider:$('#em_prov').value,apiKey:$('#em_key').value,smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked}});dbSave();toast('บันทึกการตั้งค่าอีเมลแล้ว','success');});
   bind('#backupBtn',()=>{
     const all=[...document.querySelectorAll('.bk')].find(c=>c.dataset.col==='all').checked;
     const data={};
@@ -1059,13 +941,13 @@ function renderSettings(){
       try{const data=JSON.parse(rd.result);
         if(!data||typeof data!=='object')throw new Error('ไฟล์ไม่ถูกต้อง');
         if(!confirm('จะกู้คืนข้อมูลจากไฟล์นี้หรือ? ข้อมูลที่มีอยู่จะถูกผสานทับ (คีย์เดียวกันจะถูกแทนที่)'))return;
-        Object.keys(data).forEach(k=>{if(SUPA_COLS.includes(k)&&Array.isArray(data[k])&&DB[k]!==undefined){if(authIdentity){const rows=new Map(DB[k].map(x=>[x.id,x]));data[k].forEach(x=>{if(x&&typeof x==='object'){x.id=x.id||uid();if(k!=='audit'||!rows.has(x.id))rows.set(x.id,x);}});DB[k]=Array.from(rows.values());}else DB[k]=data[k];}});
-        if(data.settings){const connection=DB.settings.db;Object.assign(DB.settings,defaultSettings(),data.settings);DB.settings.db=connection;}
-        dbSave();toast(authIdentity?'ผสานไฟล์ในเครื่องแล้ว · รอผลบันทึกออนไลน์':'กู้คืนในเครื่องแล้ว','success');renderPage();
+        Object.keys(data).forEach(k=>{if(Array.isArray(data[k])&&DB[k]!==undefined){DB[k]=data[k];}});
+        if(data.settings)DB.settings=Object.assign(defaultSettings(),data.settings);
+        dbSave();toast('กู้คืนข้อมูลสำเร็จ ระบบจะรีเฟรช','success');setTimeout(()=>location.reload(),800);
       }catch(err){toast('ไฟล์สำรองไม่ถูกต้อง: '+err.message,'error');}
     };rd.readAsText(f);
   });
-  bind('#resetBtn',()=>{if(DB.settings.db.mode==='supabase'){toast('ปุ่มนี้ใช้รีเซ็ตโหมดสาธิตเท่านั้น ข้อมูลออนไลน์จะไม่ถูกลบ','info');return;}if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
+  bind('#resetBtn',()=>{if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
   if(window.lucide)lucide.createIcons();
 }
 function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=u.name;$('#userRole').textContent=u.role==='admin'?'แอดมินระบบ':'พนักงาน';$('#userAvatar').textContent=u.name.charAt(0);}
@@ -1090,7 +972,7 @@ function docHeader(reportTitle,docNo){
     </div>
   </div>
   <div class="doc-meta">
-    <div>วันที่ออกเอกสาร: ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} เวลา ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
+    <div>วันที่พิมพ์: ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
     <div class="doc-no">เลขที่เอกสาร: ${docNo}</div>
   </div>`;
 }
@@ -1168,14 +1050,14 @@ function openEmailReport(kind){
     <p style="font-size:12px;color:var(--muted);grid-column:1/-1">ระบบจะแนบรายงานเป็น HTML ในอีเมล ต้องตั้งค่าผู้ให้บริการอีเมลในหน้าการตั้งค่าก่อน</p>
   </div></div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-gold" id="doSendEmail"><i data-lucide="send"></i> ส่งรายงาน</button></div>`);
-  $('#doSendEmail').addEventListener('click',async()=>{
+  $('#doSendEmail').addEventListener('click',()=>{
     const to=$('#er_to').value.trim();if(!to){toast('กรุณากรอกอีเมลผู้รับ','error');return;}
     let r;
     if(kind==='cash')r={html:'(รายงานลูกค้าจ่ายสด)',docNo:nextDocNo(DB.settings.docPrefix.cash)};
     else if(kind&&kind.startsWith('customers-'))r=buildCustomerReportHtml(kind.split('-')[1]);
     else r=buildDebtorReportHtml(kind==='nai'?'nai':'other','all','combined');
-    const sent=await sendAlert('report','[รายงาน] '+ (kind==='cash'?'รายงานลูกค้าจ่ายสด':'รายงานลูกหนี้') +' เลขที่ '+r.docNo, ( $('#er_fmt').value==='formal'?'<p>เรียน ผู้เกี่ยวข้อง</p><p>ทางโรงน้ำดื่ม เฟรชชี่ วอเตอร์ ขอส่งรายงานฉบับนี้ให้เพื่อทราบ</p><hr>':'<p>ส่งรายงานให้ครับ</p>') + r.html,to);
-    if(sent){closeModal();toast('ผู้ให้บริการรับรายงานแล้ว','success');}
+    sendAlert('report','[รายงาน] '+ (kind==='cash'?'รายงานลูกค้าจ่ายสด':'รายงานลูกหนี้') +' เลขที่ '+r.docNo, ( $('#er_fmt').value==='formal'?'<p>เรียน ผู้เกี่ยวข้อง</p><p>ทางโรงน้ำดื่ม เฟรชชี่ วอเตอร์ ขอส่งรายงานฉบับนี้ให้เพื่อทราบ</p><hr>':'<p>ส่งรายงานให้ครับ</p>') + r.html);
+    closeModal();toast('ส่งรายงานทางอีเมลแล้ว','success');
   });
 }
 
@@ -1203,15 +1085,13 @@ document.addEventListener('dragstart',e=>e.preventDefault());
 $('#loginBtn').addEventListener('click',doLogin);
 $('#loginCode').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 $('#loginCode').addEventListener('input',()=>{
-  if(DB.settings.db.mode==='supabase')return;
   const v=$('#loginCode').value.trim(); const pv=$('#loginNamePreview'); if(!pv)return;
   if(!v){pv.classList.add('hidden');return;}
   const u=DB.employees.find(e=>e.code===v);
   if(u){pv.classList.remove('hidden');pv.classList.remove('err');pv.innerHTML='<i data-lucide="user-check" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"></i>ยินดีต้อนรับ คุณ'+esc(u.name)+' · '+(u.role==='admin'?'แอดมินระบบ':'พนักงาน');if(window.lucide)lucide.createIcons();}
   else{pv.classList.remove('hidden');pv.classList.add('err');pv.textContent='รหัสนี้ยังไม่ตรงกับผู้ใช้ใด ๆ';}
 });
-async function doLogin(){
-  if(DB.settings.db.mode==='supabase'){const btn=$('#loginBtn');btn.disabled=true;try{await startOnline($('#loginEmail').value.trim(),$('#loginPassword').value);$('#loginPassword').value='';}catch(e){toast('เข้าสู่ระบบไม่สำเร็จ: '+e.message,'error');}finally{btn.disabled=false;}return;}
+function doLogin(){
   const code=$('#loginCode').value.trim();
   const u=DB.employees.find(e=>e.code===code);
   if(!u){toast('รหัสผู้ใช้งานไม่ถูกต้อง','error');return;}
@@ -1224,18 +1104,16 @@ function enterApp(){
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
   refreshUserChip();
-  const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else{setStatus(_m==='supabase'?'กำลังตรวจสอบฐานข้อมูล':'โหมดสาธิต','info');if(_m==='supabase')supabaseFetch();}
-  navigate(new URLSearchParams(location.search).has('approval')&&isAdmin()?'approvals':'dashboard');
+  const _m=DB.settings.db.mode;setStatus(_m==='supabase'?'เชื่อมต่อฐานข้อมูล Supabase':'โหมดสาธิต', _m==='supabase'?'ok':'info');
+  navigate('dashboard');
 }
 $('#logoutBtn').addEventListener('click',()=>{
   openModal(`<div class="modal-head"><h3><i data-lucide="log-out"></i> ยืนยันออกจากระบบ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
   <div class="modal-body"><p>หากออกจากระบบแล้ว ระบบจะส่งอีเมลแจ้งเตือนไปหาแอดมิน และคุณจะต้องกรอกรหัสผู้ใช้งานอีกครั้งเพื่อเข้าใช้งาน ข้อมูลทั้งหมดที่บันทึกไว้จะยังคงอยู่ในระบบ</p></div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmLogout"><i data-lucide="log-out"></i> ยืนยันออกจากระบบ</button></div>`);
-  $('#confirmLogout').addEventListener('click',async()=>{
-    if(authIdentity){const pending=FreshySync.diff(remoteBase||{},FreshySync.shared(DB));if(pending.length&&!(await flushOnline())){toast('ยังมีข้อมูลรอส่ง กรุณาจัดการก่อนออกจากระบบ','error');return;}}
+  $('#confirmLogout').addEventListener('click',()=>{
     const u=me();
-    if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')await sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
-    if(authIdentity){await flushOnline();await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
+    if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
     session=null;localStorage.removeItem(SESSKEY);
     closeModal();$('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#loginCode').value='';
     toast('ออกจากระบบแล้ว','success');
@@ -1250,12 +1128,14 @@ let lastDataHash='';
 function dataHash(){return JSON.stringify(DB).length+'_'+DB.debtors.length+'_'+DB.cashsales.length+'_'+DB.audit.length;}
 setInterval(()=>{
   if(!session)return;
-  if(DB.settings.db.mode!=='supabase')dbLoad();
+  dbLoad();
   const h=dataHash();
   if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
 },5000);
-setInterval(()=>{if(DB&&DB.settings.db.mode==='supabase'&&session)supabaseFetch();},10000);
+if(DB&&DB.settings.db.mode==='supabase'){
+  setInterval(()=>{supabaseFetch();},10000);
+}
 
 /* ============================================================
    INIT
@@ -1273,10 +1153,10 @@ function cycleTheme(){const cur=localStorage.getItem(THEMEKEY)||'auto';const nex
 applyTheme();
 if(window.matchMedia)window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 function setStatus(text,cls){const el=$('#modeTag');if(!el)return;el.className='status-tag '+(cls||'info');const t=$('#modeTagText');if(t)t.textContent=text;}
-window.addEventListener('online',()=>{if(authIdentity)supabaseFetch();else setStatus(DB.settings.db.mode==='supabase'?'ออนไลน์ · กรุณาเข้าสู่ระบบ':'โหมดสาธิต','info');});
+window.addEventListener('online',()=>setStatus(DB.settings.db.mode==='supabase'?'เชื่อมต่อฐานข้อมูล Supabase':'โหมดสาธิต','ok'));
 window.addEventListener('offline',()=>setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต ไม่สามารถบันทึกได้','err'));
 if(!navigator.onLine)setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต','err');
-if(DB.settings.db.mode==='supabase')setStatus('ออนไลน์ · กรุณาเข้าสู่ระบบ','info');
+if(DB.settings.db.mode==='supabase'){setStatus('กำลังโหลดข้อมูลจากฐานข้อมูล...','warn');supabaseFetch().then(()=>setStatus('เชื่อมต่อฐานข้อมูล Supabase','ok'));}
 const tbtn=$('#themeToggle');if(tbtn)tbtn.addEventListener('click',cycleTheme);
 /* กด Enter บนหน้าลูกหนี้ = เปิดฟอร์มเพิ่มรายการลูกหนี้ทันที (หลังบันทึกเสร็จ กด Enter อีกครั้ง = เพิ่มรายต่อไป) */
 document.addEventListener('keydown',e=>{
@@ -1289,31 +1169,33 @@ document.addEventListener('keydown',e=>{
   const b=document.querySelector('#addDebtorBtn');
   if(b)b.click();
 });
-// Approval links identify the request; only an authenticated admin can decide in the approvals page.
+// จัดการลิงก์อนุมัติ/ไม่อนุมัติจากอีเมล (ไม่ต้องล็อกอิน)
+(function(){
+  const sp=new URLSearchParams(location.search);
+  const aid=sp.get('approval'),tok=sp.get('action')?sp.get('token'):null,act=sp.get('action');
+  if(!aid||!tok||!act)return;
+  const a=DB.approvals.find(x=>x.id===aid&&x.token===tok&&x.status==='pending');
+  if(a){
+    if(act==='approve'){
+      dbUpdate('debtors',a.debtorId,{status:'unpaid',paidAt:null,paidBy:null,paidByName:null});
+      dbUpdate('approvals',a.id,{status:'approved',decidedBy:'กดลิงก์ในอีเมล',decidedAt:new Date().toISOString()});
+      audit('อนุมัติยกเลิกผ่านลิงก์อีเมล',a.debtorName+' กลับไปค้าง (โดย '+a.employeeName+')');
+      setTimeout(()=>{alert('อนุมัติแล้ว ข้อมูลกลับไปค้างชำระอัตโนมัติ');},200);
+    }else{
+      dbUpdate('approvals',a.id,{status:'rejected',decidedBy:'กดลิงก์ในอีเมล',decidedAt:new Date().toISOString()});
+      audit('ไม่อนุมัติยกเลิกผ่านลิงก์อีเมล',a.debtorName);
+      setTimeout(()=>{alert('บันทึกการไม่อนุมัติแล้ว');},200);
+    }
+    history.replaceState(null,'',location.pathname);
+  }
+})();
 const _qr=new URLSearchParams(location.search).get('qr');
-if(_qr&&DB.settings.db.mode!=='supabase'){renderPublicQrReport(_qr);return;}
+if(_qr){renderPublicQrReport(_qr);return;}
 try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
-if(DB.settings.db.mode==='supabase'){session=null;configureLogin();resumeOnline();}else{configureLogin();if(session&&DB.employees.find(e=>e.id===session.empId))enterApp();}
+if(session&&DB.employees.find(e=>e.id===session.empId)){enterApp();}
 if(window.lucide)lucide.createIcons();
 lastDataHash=dataHash();
 
-
-$('#loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-$('#connectSave').onclick=()=>{
- const url=$('#connectUrl').value.trim().replace(/\/$/,''),key=$('#connectKey').value.trim(),adminEmail=$('#connectAdmin').value.trim();
- if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key){toast('กรอก Project URL และ Publishable/Anon Key ให้ครบ','error');return;}
- if(key.startsWith('sb_secret_')){toast('ห้ามใส่ Secret หรือ Service Role Key ในหน้าเว็บ','error');return;}
- try{const part=key.split('.')[1];if(part&&JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'){toast('ห้ามใช้ Service Role Key','error');return;}}catch(e){}
- Object.assign(DB.settings.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key,adminEmail});safeCache();configureLogin();toast('บันทึกการเชื่อมต่อแล้ว เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน','success');
-};
-$('#downloadSql').onclick=()=>{
- const email=$('#connectAdmin').value.trim();if(!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)){toast('กรอกอีเมลแอดมินจริงก่อน','error');return;}
- const sql=SUPA_SQL.replaceAll('CHANGE_ADMIN_EMAIL@example.com',email);
- // Preserve the bootstrap guard sentinel after substituting the declaration.
- const corrected=sql.replace("if admin_email = '"+email+"' then","if admin_email = 'CHANGE_ADMIN_EMAIL@example.com' then");
- const blob=new Blob([corrected],{type:'text/plain'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='database.sql';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
-};
-$('#useDemo').onclick=async()=>{if(!confirm('เปิดโหมดสาธิตในเครื่องนี้? ข้อมูลออนไลน์จะไม่ถูกเปลี่ยน'))return;if(authClient)await authClient.auth.signOut();const cfg=DB.settings.db;authIdentity=null;remoteBase=null;DB=seed();DB.settings.db=Object.assign({},cfg,{mode:'demo'});session=null;localStorage.removeItem(SESSKEY);dbSave();configureLogin();};
 // expose for inline onclick handlers
 window.closeModal=closeModal;
 })();

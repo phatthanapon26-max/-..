@@ -4,199 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ระบบสารสนเทศการจัดการลูกหนี้และรายงานการส่งน้ำ — โรงน้ำดื่ม เฟรชชี่ วอเตอร์</title>
-<script src="vendor/lucide.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lucide@1/dist/umd/lucide.min.js"></script>
 <style>
-/* sarabun-thai-400-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 400;
-  src: url(vendor/fonts/sarabun-thai-400-normal.woff2) format('woff2');
-  unicode-range: U+02D7,U+0303,U+0331,U+0E01-0E5B,U+200C-200D,U+25CC;
-}
-
-/* sarabun-vietnamese-400-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 400;
-  src: url(vendor/fonts/sarabun-vietnamese-400-normal.woff2) format('woff2');
-  unicode-range: U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;
-}
-
-/* sarabun-latin-ext-400-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 400;
-  src: url(vendor/fonts/sarabun-latin-ext-400-normal.woff2) format('woff2');
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-
-/* sarabun-latin-400-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 400;
-  src: url(vendor/fonts/sarabun-latin-400-normal.woff2) format('woff2');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}/* sarabun-thai-500-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 500;
-  src: url(vendor/fonts/sarabun-thai-500-normal.woff2) format('woff2');
-  unicode-range: U+02D7,U+0303,U+0331,U+0E01-0E5B,U+200C-200D,U+25CC;
-}
-
-/* sarabun-vietnamese-500-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 500;
-  src: url(vendor/fonts/sarabun-vietnamese-500-normal.woff2) format('woff2');
-  unicode-range: U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;
-}
-
-/* sarabun-latin-ext-500-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 500;
-  src: url(vendor/fonts/sarabun-latin-ext-500-normal.woff2) format('woff2');
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-
-/* sarabun-latin-500-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 500;
-  src: url(vendor/fonts/sarabun-latin-500-normal.woff2) format('woff2');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}/* sarabun-thai-600-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 600;
-  src: url(vendor/fonts/sarabun-thai-600-normal.woff2) format('woff2');
-  unicode-range: U+02D7,U+0303,U+0331,U+0E01-0E5B,U+200C-200D,U+25CC;
-}
-
-/* sarabun-vietnamese-600-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 600;
-  src: url(vendor/fonts/sarabun-vietnamese-600-normal.woff2) format('woff2');
-  unicode-range: U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;
-}
-
-/* sarabun-latin-ext-600-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 600;
-  src: url(vendor/fonts/sarabun-latin-ext-600-normal.woff2) format('woff2');
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-
-/* sarabun-latin-600-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 600;
-  src: url(vendor/fonts/sarabun-latin-600-normal.woff2) format('woff2');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}/* sarabun-thai-700-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 700;
-  src: url(vendor/fonts/sarabun-thai-700-normal.woff2) format('woff2');
-  unicode-range: U+02D7,U+0303,U+0331,U+0E01-0E5B,U+200C-200D,U+25CC;
-}
-
-/* sarabun-vietnamese-700-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 700;
-  src: url(vendor/fonts/sarabun-vietnamese-700-normal.woff2) format('woff2');
-  unicode-range: U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;
-}
-
-/* sarabun-latin-ext-700-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 700;
-  src: url(vendor/fonts/sarabun-latin-ext-700-normal.woff2) format('woff2');
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-
-/* sarabun-latin-700-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 700;
-  src: url(vendor/fonts/sarabun-latin-700-normal.woff2) format('woff2');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}/* sarabun-thai-800-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 800;
-  src: url(vendor/fonts/sarabun-thai-800-normal.woff2) format('woff2');
-  unicode-range: U+02D7,U+0303,U+0331,U+0E01-0E5B,U+200C-200D,U+25CC;
-}
-
-/* sarabun-vietnamese-800-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 800;
-  src: url(vendor/fonts/sarabun-vietnamese-800-normal.woff2) format('woff2');
-  unicode-range: U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;
-}
-
-/* sarabun-latin-ext-800-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 800;
-  src: url(vendor/fonts/sarabun-latin-ext-800-normal.woff2) format('woff2');
-  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-
-/* sarabun-latin-800-normal */
-@font-face {
-  font-family: 'Sarabun';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 800;
-  src: url(vendor/fonts/sarabun-latin-800-normal.woff2) format('woff2');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}
 :root,[data-theme="light"]{
   --navy:#1e3a5f; --navy2:#2c5282; --navy3:#3b6aa8; --navy-soft:#eef3f9;
   --gold:#e6b422; --gold2:#c9941a; --gold-soft:#fbf3df;
@@ -220,7 +32,7 @@ input::placeholder,textarea::placeholder{color:var(--muted)!important}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.display-font{font-family:'Sarabun',sans-serif;letter-spacing:.3px}
+.display-font{font-family:'Chakra Petch','Sarabun',sans-serif;letter-spacing:.3px}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
 .hidden{display:none !important}
@@ -420,7 +232,6 @@ table.tbl tr:hover td{background:#fafbfd}
 /* ---------- PRINT AREA ---------- */
 .print-area{display:none}
 @media print{
-  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   body *{visibility:hidden}
   .print-area,.print-area *{visibility:visible}
   .print-area{display:block;position:absolute;left:0;top:0;width:100%;padding:0}
@@ -520,43 +331,6 @@ table.tbl tr:hover td{background:#fafbfd}
   .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .tbl{min-width:520px}
 }
-
-/* Visual refresh: readable blue and white */
-@media screen {
-:root,[data-theme="light"]{--bg:#edf4fc;--navy:#123866;--navy2:#1761b7;--border:#d7e5f4;--radius:18px;--shadow:0 5px 22px rgba(23,75,130,.08)}
-body{font-size:16px;background-image:radial-gradient(ellipse at 85% 0%,rgba(65,156,240,.13),transparent 55%)}
-.sidebar{background:linear-gradient(165deg,#144d86,#092b52)}
-.sidebar-brand .name{font-size:17px}.sidebar-brand .name small{font-size:12px;color:#bed9f4}
-.topbar{min-height:72px;height:auto;padding-top:12px;padding-bottom:12px;box-shadow:0 3px 18px #163d6610}
-.topbar .page-title{font-size:20px}.page-head h2{font-size:24px}.page-head .desc{font-size:15px}
-.btn{font-size:15px;min-height:44px}.btn-primary{background:linear-gradient(135deg,#2383df,#1655aa);box-shadow:0 5px 12px #1761b72b}
-.field label{font-size:15px}input,select,textarea{font-size:16px}
-.stat-card{padding:23px;border-top-width:5px;transition:transform .18s,box-shadow .18s}.stat-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px #16406c1c}
-.stat-card .value{font-size:34px}.stat-card .label{font-size:15px}.stat-card .sub{font-size:14px}
-.stat-card.green{background:linear-gradient(130deg,var(--card),#16a34a10)}.stat-card.red{background:linear-gradient(130deg,var(--card),#dc262610)}.stat-card.blue{background:linear-gradient(130deg,var(--card),#2563eb13)}.stat-card.purple{background:linear-gradient(130deg,var(--card),#7c3aed10)}
-.panel-head{background:var(--navy-soft);padding:18px 22px}.panel-head h3{font-size:18px}.panel-body{padding:20px 22px}
-.login-card{max-width:460px;padding:40px}.login-card h1{font-size:24px}.login-card .sub{font-size:15px}
-@media(max-width:600px){.topbar .page-title{font-size:17px}.stat-card{padding:16px}.stat-card .value{font-size:28px}.panel-body{padding:16px}.login-card{padding:28px 22px}}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-}
-
-@media screen {.connection-setup{margin-top:18px;border:1px solid var(--border);border-radius:14px;padding:14px}.connection-setup summary{cursor:pointer;font-size:15px;font-weight:600;color:var(--navy);margin-bottom:12px}input,select,textarea{font-size:16px!important}.login-card{max-width:480px}.login-foot{font-size:13px}.status-tag{max-width:340px;white-space:normal}.topbar .rt-dot .dot{background:var(--blue)}.nav-item{font-size:15px!important}.tbl{font-size:14px!important}.sidebar .user-chip .un{font-size:15px}button:disabled{opacity:.6;cursor:wait}@media(max-width:600px){.status-tag{max-width:130px;font-size:12px}.topbar{flex-wrap:wrap;height:auto}.topbar .page-title{max-width:75%}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}}
-
-/* Production visual system: clearer hierarchy, richer color and responsive sizing. */
-body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
-.content{width:100%;max-width:1540px;margin:0 auto;padding:28px clamp(18px,3vw,42px) 72px}
-.sidebar{width:270px;background:linear-gradient(180deg,#062a52 0%,#0a4a82 55%,#087a91 130%)}
-.sidebar-brand{min-height:92px;background:rgba(255,255,255,.06)}
-.nav-item{margin:3px 11px;border-radius:12px;padding:12px 14px}.nav-item.active{background:linear-gradient(135deg,#fff,#e8f5ff);color:#0c4c80;box-shadow:0 7px 18px #001d3b33}
-.topbar{background:#ffffffed;backdrop-filter:blur(18px);border-bottom-color:#cfe0ef}
-.page-head{margin-bottom:22px}.page-head h2{font-size:clamp(22px,2.2vw,31px);letter-spacing:-.3px}.page-head .desc{font-size:15px}
-.stats-grid{grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:18px}.stat-card{min-height:144px;border:0;border-top:0;padding:22px 24px;box-shadow:0 10px 30px #174d7b12}.stat-card:after{content:"";position:absolute;width:105px;height:105px;border-radius:50%;right:-35px;bottom:-45px;background:currentColor;opacity:.07}.stat-card.green{border-left:6px solid #16a34a}.stat-card.red{border-left:6px solid #dc2626}.stat-card.blue{border-left:6px solid #2563eb}.stat-card.purple{border-left:6px solid #7c3aed}.stat-card .value{font-size:clamp(30px,3vw,42px)}
-.panel{border:0;box-shadow:0 10px 32px #16406c12}.panel-head{background:linear-gradient(100deg,#edf6ff,#f8fbff);border-bottom:1px solid #d7e6f3}.tbl tbody tr:hover{background:#eff8ff}
-.command-bar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px;padding:17px 20px;border-radius:18px;color:#fff;background:linear-gradient(120deg,#0c3f75,#147ab0 65%,#0d9b91);box-shadow:0 12px 28px #0c51832b}.command-bar>div:first-child{display:flex;flex-direction:column}.command-bar b{display:flex;align-items:center;gap:8px;font-size:17px}.command-bar span{font-size:13px;opacity:.86;margin-top:3px}.command-actions{display:flex;gap:9px;flex-wrap:wrap}.command-actions .btn-ghost{background:#ffffffed;border-color:#fff;color:#16456e}.btn-success{background:linear-gradient(135deg,#149447,#0e7a58);color:#fff;border-color:transparent}
-.report-schedule{display:flex;align-items:center;gap:14px;margin-top:18px;padding:18px 20px;background:linear-gradient(115deg,#f0f7ff,#f0fcf8);border:1px solid #cce1ed;border-radius:18px;box-shadow:0 7px 22px #16406c0e}.report-clock{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#1761b7,#07958d);color:#fff}.report-schedule b{font-size:17px;color:var(--navy)}.report-schedule p{margin:3px 0 0;color:var(--muted);font-size:14px}.report-schedule .status-tag{margin-left:auto}
-.doc-page{font-size:13px}.doc-head{border:2px solid #153d66;border-radius:8px;padding:12px;margin-bottom:10px}.doc-head:after{content:"เอกสารทางการ";position:absolute;right:10px;top:8px;font-size:9px;color:#66788a;letter-spacing:.4px}.doc-table th{background:#dfeaf4;color:#102f50;border-color:#657d94}.doc-table td{border-color:#8799aa}.doc-meta{border-bottom:1px solid #9aa9b8;padding-bottom:8px}.doc-foot{color:#263b50;border-top:1px solid #657d94}
-@media(max-width:900px){.sidebar{width:270px;left:-282px}.content{padding:20px 16px 60px}.command-bar{align-items:flex-start;flex-direction:column}.command-actions{width:100%}.command-actions .btn{flex:1}.report-schedule{align-items:flex-start;flex-wrap:wrap}.report-schedule .status-tag{margin-left:62px}}
-@media(max-width:540px){.content{padding:16px 12px 50px}.stats-grid{grid-template-columns:1fr}.stat-card{min-height:126px}.page-head h2{font-size:23px}.command-actions{display:grid;grid-template-columns:1fr}.report-schedule .status-tag{margin-left:0}.doc-page{font-size:11px}.topbar{padding:10px 12px}}
 </style>
 </head>
 <body>
@@ -568,19 +342,16 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
     <div class="login-logo"><i data-lucide="droplets"></i></div>
     <h1 class="display-font">ระบบสารสนเทศ<br>การจัดการลูกหนี้และรายงานการส่งน้ำ</h1>
     <p class="sub">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</p>
-    <div class="field" id="demoLoginField">
-      <label>รหัสสาธิต</label>
+    <div class="field">
+      <label>รหัสผู้ใช้งาน</label>
       <div style="position:relative">
         <i data-lucide="user" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)"></i>
         <input type="password" id="loginCode" placeholder="กรอกรหัสผู้ใช้งาน" autocomplete="off" style="padding-left:38px">
       </div>
       <div id="loginNamePreview" class="login-preview hidden"></div>
     </div>
-    <div id="onlineLogin" class="hidden"><div class="field"><label>อีเมลบัญชีจริง</label><input id="loginEmail" type="email" autocomplete="username"></div><div class="field"><label>รหัสผ่าน</label><input id="loginPassword" type="password" autocomplete="current-password"></div></div>
-    <p id="loginPreviewNote" style="font-size:14px;margin-bottom:14px;color:var(--muted)"></p>
     <button class="btn btn-primary btn-block" id="loginBtn"><i data-lucide="log-in"></i> เข้าสู่ระบบ</button>
-    <details class="connection-setup"><summary>ตั้งค่าฐานข้อมูลครั้งแรก</summary><div class="field"><label>Supabase Project URL</label><input id="connectUrl" placeholder="https://xxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><input id="connectKey" autocomplete="off"></div><div class="field"><label>อีเมลผู้ดูแลระบบจริง</label><input id="connectAdmin" type="email"></div><p style="font-size:14px;margin-bottom:12px">สร้างบัญชีแอดมินใน Supabase Authentication → Users ก่อน แล้วดาวน์โหลด SQL ไปรันใน SQL Editor ครั้งเดียว</p><button id="downloadSql" class="btn btn-ghost">ดาวน์โหลด SQL</button><button id="connectSave" class="btn btn-primary">บันทึกการเชื่อมต่อ</button><button id="useDemo" class="btn btn-ghost">ทดลองโหมดสาธิต</button></details>
-    <div class="login-foot">© โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ระบบจัดการลูกหนี้และรายงานการส่งน้ำ</div>
+    <div class="login-foot">© โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ข้อมูลส่วนบุคคล ปลอดภัย</div>
   </div>
 </div>
 
@@ -589,7 +360,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo"><i data-lucide="droplets"></i></div>
-      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v2.0</small></div>
+      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v1.0</small></div>
     </div>
     <nav class="nav" id="navMenu"></nav>
     <div class="sidebar-foot">
@@ -607,7 +378,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
       <div class="page-title" id="pageTitle"><i data-lucide="layout-dashboard"></i> ภาพรวมระบบ</div>
       <div class="spacer"></div>
       <button class="btn btn-ghost btn-sm" id="themeToggle" title="เปลี่ยนธีม"><i data-lucide="moon"></i><span id="themeLabel" style="font-size:11px;margin-left:2px">สว่าง</span></button>
-      <button class="btn btn-ghost pending-btn" onclick="resolvePending()">ข้อมูลรอส่ง</button><span class="status-tag info" id="modeTag"><i data-lucide="database"></i> <span id="modeTagText">โหมดสาธิต</span></span>
+      <span class="status-tag info" id="modeTag"><i data-lucide="database"></i> <span id="modeTagText">โหมดสาธิต</span></span>
       <div class="rt-dot"><span class="dot"></span><span id="rtText">อัปเดตแบบเรียลไทม์</span></div>
     </header>
     <main class="content" id="pageContent"></main>
@@ -627,17 +398,13 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
   <div class="privacy-card">
     <div class="ico"><i data-lucide="shield-alert"></i></div>
     <h3>สงวนสิทธิ์</h3>
-    <p>เนื่องจากข้อมูลนี้เป็นข้อมูลส่วนบุคคล ระบบซ่อนข้อมูลเมื่อออกจากหน้าต่าง กรุณากลับมาที่หน้าต่างระบบเพื่อใช้งานต่อ</p>
+    <p>เนื่องจากข้อมูลนี้เป็นข้อมูลส่วนบุคคล ไม่สามารถแคปหน้าจอหรือเปิดซ้อนหน้าจอได้ กรุณากลับมาที่หน้าต่างระบบเพื่อใช้งานต่อ</p>
   </div>
 </div>
 
 <!-- ============ PRINT AREA ============ -->
 <div class="print-area" id="printArea"></div>
 
-<script src="vendor/supabase.js"></script>
-<script src="deploy-config.js"></script>
-<script src="database-config.js"></script>
-<script src="sync.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
