@@ -736,6 +736,61 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
   @page{size:A4 portrait;margin:12mm 11mm 12mm}
   .doc-page{font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.doc-head{grid-template-columns:68px 1fr 145px;padding:11px 13px}.doc-title .factory{font-size:19px}.doc-title .report-name{font-size:15px}.doc-table{font-size:9.5px}.doc-table th,.doc-table td{padding:5px 4px!important}.sign-row{margin-top:36px}.doc-foot{position:relative;bottom:auto}
 }
+
+/* ============================================================
+   V5 — MODERN GOVERNMENT COMMAND UI
+   สุขุม เข้ม ทันสมัย อ่านง่ายสำหรับงานภาครัฐและองค์กร
+   ============================================================ */
+@media screen{
+  :root,[data-theme="light"],[data-theme="dark"]{
+    --bg:#eaf0f5;--card:#fff;--text:#122536;--muted:#617284;--border:#cad7e2;
+    --navy:#0a2740;--navy2:#123f61;--navy3:#167594;--navy-soft:#e8f1f6;
+    --gold:#d5a72b;--gold2:#a8790a;--orange:#c96a21;--green:#168262;--red:#ba3c45;
+    --shadow:0 10px 28px rgba(8,37,61,.10);--shadow-lg:0 28px 76px rgba(3,24,42,.28)
+  }
+  body{background:linear-gradient(135deg,#e7eef4 0%,#f5f8fa 48%,#e9f0f4 100%);color:var(--text)}
+  .main:before{opacity:.14;background-image:linear-gradient(rgba(16,57,86,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(16,57,86,.18) 1px,transparent 1px);background-size:36px 36px;mask-image:linear-gradient(to bottom,black,transparent 65%)}
+  .marquee{height:28px;background:#061d31;color:#d8e7f1;border-bottom:1px solid #31536b;font-size:11px;letter-spacing:.025em}
+  .sidebar{background:linear-gradient(180deg,#061d31 0%,#0a2e49 52%,#0b4054 100%);border-right:1px solid #33566d;box-shadow:14px 0 42px rgba(4,25,42,.20)}
+  .sidebar-brand{background:rgba(255,255,255,.025);border-bottom:1px solid rgba(178,207,224,.16)}
+  .sidebar-brand .logo{background:linear-gradient(145deg,#e0b83e,#a9780c);color:#071e31;border:1px solid #efd56d;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+  .sidebar-brand .name{font-weight:850;letter-spacing:.01em}.sidebar-brand .name small{color:#9fb5c5}
+  .nav-group-label{color:#c9a846;letter-spacing:.12em}.nav-item{color:#cbd9e3;border-radius:9px}.nav-item svg{color:#89aabc}
+  .nav-item:hover{background:#123b56;border-color:#31556b;color:#fff}.nav-item.active{background:linear-gradient(90deg,#d4ad38,#e4c75d);color:#071f33;border-color:#f0dc8e;box-shadow:0 9px 24px rgba(0,0,0,.25)}.nav-item.active svg{color:#102e43}
+  .sidebar-foot{background:rgba(3,18,30,.32);border-top:1px solid rgba(186,210,225,.14)}
+  .topbar{background:rgba(248,251,253,.95);border-bottom:1px solid #bdccd7;box-shadow:0 7px 24px rgba(6,37,61,.09)}
+  .topbar .page-title{color:#0a2c47;letter-spacing:.01em}.topbar .page-title svg{color:#a97d13}
+  .content{max-width:1480px;padding-top:24px}
+  .page-head{padding:21px 24px;border-radius:12px;border:1px solid #bdccd7;border-left:7px solid #0c3b5b;background:linear-gradient(110deg,#fff 0%,#f3f7f9 70%,#e6eef3 100%);box-shadow:var(--shadow)}
+  .page-head h2{color:#092a45;font-weight:900;letter-spacing:.005em}.page-head h2:after{height:3px;width:72px;background:#caa02a;border-radius:0}.page-head .desc{color:#5b6d7d}
+  .command-bar{border-radius:12px;border:1px solid #315a72;background:linear-gradient(112deg,#082741,#0b3c5c 62%,#0d5965);box-shadow:0 15px 35px rgba(5,38,61,.20)}
+  .panel,.debtor-card,.stat-card{border:1px solid #c8d5df;border-radius:12px!important;background:#fff;box-shadow:var(--shadow)}
+  .panel-head{min-height:60px;background:linear-gradient(105deg,#e8eff4,#f9fbfc 70%,#f3ead0);border-bottom:1px solid #c6d4de}.panel-head h3{color:#0b334f}
+  .stat-card{border:1px solid #c3d1dc!important;border-left:6px solid #244f6a!important;background:linear-gradient(140deg,#fff,#f3f7f9)!important;box-shadow:var(--shadow)!important}
+  .stat-card.green{border-left-color:#168262!important}.stat-card.red{border-left-color:#b83d48!important}.stat-card.blue{border-left-color:#187296!important}.stat-card.purple{border-left-color:#60558c!important}.stat-card.gold{border-left-color:#bd8f1d!important}
+  .stat-card:after{border-radius:4px;transform:rotate(35deg);opacity:.035}.stat-card .label{color:#54697a;text-transform:none}.stat-card .value{color:#0a2b45}
+  .btn{border-radius:8px;font-weight:800;box-shadow:none}.btn-primary{background:#0b4c73;border:1px solid #0b4c73}.btn-primary:hover{background:#083c5d}.btn-success{background:#147657;border:1px solid #147657}.btn-danger{background:#ab3541;border:1px solid #ab3541}.btn-gold{background:#c99c25;border:1px solid #aa7c0e;color:#13293a}.btn-ghost{background:#fff;border:1px solid #b6c7d3;color:#153b55}
+  .tbl-wrap{border-radius:10px;border:1px solid #b9c9d5}.tbl thead th{background:#0c3552;color:#fff;border-right:1px solid #49667a;font-weight:850}.tbl thead th:first-child{border-radius:8px 0 0}.tbl thead th:last-child{border-radius:0 8px 0 0}.tbl tbody td{color:#20394c;border-bottom:1px solid #d9e2e8}.tbl tbody tr:nth-child(even){background:#f3f6f8}.tbl tbody tr:hover{background:#edf3d9}
+  .field label{color:#163e59}.field input,.field select,.field textarea{border-radius:8px;border:1.5px solid #b9cad6;background:#f9fbfc}.field input:focus,.field select:focus,.field textarea:focus{border-color:#1b698d;box-shadow:0 0 0 3px rgba(17,99,136,.14)}
+  .modal{border-radius:14px;border:1px solid #9fb3c1;box-shadow:var(--shadow-lg)}.modal-head{background:linear-gradient(100deg,#dce7ee,#f8fafb);border-bottom:1px solid #b7c8d4}.modal-head h3{color:#092e49}.modal-foot{background:#edf2f5;border-top:1px solid #c1d0da}
+  .status-tag{border-radius:6px}.chip{border-radius:7px}.chip.active{background:#0c466b;color:#fff;border-color:#0c466b}
+  .qr-wrap{border-radius:8px;border:1px solid #9fb9ca;background:#edf4f7}.qr-wrap:hover{background:#e0edf2;box-shadow:0 8px 18px rgba(10,52,81,.14)}
+  .login-card{border-radius:16px;border:1px solid #aebfcb;background:rgba(249,251,252,.97);box-shadow:0 34px 100px rgba(2,24,41,.32)}.login-logo{border-radius:12px;background:linear-gradient(145deg,#0c486e,#092a43);border:1px solid #476b82;box-shadow:0 12px 26px rgba(5,39,63,.27)}
+  .login-card h1{color:#082a44}.connection-setup.hidden{display:none!important}
+}
+@media screen and (max-width:700px){
+  .marquee{display:none}.topbar{background:#f8fbfd}.content{padding:14px 11px calc(42px + env(safe-area-inset-bottom))}.page-head{padding:15px;border-radius:10px;border-left-width:5px}
+  .panel,.debtor-card,.stat-card{border-radius:10px!important}.command-bar{border-radius:10px}.panel-head{border-radius:0}
+  .stats-grid{gap:10px!important}.stat-card{flex-basis:84vw!important;min-height:112px!important}.stat-card .value{font-size:27px!important}
+  .modal{border-radius:14px 14px 0 0}.modal-head{border-radius:0}.field input,.field select,.field textarea{border-radius:8px}
+  .command-actions .btn{border-radius:8px}.qr-wrap{width:100%;justify-content:space-between;padding:9px}.qr-mini{width:58px;height:58px}
+}
+
+/* เอกสารมาตรฐานงานสารบรรณ — พิมพ์ขาวดำได้ชัดเจน */
+.doc-page{font-family:'Sarabun',sans-serif;color:#000;background:#fff}.doc-head{border:1.6px solid #000;background:#fff;grid-template-columns:70px 1fr 160px;padding:11px 13px}.doc-logo{border:1px solid #555;border-radius:0}.doc-title .factory{color:#000;font-size:20px}.doc-title .factory-sub{color:#222}.doc-title .report-name{color:#000;font-size:16px;text-decoration:underline;text-underline-offset:4px}.doc-control{border-left:1px solid #000}.doc-control .control-label{color:#000}.doc-control strong,.doc-control span{color:#000}.doc-meta{border:1.6px solid #000;border-top:0;background:#fff;color:#000}.doc-meta>div{border-right:1px solid #555}.doc-meta .doc-no{color:#000}.doc-section-title{border-left:5px solid #000;background:#e8e8e8;color:#000}.doc-table th{background:#263746!important;color:#fff!important;border:1px solid #000!important}.doc-table td{border:1px solid #444!important;color:#000}.doc-table tbody tr:nth-child(even) td{background:#f1f1f1}.doc-summary{border-color:#444;background:#e9e9e9;color:#000}.sign-box .line{border-color:#000}.sign-box .role,.sign-box .sign-date{color:#000}.doc-foot{border-color:#000;color:#000}.doc-foot strong{color:#000}
+@media print{
+  @page{size:A4 portrait;margin:15mm 13mm 14mm}.doc-page{font-size:10.5pt;color:#000}.doc-head{grid-template-columns:18mm 1fr 41mm;min-height:27mm}.doc-title .factory{font-size:16pt}.doc-title .report-name{font-size:13pt}.doc-meta{font-size:8.5pt}.doc-table{font-size:8.5pt}.doc-table th{background:#263746!important;color:#fff!important}.doc-table tr{page-break-inside:avoid}.doc-section-title{page-break-after:avoid}.sign-row{page-break-inside:avoid;margin-top:18mm}.doc-foot{font-size:7.5pt}
+}
 </style>
 </head>
 <body>
@@ -758,7 +813,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
     <div id="onlineLogin" class="hidden"><div class="field"><label>อีเมลบัญชีจริง</label><input id="loginEmail" type="email" autocomplete="username"></div><div class="field"><label>รหัสผ่าน</label><input id="loginPassword" type="password" autocomplete="current-password"></div></div>
     <p id="loginPreviewNote" style="font-size:14px;margin-bottom:14px;color:var(--muted)"></p>
     <button class="btn btn-primary btn-block" id="loginBtn"><i data-lucide="log-in"></i> เข้าสู่ระบบ</button>
-    <details class="connection-setup"><summary>ตั้งค่าฐานข้อมูลครั้งแรก</summary><div class="field"><label>Supabase Project URL</label><input id="connectUrl" placeholder="https://xxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><input id="connectKey" autocomplete="off"></div><div class="field"><label>อีเมลผู้ดูแลระบบจริง</label><input id="connectAdmin" type="email"></div><p style="font-size:14px;margin-bottom:12px">สร้างบัญชีแอดมินใน Supabase Authentication → Users ก่อน แล้วดาวน์โหลด SQL ไปรันใน SQL Editor ครั้งเดียว</p><button id="downloadSql" class="btn btn-ghost">ดาวน์โหลด SQL</button><button id="connectSave" class="btn btn-primary">บันทึกการเชื่อมต่อ</button><button id="useDemo" class="btn btn-ghost">ทดลองโหมดสาธิต</button></details>
+    <details class="connection-setup" id="connectionSetup"><summary>ตั้งค่าฐานข้อมูลครั้งแรก</summary><div class="field"><label>Supabase Project URL</label><input id="connectUrl" placeholder="https://xxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><input id="connectKey" autocomplete="off"></div><div class="field"><label>อีเมลผู้ดูแลระบบจริง</label><input id="connectAdmin" type="email"></div><p style="font-size:14px;margin-bottom:12px">สร้างบัญชีแอดมินใน Supabase Authentication → Users ก่อน แล้วดาวน์โหลด SQL ไปรันใน SQL Editor ครั้งเดียว</p><button id="downloadSql" class="btn btn-ghost">ดาวน์โหลด SQL</button><button id="connectSave" class="btn btn-primary">บันทึกการเชื่อมต่อ</button><button id="useDemo" class="btn btn-ghost">ทดลองโหมดสาธิต</button></details>
     <div class="login-foot">© โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ระบบจัดการลูกหนี้และรายงานการส่งน้ำ</div>
   </div>
 </div>
