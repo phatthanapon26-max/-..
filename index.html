@@ -842,6 +842,75 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 @media print{
   @page{size:A4 portrait;margin:12mm 12mm 14mm}.doc-page{font-size:9pt}.doc-head{break-inside:avoid}.doc-table thead{display:table-header-group}.doc-table tr{break-inside:avoid;page-break-inside:avoid}.doc-section-title{break-after:avoid}.sign-row{break-inside:avoid;page-break-inside:avoid}.doc-foot{break-inside:avoid}
 }
+
+/* ============================================================
+   V7 — CLEAN MODERN UI / TRUE DARK MODE / ONE-PAGE PRINT FIX
+   ============================================================ */
+@media screen{
+  :root,[data-theme="light"]{
+    --bg:#f4f8fb;--card:#fff;--text:#15344d;--muted:#61788b;--border:#d6e3ec;
+    --navy:#0b4e7e;--navy2:#0878bc;--navy3:#16a9d3;--navy-soft:#edf7fc;
+    --gold:#f5b719;--gold2:#d58b08;--orange:#f47732;--green:#159a62;--red:#d94152;
+    --shadow:0 8px 24px rgba(22,73,109,.09);--shadow-lg:0 24px 60px rgba(12,53,82,.20)
+  }
+  body{background:#f4f8fb!important;color:var(--text)}
+  .marquee{background:#0b5d91;color:#fff}
+  .sidebar{background:#0877ae!important}.sidebar-brand{background:#076a9d!important}.sidebar-brand .logo{background:#ffc52d!important;color:#744500}.nav-item:hover{background:#0a6797}.nav-item.active{background:#fff!important;color:#07547f}.nav-group-label{color:#ffe27b}
+  .topbar{background:#fff!important}.page-head{background:#fff!important;border:1px solid var(--border);border-top:5px solid #19a7d1;border-radius:16px;box-shadow:var(--shadow)}
+  .page-head h2:after{background:#f5b719!important;height:4px;width:68px}
+  .panel,.debtor-card,.stat-card{background:#fff!important;border-color:var(--border);box-shadow:var(--shadow)}
+  .panel-head{background:#f7fbfd!important}.stat-card:after{display:none}.stat-card{border-radius:16px!important}
+  .command-bar{background:#fff!important;color:#123d5c!important;border:1px solid #d1e2ec;border-left:6px solid #0d8fc2;box-shadow:var(--shadow);border-radius:16px}
+  .command-bar b,.command-bar span{color:#123d5c!important;opacity:1!important}.command-bar b svg{color:#f0aa14}
+  .command-actions .btn-primary{background:#137fc2!important;color:#fff}.command-actions .btn-success{background:#16965f!important;color:#fff}.command-actions .btn-ghost{background:#fff7dd!important;color:#875400!important;border-color:#f1c558!important}
+  .btn-danger,.btn-danger span,.btn-danger svg{color:#fff!important}.btn-danger{background:#db4655!important;border-color:#c93646!important;opacity:1!important;text-shadow:none!important}.btn-danger:disabled{color:#fff!important;opacity:.62!important}
+  .tbl thead th{background:#0c78ae!important;color:#fff}.tbl tbody tr:nth-child(even){background:#f5f9fc}.tbl tbody tr:hover{background:#fff8dc}
+  .modal-head{background:#f5fafc!important}.modal-foot{background:#f5f8fa!important}.qr-wrap{background:#f1f8fc!important}
+  .payment-cards{display:none}
+}
+
+/* Dark mode is independent, high-contrast, and never reuses the light palette. */
+@media screen{
+  [data-theme="dark"]{
+    --bg:#071725;--card:#102638;--text:#edf7ff;--muted:#a8bed0;--border:#29475c;
+    --navy:#9ad9ff;--navy2:#31a9df;--navy3:#42c7de;--navy-soft:#16364b;
+    --gold:#ffd052;--gold2:#f6bd35;--orange:#ff9555;--green:#35c987;--red:#ff7180;
+    --shadow:0 9px 26px rgba(0,0,0,.27);--shadow-lg:0 25px 65px rgba(0,0,0,.48)
+  }
+  [data-theme="dark"] body{background:#071725!important;color:#edf7ff}
+  [data-theme="dark"] .main{background:#071725}[data-theme="dark"] .topbar{background:#0d2232!important;border-color:#28465b}[data-theme="dark"] .topbar .page-title{color:#eaf7ff}
+  [data-theme="dark"] .page-head,[data-theme="dark"] .panel,[data-theme="dark"] .debtor-card,[data-theme="dark"] .stat-card,[data-theme="dark"] .command-bar{background:#102638!important;border-color:#29475c;color:#edf7ff}
+  [data-theme="dark"] .page-head h2,[data-theme="dark"] .panel-head h3,[data-theme="dark"] .stat-card .value,[data-theme="dark"] .command-bar b,[data-theme="dark"] .command-bar span{color:#edf7ff!important}
+  [data-theme="dark"] .page-head .desc,[data-theme="dark"] .stat-card .label,[data-theme="dark"] .stat-card .sub{color:#a8bed0}
+  [data-theme="dark"] .panel-head,[data-theme="dark"] .modal-head,[data-theme="dark"] .modal-foot{background:#153044!important;border-color:#29475c}
+  [data-theme="dark"] .tbl-wrap,[data-theme="dark"] .modal,[data-theme="dark"] .field input,[data-theme="dark"] .field select,[data-theme="dark"] .field textarea,[data-theme="dark"] .search-box{background:#0d2232;color:#edf7ff;border-color:#34556b}
+  [data-theme="dark"] .tbl tbody td{color:#dcebf5;border-color:#29475c}[data-theme="dark"] .tbl tbody tr:nth-child(even){background:#122b3d}[data-theme="dark"] .tbl tbody tr:hover{background:#203a47}
+  [data-theme="dark"] .field label{color:#cdeaff}[data-theme="dark"] .field input::placeholder,[data-theme="dark"] .search-box input::placeholder{color:#7892a5}
+  [data-theme="dark"] .btn-ghost{background:#17364a;color:#e9f7ff;border-color:#416077}[data-theme="dark"] .qr-wrap{background:#17364a!important}[data-theme="dark"] .dc-foot{background:#102638;color:#dcebf5}
+}
+
+@media screen and (max-width:700px){
+  .page-head{border-radius:14px;padding:15px}.command-bar{border-radius:14px;padding:14px}.command-bar>div:first-child{width:100%}.command-bar b{font-size:16px}.command-bar span{line-height:1.4}
+  .command-actions{grid-template-columns:repeat(3,minmax(0,1fr))!important}.command-actions .btn{min-height:64px;color:inherit!important}.command-actions .btn-primary,.command-actions .btn-success{color:#fff!important}
+  .payment-table{display:none!important}.payment-cards{display:grid;gap:12px}.payment-card{padding:15px;border:1px solid var(--border);border-radius:15px;background:var(--card);box-shadow:0 6px 18px rgba(22,73,109,.07)}
+  .payment-card-head{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}.payment-card-head strong{font-size:20px;color:var(--green)}.payment-card h3{font-size:18px;color:var(--navy);margin:8px 0 11px}
+  .payment-card dl{display:grid;gap:7px;margin:0 0 12px}.payment-card dl div{display:flex;justify-content:space-between;gap:14px;padding-bottom:6px;border-bottom:1px dashed var(--border)}.payment-card dt{color:var(--muted);font-size:12px}.payment-card dd{margin:0;text-align:right;font-weight:700;font-size:13px}.payment-card .btn{width:100%;min-height:50px;justify-content:center}
+  [data-theme="dark"] .payment-card{background:#102638;border-color:#29475c}[data-theme="dark"] .payment-card h3{color:#eaf7ff}
+}
+
+/* Print only the document. Hidden application layout must not create blank pages. */
+@media print{
+  html,body{margin:0!important;padding:0!important;background:#fff!important;background-image:none!important;height:auto!important;min-height:0!important}
+  body>*:not(.print-area){display:none!important}
+  .print-area{display:block!important;position:static!important;inset:auto!important;width:auto!important;margin:0!important;padding:0!important;background:#fff!important;background-image:none!important}
+  .print-area,.print-area *,.doc-page,.doc-page *{visibility:visible!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important}
+  .doc-page{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;min-height:0!important;height:auto!important;background:#fff!important;color:#000!important}
+  .doc-head,.doc-meta,.doc-section-title,.doc-table,.doc-table th,.doc-table td,.doc-summary,.sign-row,.sign-box,.doc-foot{background-color:#fff!important;color:#000!important}
+  .doc-table th{background-color:#e5e5e5!important;color:#000!important}
+  .doc-head{border-color:#000!important}.doc-section-title{border-color:#000!important;background:#eee!important}
+  .doc-gap{height:4mm!important}.sign-row{margin-top:13mm!important}.doc-foot{margin-top:5mm!important}
+  @page{size:A4 portrait;margin:10mm 11mm 11mm}
+}
 </style>
 </head>
 <body>
@@ -924,6 +993,6 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 <script src="deploy-config.js"></script>
 <script src="database-config.js"></script>
 <script src="sync.js"></script>
-<script src="app.js?v=6.0.0"></script>
+<script src="app.js?v=7.0.0"></script>
 </body>
 </html>
