@@ -254,6 +254,13 @@ async function startOnline(email,password){
  const {data,error}=await client.auth.signInWithPassword({email,password});
  if(error)throw error;
  authIdentity=data.user;
+ // Returning users must never wait for a slow database pool before the UI opens.
+ // The cached snapshot is a copy of the last successful real Supabase response.
+ if(resumeCachedOnline(data.user)){
+  enterApp();setStatus('เข้าสู่ระบบแล้ว · กำลังซิงก์ฐานข้อมูลเบื้องหลัง','warn');
+  hydrateOnline().catch(()=>{setStatus('ใช้งานข้อมูลล่าสุด · รายการใหม่จะรอส่งอัตโนมัติ','warn');});
+  return;
+ }
  try{await hydrateOnline();}catch(e){
   // Authentication succeeded. Never destroy a valid session merely because the
   // database connection pool is temporarily busy; restore the last real snapshot.
@@ -288,7 +295,13 @@ async function resumeOnline(){
  try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
  if(!data.session)return;
  const verified=await client.auth.getUser();if(verified.error)throw verified.error;
- authIdentity=verified.data.user;await hydrateOnline();
+ authIdentity=verified.data.user;
+ if(resumeCachedOnline(authIdentity)){
+  enterApp();setStatus('เปิดระบบจากข้อมูลจริงล่าสุด · กำลังซิงก์เบื้องหลัง','warn');
+  hydrateOnline().catch(()=>setStatus('ใช้งานข้อมูลล่าสุด · ฐานข้อมูลจะเชื่อมต่อซ้ำอัตโนมัติ','warn'));
+  return;
+ }
+ await hydrateOnline();
  }catch(e){
   if(authIdentity&&resumeCachedOnline(authIdentity)){enterApp();setStatus('ฐานข้อมูลกำลังเชื่อมต่อใหม่ · ใช้ข้อมูลล่าสุดในเครื่อง','warn');setTimeout(()=>supabaseFetch(),2500);return;}
   session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('ยืนยันบัญชีแล้ว แต่ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง','error');
