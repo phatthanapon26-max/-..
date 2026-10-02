@@ -55,10 +55,10 @@ function toast(msg, type){
 
 /* ---------- modal ---------- */
 function openModal(html){
-  $('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
+  $('#modalBox').className='modal';$('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
   if(window.lucide)lucide.createIcons();
 }
-function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').innerHTML='';}
+function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').className='modal';$('#modalBox').innerHTML='';}
 $('#modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal();});
 
 /* ============================================================
@@ -145,7 +145,10 @@ function authFor(cfg){
  if(!window.supabase)throw Error('โหลดระบบล็อกอินไม่สำเร็จ');
  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(cfg.url))throw Error('กรอก URL โครงการ Supabase แบบ https://ชื่อโครงการ.supabase.co');
  if(!authClient||authClient._freshyUrl!==cfg.url||authClient._freshyKey!==cfg.key){
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(20000)}))}});
+  // Preserve an existing session from earlier versions that used sessionStorage.
+  for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
+  // localStorage keeps the authenticated session available when a QR report opens in a new tab.
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(20000)}))}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
@@ -449,7 +452,7 @@ function renderDebtors(area){
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
       <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
-      <a class="qr-wrap" href="${qrUrl}" target="_blank" rel="noopener" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>แตะเพื่อเปิดรายงาน</b><br>หรือสแกน QR Code</small></a></div>
+      <a class="qr-wrap" href="${qrUrl}" target="_blank" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>แตะเพื่อเปิดรายงาน</b><br>หรือสแกน QR Code</small></a></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
@@ -495,22 +498,22 @@ function openAddDebtor(area){
   openModal(`
     <div class="modal-head"><h3><i data-lucide="plus-circle"></i> เพิ่มรายการลูกหนี้ค้างจ่าย ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">พิมพ์ชื่อลูกหนี้แล้วกด <b>Enter</b> เพื่อย้ายไปช่องถัดไป ระบบจะแสดงรหัสลูกหนี้และหมู่/หมู่บ้านให้อัตโนมัติ (แก้ไขได้)</p>
-      <div class="form-grid">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">เลือกชื่อลูกหนี้ กรอกจำนวนและยอดเงิน แล้วกดปุ่มบันทึกด้านล่าง</p>
+      <div class="form-grid debt-form-grid">
         <div class="field full" style="position:relative"><label>ชื่อลูกหนี้ <span style="color:var(--red)">*</span></label>
           <input id="f_name" class="f-step" autocomplete="off" placeholder="พิมพ์ชื่อลูกหนี้...">
           <div class="search-suggest hidden" id="f_nameSug" style="position:absolute;top:auto;left:0;right:0;z-index:40"></div>
         </div>
         <div class="field"><label>รหัสลูกหนี้ (ระบบรันอัตโนมัติ)</label><input id="f_code" readonly style="background:#f1f3f6;font-weight:700;color:var(--navy2)" value="รอพิมพ์ชื่อ"></div>
         <div class="field"><label>${area==='nai'?'หมู่ที่ (พิมพ์ 7 หรือ 16 ได้)':'ชื่อบ้าน / หมู่บ้าน'}</label><input id="f_area" class="f-step" autocomplete="off" placeholder="${area==='nai'?'เช่น 7 หรือ 16':'เลือก/พิมพ์หมู่บ้าน'}"></div>
-        <div class="field"><label>จำนวนถังที่ค้าง</label><input type="number" id="f_jugs" class="f-step" value="0" min="0"></div>
-        <div class="field"><label>เงินค้างน้ำถัง (บาท)</label><input type="number" id="f_ja" class="f-step" value="0" min="0"></div>
-        <div class="field"><label>จำนวนแพ็คที่ค้าง</label><input type="number" id="f_packs" class="f-step" value="0" min="0"></div>
-        <div class="field"><label>เงินค้างน้ำแพ็ค (บาท)</label><input type="number" id="f_pa" class="f-step" value="0" min="0"></div>
-        <div class="field full"><label>วันที่ค้างชำระ (กด Enter เพื่อบันทึก)</label><input type="date" id="f_date" class="f-step" value="${todayStr()}"></div>
+        <div class="debt-product-group jug-group full"><div class="field"><label>จำนวนถังที่ค้าง</label><input type="number" inputmode="numeric" id="f_jugs" class="f-step" value="0" min="0"></div><div class="field"><label>เงินค้างน้ำถัง (บาท)</label><input type="number" inputmode="decimal" id="f_ja" class="f-step debt-money" value="0" min="0"></div></div>
+        <div class="debt-product-group pack-group full"><div class="field"><label>จำนวนแพ็คที่ค้าง</label><input type="number" inputmode="numeric" id="f_packs" class="f-step" value="0" min="0"></div><div class="field"><label>เงินค้างน้ำแพ็ค (บาท)</label><input type="number" inputmode="decimal" id="f_pa" class="f-step debt-money" value="0" min="0"></div></div>
+        <div class="field full"><label>วันที่ค้างชำระ</label><input type="date" id="f_date" class="f-step" value="${todayStr()}"></div>
+        <div class="debt-total-preview full"><span>ยอดค้างรวมที่จะบันทึก</span><strong id="debtTotalPreview">0 บาท</strong></div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="saveDebtor"><i data-lucide="save"></i> บันทึกลูกหนี้</button></div>`);
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="saveDebtor"><i data-lucide="save"></i> ยืนยันบันทึกลูกหนี้</button></div>`);
+  $('#modalBox').classList.add('debt-entry-modal');
   let selectedCustId=null;
   const nameI=$('#f_name'), sug=$('#f_nameSug'), codeI=$('#f_code'), areaI=$('#f_area');
   function applyCustomer(c){
@@ -548,6 +551,9 @@ function openAddDebtor(area){
     });
   });
   nameI.focus();
+  const refreshDebtTotal=()=>{$('#debtTotalPreview').textContent=fmtN((+$('#f_ja').value||0)+(+$('#f_pa').value||0))+' บาท';};
+  ['#f_ja','#f_pa'].forEach(sel=>$(sel).addEventListener('input',refreshDebtTotal));
+  $('#modalBox').querySelectorAll('input[type="number"]').forEach(el=>el.addEventListener('focus',()=>el.select()));
   $('#saveDebtor').addEventListener('click',()=>{
     const name=nameI.value.trim(); if(!name){toast('กรุณาพิมพ์ชื่อลูกหนี้','error');nameI.focus();return;}
     const jugs=+$('#f_jugs').value||0, packs=+$('#f_packs').value||0, ja=+$('#f_ja').value||0, pa=+$('#f_pa').value||0;
@@ -874,28 +880,30 @@ function renderPublicQrReport(cid){
   const days=(iso)=>Math.max(0,Math.floor((new Date()-new Date(iso))/86400000));
   let rows='';
   debts.forEach((d,i)=>{rows+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td class="num">${days(d.debtDate)}</td><td>${cs.txt}</td><td class="num">${d.jugs||0}</td><td class="num">${fmtN(d.jugAmount||0)}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.packAmount||0)}</td><td class="num">${fmtN(d.total)}</td></tr>`;});
+  const mobileRows=debts.map((d,i)=>`<article class="qr-debt-card"><div class="qr-debt-head"><b>รายการที่ ${i+1}</b><span>${thDate(d.debtDate)}</span></div><div class="qr-debt-grid"><span>ค้างมา <b>${days(d.debtDate)} วัน</b></span><span>เครดิต <b>${cs.txt}</b></span><span>น้ำถัง <b>${d.jugs||0} ถัง · ${fmtN(d.jugAmount||0)} บาท</b></span><span>น้ำแพ็ค <b>${d.packs||0} แพ็ค · ${fmtN(d.packAmount||0)} บาท</b></span></div><div class="qr-debt-total">ยอดรายการ <b>${fmtN(d.total)} บาท</b></div></article>`).join('');
   const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
   document.body.innerHTML=`
-  <style>@media print{body *{visibility:visible!important}.no-print{display:none!important}body{background:#fff!important}@page{size:A4;margin:14mm 12mm}}</style>
-  <div style="max-width:820px;margin:0 auto;padding:16px;font-family:'Sarabun',sans-serif">
-    <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button onclick="window.print()" style="padding:9px 18px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">พิมพ์ / บันทึกเป็น PDF</button><button onclick="location.href=location.pathname" style="padding:9px 18px;background:#6b7280;color:#fff;border:none;border-radius:8px;cursor:pointer">กลับเข้าระบบ</button></div>
-    <div style="background:#fff;padding:32px;color:#1f2a37;border:1px solid #e2e7ee;border-radius:10px">
-      <div style="text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:12px;margin-bottom:14px">
-        <div style="font-size:20px;font-weight:800;color:#1e3a5f">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>
-        <div style="font-size:12px;color:#6b7684">นครราชสีมา · โทร. 08X-XXX-XXXX</div>
-        <div style="font-size:16px;font-weight:700;margin-top:8px;color:#b8860b">รายงานประวัติลูกหนี้ (สแกน QR Code)</div>
+  <style>
+  *{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#eef8ff,#fffaf0);color:#17324d;font-family:'Sarabun',sans-serif}.qr-page{max-width:920px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#eef8ff 70%,transparent)}.qr-btn{padding:11px 17px;border:0;border-radius:13px;font:700 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:linear-gradient(135deg,#147fcf,#0b5da8);color:#fff}.qr-btn.back{background:linear-gradient(135deg,#ffd34b,#f49a19);color:#704000}.qr-sheet{background:#fff;padding:30px;color:#1f2a37;border:1px solid #d9e9f5;border-radius:22px;box-shadow:0 18px 55px rgba(20,82,132,.14)}.qr-hero{text-align:center;border-bottom:3px solid transparent;border-image:linear-gradient(90deg,#1484d2,#1cb2c1,#f3b21d) 1;padding-bottom:15px;margin-bottom:17px}.qr-hero .brand{font-size:24px;font-weight:800;color:#144b7c}.qr-hero .contact{font-size:13px;color:#6b7684}.qr-hero .title{font-size:18px;font-weight:800;margin-top:9px;color:#d88908}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:15px}.qr-meta div{padding:11px;border-radius:13px;background:#f4f9fd;border:1px solid #e0edf6;font-size:12px}.qr-meta b{display:block;color:#285777;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #dce8f1;border-radius:14px}.qr-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px}.qr-table th{background:#eaf4fc;padding:8px;border:1px solid #cfdeea}.qr-table td{padding:8px;border:1px solid #dde7ef;text-align:center}.qr-table tfoot td{background:#fff4cf;font-weight:800}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:18px;padding:16px;border-radius:17px;background:linear-gradient(135deg,#f2f9ff,#fff8df)}.qr-summary .copy{flex:1;font-size:12px;color:#63788a}.qr-summary .amount{font-size:24px;font-weight:800;color:#e27713;margin-top:6px}.qr-code{width:118px;height:118px;border:7px solid #fff;box-shadow:0 8px 24px rgba(23,73,111,.14)}.qr-signs{display:flex;gap:10px;margin-top:24px;font-size:12px}
+  @media(max-width:640px){.qr-page{padding:10px}.qr-actions{padding-top:5px}.qr-btn{flex:1;padding:12px 8px}.qr-sheet{padding:17px 14px;border-radius:19px}.qr-hero .brand{font-size:21px}.qr-hero .title{font-size:16px}.qr-meta{grid-template-columns:1fr 1fr;gap:7px}.qr-meta div{padding:9px;font-size:12px}.qr-table-wrap{display:none}.qr-mobile-list{display:grid;gap:10px}.qr-debt-card{border:1px solid #d9e9f5;border-left:5px solid #f2a91c;border-radius:15px;overflow:hidden;background:#fff}.qr-debt-head{display:flex;justify-content:space-between;padding:10px 12px;background:linear-gradient(100deg,#eef8ff,#fff8df);color:#275577}.qr-debt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:11px;font-size:12px}.qr-debt-grid span{color:#68798a}.qr-debt-grid b{display:block;color:#183c5d;margin-top:2px}.qr-debt-total{display:flex;justify-content:space-between;padding:10px 12px;background:#f7fbfe;color:#657789}.qr-debt-total b{font-size:17px;color:#e27414}.qr-summary{align-items:flex-start;padding:13px;gap:10px}.qr-summary .amount{font-size:21px}.qr-code{width:96px;height:96px}.qr-signs{display:none}}
+  @media print{body{background:#fff!important}.no-print{display:none!important}.qr-page{max-width:none;padding:0}.qr-sheet{padding:0;border:0;box-shadow:none}.qr-mobile-list{display:none!important}.qr-table-wrap{display:block!important}.qr-signs{display:flex!important}@page{size:A4;margin:14mm 12mm}}
+  </style>
+  <div class="qr-page">
+    <div class="qr-actions no-print"><button class="qr-btn primary" onclick="window.print()">พิมพ์ / บันทึก PDF</button><button class="qr-btn back" onclick="location.href=location.pathname">กลับเข้าระบบ</button></div>
+    <div class="qr-sheet">
+      <div class="qr-hero">
+        <div class="brand">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>
+        <div class="contact">นครราชสีมา · โทร. 08X-XXX-XXXX</div>
+        <div class="title">รายงานประวัติลูกหนี้ · QR Code</div>
       </div>
-      <table style="width:100%;font-size:13px;margin-bottom:12px;border-collapse:collapse">
-        <tr><td style="padding:4px;width:25%"><b>เลขที่เอกสาร:</b> ${docNo}</td><td style="padding:4px;width:25%"><b>วันที่สแกน:</b> ${thDateTimeSec(new Date().toISOString())}</td><td style="padding:4px;width:25%"><b>รหัสลูกหนี้:</b> ${esc(c.code)}</td><td style="padding:4px;width:25%"><b>ชื่อลูกหนี้:</b> ${esc(c.name)}</td></tr>
-        <tr><td style="padding:4px"><b>พนักงานที่กรอก:</b> ${esc(emp.name||'-')}</td><td style="padding:4px"><b>ตำแหน่ง:</b> ${emp.role==='admin'?'แอดมิน':'พนักงาน'}</td><td style="padding:4px"><b>จำนวนค้าง:</b> ${debts.length} รายการ</td><td style="padding:4px"><b>เครดิต:</b> ${cs.txt}</td></tr>
-      </table>
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#eef3f9"><th style="border:1px solid #cbd5e1;padding:6px">ลำดับ</th><th style="border:1px solid #cbd5e1;padding:6px">วันที่ค้าง</th><th style="border:1px solid #cbd5e1;padding:6px">ค้างมา (วัน)</th><th style="border:1px solid #cbd5e1;padding:6px">เครดิต</th><th style="border:1px solid #cbd5e1;padding:6px">ถัง</th><th style="border:1px solid #cbd5e1;padding:6px">เงินน้ำถัง</th><th style="border:1px solid #cbd5e1;padding:6px">แพ็ค</th><th style="border:1px solid #cbd5e1;padding:6px">เงินน้ำแพ็ค</th><th style="border:1px solid #cbd5e1;padding:6px">รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;padding:12px;border:1px solid #cbd5e1">ไม่มีรายการค้าง</td></tr>'}</tbody>
-      <tfoot><tr style="background:#fbf3df;font-weight:700"><td colspan="8" style="text-align:right;padding:8px;border:1px solid #cbd5e1">ยอดค้างรวมทั้งหมด</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:right">${fmtN(total)} บาท</td></tr></tfoot></table>
-      <div style="display:flex;gap:16px;align-items:flex-end;margin-top:20px">
-        <div style="flex:1;font-size:11px;color:#6b7684">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์<br>เลขที่เอกสาร: <b>${docNo}</b></div>
-        <img src="${qrImg}" style="width:110px;height:110px;border:1px solid #ddd;padding:4px;background:#fff">
+      <div class="qr-meta"><div><b>เลขที่เอกสาร</b>${docNo}</div><div><b>วันที่เปิดรายงาน</b>${thDateTimeSec(new Date().toISOString())}</div><div><b>รหัสลูกหนี้</b>${esc(c.code)}</div><div><b>ชื่อลูกหนี้</b>${esc(c.name)}</div><div><b>ผู้บันทึก</b>${esc(emp.name||'-')}</div><div><b>ตำแหน่ง</b>${emp.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน'}</div><div><b>จำนวนค้าง</b>${debts.length} รายการ</div><div><b>เครดิต</b>${cs.txt}</div></div>
+      <div class="qr-table-wrap"><table class="qr-table"><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ค้างมา (วัน)</th><th>เครดิต</th><th>ถัง</th><th>เงินน้ำถัง</th><th>แพ็ค</th><th>เงินน้ำแพ็ค</th><th>รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9">ไม่มีรายการค้าง</td></tr>'}</tbody><tfoot><tr><td colspan="8" style="text-align:right">ยอดค้างรวมทั้งหมด</td><td>${fmtN(total)} บาท</td></tr></tfoot></table></div>
+      <div class="qr-mobile-list">${mobileRows||'<div style="text-align:center;padding:20px">ไม่มีรายการค้าง</div>'}</div>
+      <div class="qr-summary">
+        <div class="copy">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้<br>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · เลขที่เอกสาร <b>${docNo}</b><div class="amount">ยอดค้างรวม ${fmtN(total)} บาท</div></div>
+        <img class="qr-code" src="${qrImg}" alt="QR Code รายงานลูกหนี้">
       </div>
-      <div style="display:flex;gap:10px;margin-top:24px;font-size:12px">
+      <div class="qr-signs">
         ${sign('ผู้จัดการข้อมูล')}${sign('ผู้กรอกข้อมูล')}${sign('ผู้ออก QR Code')}${sign('ผู้ตรวจสอบ')}${sign('หัวหน้า / ผู้บริหาร')}
       </div>
     </div>
