@@ -149,7 +149,7 @@ function authFor(cfg){
   // Preserve an existing session from earlier versions that used sessionStorage.
   for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
   // localStorage keeps the authenticated session available when a QR report opens in a new tab.
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(20000)}))}});
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(45000)}))}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
@@ -254,7 +254,22 @@ async function startOnline(email,password){
  const {data,error}=await client.auth.signInWithPassword({email,password});
  if(error)throw error;
  authIdentity=data.user;
- try{await hydrateOnline();}catch(e){await client.auth.signOut();authIdentity=null;session=null;throw e;}
+ try{await hydrateOnline();}catch(e){
+  // Authentication succeeded. Never destroy a valid session merely because the
+  // database connection pool is temporarily busy; restore the last real snapshot.
+  if(resumeCachedOnline(data.user)){enterApp();setStatus('เข้าสู่ระบบแล้ว · ฐานข้อมูลกำลังเชื่อมต่อใหม่','warn');toast('ยืนยันบัญชีสำเร็จ ใช้ข้อมูลล่าสุดในเครื่องชั่วคราว','info');setTimeout(()=>supabaseFetch(),2500);return;}
+  throw Error('ยืนยันบัญชีสำเร็จ แต่ฐานข้อมูลยังไม่ตอบสนอง กรุณากดเข้าสู่ระบบอีกครั้งในอีกสักครู่ ('+(e.message||'connection timeout')+')');
+ }
+}
+function resumeCachedOnline(user){
+ let cached=null;try{cached=JSON.parse(localStorage.getItem(draftKey()));}catch(e){}
+ if(!cached||!cached.base||!cached.data)return false;
+ const data=cached.data,employee=(data.employees||[]).find(e=>String(e.email||'').toLowerCase()===String(user.email||'').toLowerCase());
+ if(!employee)return false;
+ const cfg=DB.settings.db;
+ for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),data.settings||{});else DB[k]=data[k]||[];}
+ DB.settings.db=cfg;remoteBase=cached.base;session={empId:employee.id,loginAt:new Date().toISOString(),online:true,cached:true};
+ return true;
 }
 async function hydrateOnline(){
  const payload=await rpc('freshy_read');
@@ -274,7 +289,10 @@ async function resumeOnline(){
  if(!data.session)return;
  const verified=await client.auth.getUser();if(verified.error)throw verified.error;
  authIdentity=verified.data.user;await hydrateOnline();
- }catch(e){authIdentity=null;session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('เข้าสู่ระบบใหม่: '+e.message,'error');}
+ }catch(e){
+  if(authIdentity&&resumeCachedOnline(authIdentity)){enterApp();setStatus('ฐานข้อมูลกำลังเชื่อมต่อใหม่ · ใช้ข้อมูลล่าสุดในเครื่อง','warn');setTimeout(()=>supabaseFetch(),2500);return;}
+  session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('ยืนยันบัญชีแล้ว แต่ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง','error');
+ }
 }
 function dbAdd(col,doc){doc.id=doc.id||uid();DB[col].push(doc);dbSave();return doc;}
 function dbUpdate(col,id,patch){const i=DB[col].findIndex(x=>x.id===id);if(i>=0){Object.assign(DB[col][i],patch);dbSave();return DB[col][i];}return null;}
