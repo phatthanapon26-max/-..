@@ -557,6 +557,57 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 .doc-page{font-size:13px}.doc-head{border:2px solid #153d66;border-radius:8px;padding:12px;margin-bottom:10px}.doc-head:after{content:"เอกสารทางการ";position:absolute;right:10px;top:8px;font-size:9px;color:#66788a;letter-spacing:.4px}.doc-table th{background:#dfeaf4;color:#102f50;border-color:#657d94}.doc-table td{border-color:#8799aa}.doc-meta{border-bottom:1px solid #9aa9b8;padding-bottom:8px}.doc-foot{color:#263b50;border-top:1px solid #657d94}
 @media(max-width:900px){.sidebar{width:270px;left:-282px}.content{padding:20px 16px 60px}.command-bar{align-items:flex-start;flex-direction:column}.command-actions{width:100%}.command-actions .btn{flex:1}.report-schedule{align-items:flex-start;flex-wrap:wrap}.report-schedule .status-tag{margin-left:62px}}
 @media(max-width:540px){.content{padding:16px 12px 50px}.stats-grid{grid-template-columns:1fr}.stat-card{min-height:126px}.page-head h2{font-size:23px}.command-actions{display:grid;grid-template-columns:1fr}.report-schedule .status-tag{margin-left:0}.doc-page{font-size:11px}.topbar{padding:10px 12px}}
+
+/* Mobile clarity refresh: brighter surfaces, stronger layers, less vertical crowding. */
+@media screen {
+  :root,[data-theme="light"]{
+    --bg:#f5faff;--card:#ffffff;--text:#17324d;--muted:#65788b;
+    --navy:#103f70;--navy2:#1477ce;--navy3:#21a7df;--navy-soft:#eaf5ff;
+    --border:#d9e9f6;--shadow:0 8px 26px rgba(34,103,158,.10);
+    --shadow-lg:0 18px 50px rgba(25,84,136,.18)
+  }
+  body{background:linear-gradient(180deg,#f9fcff 0,#f1f8ff 48%,#f7fcfb 100%);background-attachment:fixed}
+  .panel,.stat-card,.debtor-card{border:1px solid rgba(205,228,244,.85);box-shadow:0 10px 28px rgba(25,91,145,.09)}
+  .panel{position:relative;background:rgba(255,255,255,.96)}
+  .panel:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+  .qr-wrap{text-decoration:none;color:inherit;border-radius:14px;padding:5px;transition:transform .18s,background .18s,box-shadow .18s}
+  .qr-wrap:hover,.qr-wrap:focus-visible{background:#eaf6ff;box-shadow:0 7px 18px rgba(21,111,184,.16);transform:translateY(-2px);outline:none}
+  .qr-mini{box-shadow:0 5px 14px rgba(25,82,126,.14)}
+  .mobile-nav-scrim{display:none}
+}
+@media(max-width:600px){
+  body{font-size:15px;background:linear-gradient(180deg,#fbfdff 0,#f0f8ff 56%,#f7fcfb 100%)}
+  .marquee{display:none}
+  .topbar{height:64px!important;min-height:64px!important;padding:8px 12px!important;gap:8px!important;flex-wrap:nowrap!important;overflow:visible!important;background:rgba(255,255,255,.96);border-bottom:1px solid #d8e9f6;box-shadow:0 5px 22px rgba(26,91,145,.08)}
+  .menu-toggle{width:44px;height:44px;padding:0;border-radius:14px;align-items:center;justify-content:center;background:linear-gradient(145deg,#edf7ff,#fff);border:1px solid #d7e9f7;box-shadow:0 5px 14px rgba(26,91,145,.10)}
+  .menu-toggle svg{width:24px;height:24px}
+  .topbar .page-title{font-size:17px!important;max-width:none!important;min-width:0;flex:1;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar .page-title svg{display:block!important;width:19px;height:19px;color:#19a3d7}
+  #themeToggle{width:44px;height:44px;min-height:44px;padding:0;border-radius:14px;flex:0 0 auto}
+  #themeLabel,.pending-btn,#modeTagText,#rtText{display:none!important}
+  #modeTag{width:36px;height:36px;min-width:36px;padding:0!important;display:grid;place-items:center;overflow:visible!important;border:0;background:#eaf7ff;color:#1675bc}
+  #modeTag svg{width:18px;height:18px}
+  .rt-dot{position:absolute;right:10px;bottom:7px;width:10px;height:10px;display:block!important}
+  .rt-dot .dot{display:block;width:8px;height:8px}
+  .content{padding:18px 14px calc(44px + env(safe-area-inset-bottom));overflow:hidden}
+  .page-head{margin-bottom:16px;gap:5px}.page-head h2{font-size:21px!important;line-height:1.32}.page-head .desc{font-size:13px;line-height:1.45}
+  .command-bar{padding:15px;border-radius:22px;background:linear-gradient(145deg,#ffffff,#eef8ff);color:var(--navy);border:1px solid #d4e9f7;box-shadow:0 12px 30px rgba(29,103,158,.11);gap:12px;margin-bottom:18px}
+  .command-bar b{font-size:16px;color:#124b7f}.command-bar span{font-size:12px;color:var(--muted);opacity:1}
+  .command-actions{width:100%;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px}
+  .command-actions .btn{min-width:0;min-height:68px;padding:9px 6px;white-space:normal;line-height:1.2;flex-direction:column;border-radius:15px;font-size:12.5px;box-shadow:none}
+  .command-actions .btn svg{width:20px;height:20px}.command-actions .btn-primary{background:linear-gradient(145deg,#1789e3,#0f65bd)}.command-actions .btn-success{background:linear-gradient(145deg,#22ad69,#0d8b67)}
+  .stats-grid{display:flex!important;gap:12px!important;overflow-x:auto;padding:2px 2px 13px;margin:0 -2px 14px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .stats-grid::-webkit-scrollbar{display:none}.stat-card{flex:0 0 min(78vw,300px);min-height:118px!important;padding:17px 18px!important;border-radius:21px;scroll-snap-align:start;border-left-width:5px!important}
+  .stat-card .label{font-size:13px}.stat-card .value{font-size:29px!important;margin-top:8px}.stat-card .sub{font-size:12px}
+  .panel{border-radius:22px;margin-bottom:16px}.panel-head{padding:15px 16px;background:linear-gradient(100deg,#edf7ff,#fff)}.panel-head h3{font-size:16px}.panel-body{padding:15px!important}
+  .dash-grid{gap:14px!important}.tbl-wrap{border:1px solid #e1edf6;border-radius:14px}
+  .report-schedule{padding:15px;border-radius:20px;gap:11px}.report-clock{width:42px;height:42px;border-radius:13px}.report-schedule b{font-size:15px}.report-schedule p{font-size:12px}.report-schedule .status-tag{width:auto;height:auto;margin-left:0;padding:5px 9px!important;display:inline-flex}
+  .sidebar{left:-290px!important;width:282px!important;box-shadow:18px 0 45px rgba(4,35,65,.28);transition:left .24s ease!important}.sidebar.open{left:0!important}
+  .sidebar.open + .mobile-nav-scrim{display:block;position:fixed;inset:0;background:rgba(8,38,66,.34);backdrop-filter:blur(3px);z-index:45}
+  .sidebar-brand{min-height:80px}.nav-item{font-size:15px!important;padding:12px 14px}
+  .debtor-card .dc-head{padding:12px;flex-wrap:wrap}.debtor-card .dc-head .pay-btn,.debtor-card .dc-head>.btn{margin-left:auto}.qr-wrap{margin-left:0;width:100%;justify-content:flex-end;background:#f1f8fd;border:1px solid #dcecf7;padding:8px 10px}.qr-wrap small{max-width:none;font-size:12px}.qr-mini{width:64px;height:64px}
+  .modal-backdrop{padding:10px}.modal{max-height:94vh;border-radius:22px}.modal-body{padding:15px}
+}
 </style>
 </head>
 <body>
@@ -600,6 +651,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
       <button class="btn btn-ghost btn-sm btn-block" id="logoutBtn" style="color:#cdd7e5;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><i data-lucide="log-out"></i> ออกจากระบบ</button>
     </div>
   </aside>
+  <button class="mobile-nav-scrim" id="mobileNavScrim" aria-label="ปิดเมนู"></button>
   <div class="main">
     <div class="marquee"><span>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ทดสอบระบบจัดการลูกหนี้เวอร์ชัน v.1.0 ประจำเดือนกันยายน พุทธศักราช 2569 · ข้อมูลอัปเดตลูกหนี้แบบเรียลไทม์ · ปกป้องข้อมูลส่วนบุคคลตามกฎหมาย &nbsp;✦&nbsp; โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ทดสอบระบบจัดการลูกหนี้เวอร์ชัน v.1.0 ประจำเดือนกันยายน พุทธศักราช 2569 · ข้อมูลอัปเดตลูกหนี้แบบเรียลไทม์ · ปกป้องข้อมูลส่วนบุคคลตามกฎหมาย &nbsp;✦&nbsp;</span></div>
     <header class="topbar">
