@@ -1093,24 +1093,26 @@ function docHeader(reportTitle,docNo){
     <div class="doc-logo">${logo}</div>
     <div class="doc-title">
       ${s.header.showName?`<div class="factory">${esc(s.business.name)}</div>`:''}
-      <div class="factory-sub">${esc(s.business.address)} · โทร ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
+      <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
       <div class="report-name">${esc(reportTitle)}</div>
     </div>
+    <div class="doc-control"><div class="control-label">เอกสารควบคุม / OFFICIAL RECORD</div><strong>${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>สถานะ: ใช้งานอย่างเป็นทางการ</span></div>
   </div>
   <div class="doc-meta">
-    <div>วันที่ออกเอกสาร: ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} เวลา ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
-    <div class="doc-no">เลขที่เอกสาร: ${docNo}</div>
+    <div><b>วันที่จัดทำ</b> ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543}</div>
+    <div><b>เวลาจัดทำ</b> ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
+    <div class="doc-no">เลขที่เอกสาร ${esc(docNo)}</div>
   </div>`;
 }
 function docFooter(docNo){
   const u=me();
   return `<div class="sign-row">
-    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้จัดการข้อมูล</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ส่งน้ำ</div></div>
-    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้ออกเอกสาร</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ / หัวหน้าหรือผู้บริหาร</div></div>
+    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้จัดทำข้อมูล</div><div class="sign-date">วันที่ ____/____/______</div></div>
+    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">พนักงานส่งน้ำ</div><div class="sign-date">วันที่ ____/____/______</div></div>
+    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ</div><div class="sign-date">วันที่ ____/____/______</div></div>
+    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้อนุมัติ</div><div class="sign-date">วันที่ ____/____/______</div></div>
   </div>
-  <div class="doc-foot">เลขที่เอกสาร ${docNo} ออกเอกสารโดยระบบจัดการลูกหนี้โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>`;
+  <div class="doc-foot"><span><strong>เลขที่เอกสาร ${esc(docNo)}</strong> · เอกสารภายใน ห้ามแก้ไขโดยไม่ได้รับอนุญาต</span><span>ระบบสารสนเทศจัดการลูกหนี้ · เฟรชชี่ วอเตอร์</span></div>`;
 }
 function buildDebtorReportHtml(area,filter,mode){
   let rows=DB.debtors.filter(d=>d.area===area&&d.status==='unpaid');
