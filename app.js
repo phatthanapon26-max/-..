@@ -149,7 +149,7 @@ function authFor(cfg){
   // Preserve an existing session from earlier versions that used sessionStorage.
   for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
   // localStorage keeps the authenticated session available when a QR report opens in a new tab.
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(45000)}))}});
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(15000)}))}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
@@ -192,8 +192,9 @@ async function supabaseFetch(){
   const payload=await rpc('freshy_read');
   const edits=remoteBase?FreshySync.diff(snapshot,FreshySync.shared(DB)):[];
   installRemote(payload,edits);
+  const changed=!FreshySync.equal(snapshot,FreshySync.shared(DB));
   setStatus('เชื่อมต่อออนไลน์ · อัปเดตข้อมูลแล้ว','ok');
-  if(session){refreshUserChip();if(currentPage!=='settings'&&!modalIsOpen()&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
+  if(session){refreshUserChip();if(changed&&currentPage!=='settings'&&!modalIsOpen()&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
   return true;
  }catch(e){setStatus('เชื่อมต่อไม่สำเร็จ · '+e.message,'err');return false;}
  finally{syncBusy=false;}
@@ -294,14 +295,15 @@ async function resumeOnline(){
  const cfg=supaCfg();if(!cfg)return;
  try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
  if(!data.session)return;
- const verified=await client.auth.getUser();if(verified.error)throw verified.error;
- authIdentity=verified.data.user;
+ // getSession reads the verified Supabase session from local storage instantly.
+ // Do not block the first screen on an additional network getUser request.
+ authIdentity=data.session.user;
  if(resumeCachedOnline(authIdentity)){
   enterApp();setStatus('เปิดระบบจากข้อมูลจริงล่าสุด · กำลังซิงก์เบื้องหลัง','warn');
-  hydrateOnline().catch(()=>setStatus('ใช้งานข้อมูลล่าสุด · ฐานข้อมูลจะเชื่อมต่อซ้ำอัตโนมัติ','warn'));
+  client.auth.getUser().then(v=>{if(v.error)throw v.error;return hydrateOnline();}).catch(()=>setStatus('ใช้งานข้อมูลล่าสุด · ฐานข้อมูลจะเชื่อมต่อซ้ำอัตโนมัติ','warn'));
   return;
  }
- await hydrateOnline();
+ const verified=await client.auth.getUser();if(verified.error)throw verified.error;authIdentity=verified.data.user;await hydrateOnline();
  }catch(e){
   if(authIdentity&&resumeCachedOnline(authIdentity)){enterApp();setStatus('ฐานข้อมูลกำลังเชื่อมต่อใหม่ · ใช้ข้อมูลล่าสุดในเครื่อง','warn');setTimeout(()=>supabaseFetch(),2500);return;}
   session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('ยืนยันบัญชีแล้ว แต่ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง','error');
@@ -1273,7 +1275,7 @@ function enterApp(){
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
   refreshUserChip();
-  const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else{setStatus(_m==='supabase'?'กำลังตรวจสอบฐานข้อมูล':'โหมดสาธิต','info');if(_m==='supabase')supabaseFetch();}
+  const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else setStatus(_m==='supabase'?'พร้อมใช้งาน · ซิงก์เบื้องหลัง':'โหมดสาธิต','info');
   navigate(new URLSearchParams(location.search).has('approval')&&isAdmin()?'approvals':'dashboard');
 }
 $('#logoutBtn').addEventListener('click',()=>{
@@ -1298,15 +1300,16 @@ if(mobileNavScrim)mobileNavScrim.addEventListener('click',()=>$('#sidebar').clas
    REAL TIME SYNC (polling ทุก 5 วินาที)
    ============================================================ */
 let lastDataHash='';
-function dataHash(){return JSON.stringify(DB).length+'_'+DB.debtors.length+'_'+DB.cashsales.length+'_'+DB.audit.length;}
+function dataHash(){return [DB.debtors.length,DB.cashsales.length,DB.audit.length,DB.customers.length].join('_');}
 setInterval(()=>{
   if(!session)return;
-  if(DB.settings.db.mode!=='supabase')dbLoad();
+  if(DB.settings.db.mode==='supabase')return;
+  dbLoad();
   const h=dataHash();
   if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
-},5000);
-setInterval(()=>{if(DB&&DB.settings.db.mode==='supabase'&&session)supabaseFetch();},10000);
+},15000);
+setInterval(()=>{if(DB&&DB.settings.db.mode==='supabase'&&session)supabaseFetch();},30000);
 
 /* ============================================================
    INIT
