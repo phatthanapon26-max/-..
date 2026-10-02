@@ -449,7 +449,7 @@ function renderDebtors(area){
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
       <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
-      <div class="qr-wrap"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" onclick="window.open('${qrUrl}','_blank')" title="สแกนดูรายงานลูกหนี้"><small>สแกน<br>ดูรายงาน</small></div></div>
+      <a class="qr-wrap" href="${qrUrl}" target="_blank" rel="noopener" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>แตะเพื่อเปิดรายงาน</b><br>หรือสแกน QR Code</small></a></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
@@ -1221,6 +1221,8 @@ async function doLogin(){
   enterApp();
 }
 function enterApp(){
+  const qrCustomer=new URLSearchParams(location.search).get('qr');
+  if(qrCustomer){renderPublicQrReport(qrCustomer);return;}
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
   refreshUserChip();
@@ -1242,6 +1244,8 @@ $('#logoutBtn').addEventListener('click',()=>{
   });
 });
 $('#menuToggle').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
+const mobileNavScrim=$('#mobileNavScrim');
+if(mobileNavScrim)mobileNavScrim.addEventListener('click',()=>$('#sidebar').classList.remove('open'));
 
 /* ============================================================
    REAL TIME SYNC (polling ทุก 5 วินาที)
