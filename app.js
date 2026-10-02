@@ -617,12 +617,14 @@ function renderPayments(area){
   let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='paid');
   if(paySearch)rows=rows.filter(d=>d.customerName.includes(paySearch));
   rows.sort((a,b)=>a.paidAt<b.paidAt?1:-1);
-  let html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
+  let html='<div class="tbl-wrap payment-table"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
+  let mobile='<div class="payment-cards">';
   rows.forEach((d,i)=>{
     html+=`<tr><td>${i+1}</td><td><b>${esc(d.customerName)}</b></td><td class="num" style="color:var(--green);font-weight:700">${fmtN(d.total)} บาท</td><td>${thDate(d.debtDate)}</td><td>${thDateTimeSec(d.paidAt)}</td><td>${esc(d.paidByName||'-')}</td>
     <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}"><i data-lucide="rotate-ccw"></i> ยกเลิก กลับไปค้าง</button></td></tr>`;
+    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}"><i data-lucide="rotate-ccw"></i><span>ยกเลิกและกลับไปค้าง</span></button></article>`;
   });
-  html+='</tbody></table></div>';
+  html+='</tbody></table></div>';mobile+='</div>';html+=mobile;
   if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ</p></div>';
   $('#pageContent').innerHTML=`
   <div class="page-head"><h2>ประวัติรับชำระ ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h2><span class="desc">รายการที่จ่ายแล้ว แยกจากหน้าลูกหนี้ค้างชำระอัตโนมัติ</span></div>
