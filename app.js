@@ -59,6 +59,7 @@ function openModal(html){
   if(window.lucide)lucide.createIcons();
 }
 function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').className='modal';$('#modalBox').innerHTML='';}
+function modalIsOpen(){return !$('#modalBackdrop').classList.contains('hidden');}
 $('#modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal();});
 
 /* ============================================================
@@ -183,7 +184,7 @@ async function rpc(name,body){
 }
 async function supabaseFetch(){
  if(!supaCfg()||!authIdentity||syncBusy||syncBlocked)return false;
- if(currentPage==='settings'||document.querySelector('#modalBox:not(.hidden)'))return false;
+ if(currentPage==='settings'||modalIsOpen())return false;
  if(remoteBase&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)return flushOnline();
  syncBusy=true;
  try{
@@ -192,7 +193,7 @@ async function supabaseFetch(){
   const edits=remoteBase?FreshySync.diff(snapshot,FreshySync.shared(DB)):[];
   installRemote(payload,edits);
   setStatus('เชื่อมต่อออนไลน์ · อัปเดตข้อมูลแล้ว','ok');
-  if(session){refreshUserChip();if(currentPage!=='settings'&&!document.querySelector('#modalBox:not(.hidden)')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
+  if(session){refreshUserChip();if(currentPage!=='settings'&&!modalIsOpen()&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
   return true;
  }catch(e){setStatus('เชื่อมต่อไม่สำเร็จ · '+e.message,'err');return false;}
  finally{syncBusy=false;}
@@ -238,9 +239,11 @@ window.resolvePending=resolvePending;
 function configureLogin(){
  const online=DB.settings.db.mode==='supabase';
  const deploymentLocked=!!(window.FRESHY_CONFIG&&window.FRESHY_CONFIG.mode==='supabase');
+ const configured=!!supaCfg();
  $('#onlineLogin').classList.toggle('hidden',!online);
  $('#demoLoginField').classList.toggle('hidden',online);
  $('#useDemo').classList.toggle('hidden',deploymentLocked);
+ $('#connectionSetup').classList.toggle('hidden',configured||deploymentLocked);
  $('#loginPreviewNote').textContent=online?'โหมดออนไลน์ · ยืนยันบัญชีจริงผ่าน Supabase':'โหมดสาธิต · ข้อมูลตัวอย่างในเครื่องนี้';
  $('#connectUrl').value=DB.settings.db.supabaseUrl||'';$('#connectKey').value=DB.settings.db.supabaseKey||'';
  $('#connectAdmin').value=DB.settings.db.adminEmail||'';
@@ -452,7 +455,7 @@ function renderDebtors(area){
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
       <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
-      <a class="qr-wrap" href="${qrUrl}" target="_blank" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>แตะเพื่อเปิดรายงาน</b><br>หรือสแกน QR Code</small></a></div>
+      <a class="qr-wrap" href="${qrUrl}" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>เปิดเอกสารลูกหนี้</b><br>แสดงในหน้าปัจจุบัน</small></a></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
@@ -884,17 +887,17 @@ function renderPublicQrReport(cid){
   const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
   document.body.innerHTML=`
   <style>
-  *{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#eef8ff,#fffaf0);color:#17324d;font-family:'Sarabun',sans-serif}.qr-page{max-width:920px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#eef8ff 70%,transparent)}.qr-btn{padding:11px 17px;border:0;border-radius:13px;font:700 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:linear-gradient(135deg,#147fcf,#0b5da8);color:#fff}.qr-btn.back{background:linear-gradient(135deg,#ffd34b,#f49a19);color:#704000}.qr-sheet{background:#fff;padding:30px;color:#1f2a37;border:1px solid #d9e9f5;border-radius:22px;box-shadow:0 18px 55px rgba(20,82,132,.14)}.qr-hero{text-align:center;border-bottom:3px solid transparent;border-image:linear-gradient(90deg,#1484d2,#1cb2c1,#f3b21d) 1;padding-bottom:15px;margin-bottom:17px}.qr-hero .brand{font-size:24px;font-weight:800;color:#144b7c}.qr-hero .contact{font-size:13px;color:#6b7684}.qr-hero .title{font-size:18px;font-weight:800;margin-top:9px;color:#d88908}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:15px}.qr-meta div{padding:11px;border-radius:13px;background:#f4f9fd;border:1px solid #e0edf6;font-size:12px}.qr-meta b{display:block;color:#285777;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #dce8f1;border-radius:14px}.qr-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px}.qr-table th{background:#eaf4fc;padding:8px;border:1px solid #cfdeea}.qr-table td{padding:8px;border:1px solid #dde7ef;text-align:center}.qr-table tfoot td{background:#fff4cf;font-weight:800}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:18px;padding:16px;border-radius:17px;background:linear-gradient(135deg,#f2f9ff,#fff8df)}.qr-summary .copy{flex:1;font-size:12px;color:#63788a}.qr-summary .amount{font-size:24px;font-weight:800;color:#e27713;margin-top:6px}.qr-code{width:118px;height:118px;border:7px solid #fff;box-shadow:0 8px 24px rgba(23,73,111,.14)}.qr-signs{display:flex;gap:10px;margin-top:24px;font-size:12px}
-  @media(max-width:640px){.qr-page{padding:10px}.qr-actions{padding-top:5px}.qr-btn{flex:1;padding:12px 8px}.qr-sheet{padding:17px 14px;border-radius:19px}.qr-hero .brand{font-size:21px}.qr-hero .title{font-size:16px}.qr-meta{grid-template-columns:1fr 1fr;gap:7px}.qr-meta div{padding:9px;font-size:12px}.qr-table-wrap{display:none}.qr-mobile-list{display:grid;gap:10px}.qr-debt-card{border:1px solid #d9e9f5;border-left:5px solid #f2a91c;border-radius:15px;overflow:hidden;background:#fff}.qr-debt-head{display:flex;justify-content:space-between;padding:10px 12px;background:linear-gradient(100deg,#eef8ff,#fff8df);color:#275577}.qr-debt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:11px;font-size:12px}.qr-debt-grid span{color:#68798a}.qr-debt-grid b{display:block;color:#183c5d;margin-top:2px}.qr-debt-total{display:flex;justify-content:space-between;padding:10px 12px;background:#f7fbfe;color:#657789}.qr-debt-total b{font-size:17px;color:#e27414}.qr-summary{align-items:flex-start;padding:13px;gap:10px}.qr-summary .amount{font-size:21px}.qr-code{width:96px;height:96px}.qr-signs{display:none}}
+  *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#dfe7ed,#f6f8f9);color:#102739;font-family:'Sarabun',sans-serif}.qr-page{max-width:940px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#e6ecef 70%,transparent)}.qr-btn{padding:11px 17px;border:1px solid #254a62;border-radius:7px;font:800 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:#0a3b5b;color:#fff}.qr-btn.back{background:#fff;color:#153a52}.qr-sheet{background:#fff;padding:30px;color:#111;border:1px solid #8fa2af;border-radius:8px;box-shadow:0 20px 55px rgba(4,32,51,.18)}.qr-hero{text-align:center;border:1.5px solid #111;border-bottom:4px double #111;padding:14px;margin-bottom:0}.qr-hero:before{content:'เอกสารควบคุมของหน่วยงาน';display:block;font-size:10px;font-weight:800;letter-spacing:.12em;text-align:right}.qr-hero .brand{font-size:23px;font-weight:900;color:#000}.qr-hero .contact{font-size:12px;color:#222}.qr-hero .title{font-size:17px;font-weight:900;margin-top:9px;color:#000;text-decoration:underline;text-underline-offset:4px}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:15px;border:1px solid #333;border-top:0}.qr-meta div{padding:9px;border-radius:0;background:#fff;border:0;border-right:1px solid #777;border-bottom:1px solid #999;font-size:11.5px}.qr-meta div:nth-child(4n){border-right:0}.qr-meta b{display:block;color:#111;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #222;border-radius:0}.qr-table{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}.qr-table th{background:#263746;color:#fff;padding:8px;border:1px solid #111}.qr-table td{padding:8px;border:1px solid #666;text-align:center}.qr-table tbody tr:nth-child(even){background:#f0f2f3}.qr-table tfoot td{background:#e5e8ea;font-weight:900}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:14px;padding:14px;border:1.5px solid #222;border-radius:0;background:#f3f5f6}.qr-summary .copy{flex:1;font-size:11.5px;color:#243746}.qr-summary .amount{font-size:22px;font-weight:900;color:#000;margin-top:6px}.qr-code{width:116px;height:116px;border:6px solid #fff;outline:1px solid #555;box-shadow:none}.qr-signs{display:flex;gap:12px;margin-top:36px;font-size:11px}
+  @media(max-width:640px){.qr-page{padding:9px}.qr-actions{padding-top:5px}.qr-btn{flex:1;padding:12px 8px}.qr-sheet{padding:13px 11px;border-radius:6px}.qr-hero{padding:11px 8px}.qr-hero .brand{font-size:20px}.qr-hero .title{font-size:15px}.qr-meta{grid-template-columns:1fr 1fr}.qr-meta div{padding:8px;font-size:11px;border-right:1px solid #777}.qr-meta div:nth-child(2n){border-right:0}.qr-table-wrap{display:none}.qr-mobile-list{display:grid;gap:8px}.qr-debt-card{border:1px solid #8799a5;border-left:5px solid #163f59;border-radius:6px;overflow:hidden;background:#fff}.qr-debt-head{display:flex;justify-content:space-between;padding:9px 11px;background:#e5ebef;color:#17384e}.qr-debt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;font-size:11.5px}.qr-debt-grid span{color:#596b78}.qr-debt-grid b{display:block;color:#18384d;margin-top:2px}.qr-debt-total{display:flex;justify-content:space-between;padding:9px 11px;background:#edf1f3;color:#475e6e}.qr-debt-total b{font-size:16px;color:#111}.qr-summary{align-items:flex-start;padding:11px;gap:9px}.qr-summary .amount{font-size:19px}.qr-code{width:90px;height:90px}.qr-signs{display:none}}
   @media print{body{background:#fff!important}.no-print{display:none!important}.qr-page{max-width:none;padding:0}.qr-sheet{padding:0;border:0;box-shadow:none}.qr-mobile-list{display:none!important}.qr-table-wrap{display:block!important}.qr-signs{display:flex!important}@page{size:A4;margin:14mm 12mm}}
   </style>
   <div class="qr-page">
-    <div class="qr-actions no-print"><button class="qr-btn primary" onclick="window.print()">พิมพ์ / บันทึก PDF</button><button class="qr-btn back" onclick="location.href=location.pathname">กลับเข้าระบบ</button></div>
+    <div class="qr-actions no-print"><button class="qr-btn primary" onclick="window.print()">พิมพ์เอกสาร / บันทึก PDF</button><button class="qr-btn back" onclick="location.replace(location.pathname)">กลับสู่ระบบ</button></div>
     <div class="qr-sheet">
       <div class="qr-hero">
         <div class="brand">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>
         <div class="contact">นครราชสีมา · โทร. 08X-XXX-XXXX</div>
-        <div class="title">รายงานประวัติลูกหนี้ · QR Code</div>
+        <div class="title">ทะเบียนติดตามลูกหนี้ค้างชำระ</div>
       </div>
       <div class="qr-meta"><div><b>เลขที่เอกสาร</b>${docNo}</div><div><b>วันที่เปิดรายงาน</b>${thDateTimeSec(new Date().toISOString())}</div><div><b>รหัสลูกหนี้</b>${esc(c.code)}</div><div><b>ชื่อลูกหนี้</b>${esc(c.name)}</div><div><b>ผู้บันทึก</b>${esc(emp.name||'-')}</div><div><b>ตำแหน่ง</b>${emp.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน'}</div><div><b>จำนวนค้าง</b>${debts.length} รายการ</div><div><b>เครดิต</b>${cs.txt}</div></div>
       <div class="qr-table-wrap"><table class="qr-table"><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ค้างมา (วัน)</th><th>เครดิต</th><th>ถัง</th><th>เงินน้ำถัง</th><th>แพ็ค</th><th>เงินน้ำแพ็ค</th><th>รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9">ไม่มีรายการค้าง</td></tr>'}</tbody><tfoot><tr><td colspan="8" style="text-align:right">ยอดค้างรวมทั้งหมด</td><td>${fmtN(total)} บาท</td></tr></tfoot></table></div>
@@ -1024,10 +1027,13 @@ function renderSettings(){
     if(mode==='supabase'&&(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key)){toast('กรอก Project URL และ Publishable/Anon Key ให้ครบ','error');return;}
     if(key.startsWith('sb_secret_')){toast('ห้ามใช้ Secret Key ในหน้าเว็บ','error');return;}
     try{const part=key.split('.')[1];if(part&&JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'){toast('ห้ามใช้ Service Role Key','error');return;}}catch(e){}
+    const current=supaCfg();
+    const sameConnection=mode==='supabase'&&current&&current.url===url&&current.key===key;
+    if(sameConnection&&authIdentity){Object.assign(DB.settings.db,{mode,supabaseUrl:url,supabaseKey:key});safeCache();configureLogin();toast('ยืนยันการเชื่อมต่อฐานข้อมูลจริงแล้ว · ยังอยู่ในระบบ','success');return;}
     if(authIdentity){if(FreshySync.diff(remoteBase,FreshySync.shared(DB)).length&&!(await flushOnline())){toast('จัดการข้อมูลรอส่งก่อนเปลี่ยนการเชื่อมต่อ','error');return;}await authFor(supaCfg()).auth.signOut();}
     authIdentity=null;remoteBase=null;syncBlocked=false;session=null;localStorage.removeItem(SESSKEY);
     Object.assign(DB.settings.db,{mode,supabaseUrl:url,supabaseKey:key});safeCache();configureLogin();
-    $('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');toast('บันทึกแล้ว กรุณาเข้าสู่ระบบอีกครั้ง','success');
+    $('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');toast('เปลี่ยนโครงการฐานข้อมูลแล้ว กรุณายืนยันบัญชีอีกครั้ง','success');
   });
   bind('#testDbBtn',()=>{
     const st=$('#testDbStatus');if(!st)return;
@@ -1096,12 +1102,12 @@ function docHeader(reportTitle,docNo){
       <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
       <div class="report-name">${esc(reportTitle)}</div>
     </div>
-    <div class="doc-control"><div class="control-label">เอกสารควบคุม / OFFICIAL RECORD</div><strong>${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>สถานะ: ใช้งานอย่างเป็นทางการ</span></div>
+    <div class="doc-control"><div class="control-label">เอกสารควบคุมของหน่วยงาน</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>ชั้นความลับ: ใช้ภายใน</span></div>
   </div>
   <div class="doc-meta">
-    <div><b>วันที่จัดทำ</b> ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543}</div>
-    <div><b>เวลาจัดทำ</b> ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
-    <div class="doc-no">เลขที่เอกสาร ${esc(docNo)}</div>
+    <div><b>ส่วนงาน</b> งานทะเบียนและติดตามลูกหนี้</div>
+    <div><b>วันที่ออกเอกสาร</b> ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} · ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
+    <div class="doc-no">เลขอ้างอิง ${esc(docNo)}</div>
   </div>`;
 }
 function docFooter(docNo){
@@ -1296,7 +1302,7 @@ const tbtn=$('#themeToggle');if(tbtn)tbtn.addEventListener('click',cycleTheme);
 document.addEventListener('keydown',e=>{
   if(e.key!=='Enter')return;
   if(currentPage!=='debtorsNai'&&currentPage!=='debtorsOther')return;
-  if(document.querySelector('#modalBox:not(.hidden)'))return;
+  if(modalIsOpen())return;
   const t=e.target;
   if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'||t.tagName==='BUTTON'))return;
   e.preventDefault();
@@ -1318,7 +1324,7 @@ $('#connectSave').onclick=()=>{
  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key){toast('กรอก Project URL และ Publishable/Anon Key ให้ครบ','error');return;}
  if(key.startsWith('sb_secret_')){toast('ห้ามใส่ Secret หรือ Service Role Key ในหน้าเว็บ','error');return;}
  try{const part=key.split('.')[1];if(part&&JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'){toast('ห้ามใช้ Service Role Key','error');return;}}catch(e){}
- Object.assign(DB.settings.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key,adminEmail});safeCache();configureLogin();toast('บันทึกการเชื่อมต่อแล้ว เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน','success');
+ Object.assign(DB.settings.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key,adminEmail});safeCache();configureLogin();toast('บันทึกการเชื่อมต่อฐานข้อมูลจริงแล้ว','success');
 };
 $('#downloadSql').onclick=()=>{
  const email=$('#connectAdmin').value.trim();if(!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)){toast('กรอกอีเมลแอดมินจริงก่อน','error');return;}
