@@ -608,6 +608,38 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
   .debtor-card .dc-head{padding:12px;flex-wrap:wrap}.debtor-card .dc-head .pay-btn,.debtor-card .dc-head>.btn{margin-left:auto}.qr-wrap{margin-left:0;width:100%;justify-content:flex-end;background:#f1f8fd;border:1px solid #dcecf7;padding:8px 10px}.qr-wrap small{max-width:none;font-size:12px}.qr-mini{width:64px;height:64px}
   .modal-backdrop{padding:10px}.modal{max-height:94vh;border-radius:22px}.modal-body{padding:15px}
 }
+
+/* Brighter Freshy palette and touch-first data entry. */
+@media screen {
+  .sidebar{background:linear-gradient(165deg,#0a4f91 0%,#087db3 58%,#14a8b7 125%)}
+  .sidebar-brand .logo{background:linear-gradient(145deg,#ffd84d,#f5a817);box-shadow:0 8px 22px rgba(239,166,16,.35)}
+  .nav-group-label{color:#ffd76b;font-size:11px;letter-spacing:.06em}
+  .nav-item{color:#e7f5ff}.nav-item svg{color:#ffd36a}.nav-item:hover{background:rgba(255,255,255,.13)}
+  .nav-item.active{background:linear-gradient(135deg,#fffdf4,#fff);color:#07548d;box-shadow:0 9px 23px rgba(0,38,76,.23)}
+  .nav-item.active svg{color:#f0a914}
+  .btn-gold{background:linear-gradient(135deg,#ffbf22,#f07c18);border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(240,124,24,.24)}
+  .command-actions .btn-ghost{background:linear-gradient(145deg,#fff9e7,#fff2c5);color:#9a5707;border-color:#ffd56a}
+  .stat-card.green{background:linear-gradient(140deg,#fff,#e9fff1)}
+  .stat-card.red{background:linear-gradient(140deg,#fff,#fff0ec)}
+  .stat-card.blue{background:linear-gradient(140deg,#fff,#eaf5ff)}
+  .stat-card.purple{background:linear-gradient(140deg,#fff,#f4efff)}
+  .stat-card.gold{background:linear-gradient(140deg,#fff,#fff7d8)}
+  .page-head h2:after{content:"";display:block;width:54px;height:5px;margin-top:7px;border-radius:6px;background:linear-gradient(90deg,#ffbd24,#f47c20,#24aee1)}
+  .debt-product-group{border:1px solid #d8e9f6;border-radius:17px;padding:13px;background:linear-gradient(145deg,#f8fcff,#fff);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .debt-product-group.jug-group{border-left:5px solid #1e91dc}.debt-product-group.pack-group{border-left:5px solid #f2a91c;background:linear-gradient(145deg,#fffaf0,#fff)}
+  .debt-product-group .field{margin:0}.debt-total-preview{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 15px;border-radius:15px;background:linear-gradient(135deg,#0d70bd,#16a7bb);color:#fff;margin-top:2px}
+  .debt-total-preview span{font-size:13px}.debt-total-preview strong{font-size:22px;font-variant-numeric:tabular-nums}
+}
+@media(max-width:600px){
+  .sidebar{background:linear-gradient(165deg,#075697 0%,#087fb7 58%,#14a8b7 125%)}
+  .debt-entry-modal{height:min(94vh,820px);display:flex;flex-direction:column;overflow:hidden;border-radius:24px 24px 0 0!important;align-self:flex-end}
+  .debt-entry-modal .modal-head{flex:0 0 auto;padding:15px 16px;background:linear-gradient(105deg,#eef8ff,#fff8df);border-bottom:1px solid #dcebf5}
+  .debt-entry-modal .modal-head h3{font-size:17px}.debt-entry-modal .modal-body{flex:1;overflow-y:auto;padding:14px 14px 120px!important}
+  .debt-entry-modal .modal-foot{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(16px);box-shadow:0 -8px 28px rgba(16,72,116,.12);display:grid;grid-template-columns:100px 1fr;z-index:5}
+  .debt-entry-modal .modal-foot .btn{min-height:50px;font-size:15px;border-radius:15px}
+  .debt-form-grid{display:block!important}.debt-form-grid>.field{margin-bottom:11px}.debt-product-group{margin-bottom:11px;padding:11px;gap:8px}.debt-product-group input{min-height:48px;text-align:center;font-size:18px!important;font-weight:700}
+  .debt-product-group label{font-size:12px}.debt-total-preview{position:sticky;bottom:0;z-index:3;margin-top:10px;box-shadow:0 8px 22px rgba(13,112,189,.20)}
+}
 </style>
 </head>
 <body>
