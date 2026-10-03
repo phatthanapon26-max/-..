@@ -197,11 +197,32 @@ begin
  return public.freshy_read();
 end $$;
 
+create or replace function public.freshy_public_qr(customer_id text) returns jsonb
+language plpgsql stable security definer set search_path=pg_catalog,public as $$
+declare customer jsonb; debts jsonb; business jsonb; recorder jsonb;
+begin
+ if customer_id is null or length(customer_id)>160 then return null; end if;
+ select x into customer from public.freshy_store s, jsonb_array_elements(s.value) x
+ where s.key='customers' and x->>'id'=customer_id limit 1;
+ if customer is null then return null; end if;
+ select coalesce(jsonb_agg(x order by x->>'debtDate'),'[]'::jsonb) into debts
+ from public.freshy_store s, jsonb_array_elements(s.value) x
+ where s.key='debtors' and x->>'customerId'=customer_id and x->>'status'='unpaid';
+ select coalesce(value->'business','{}'::jsonb) into business from public.freshy_store where key='settings';
+ select jsonb_build_object('name',coalesce(e->>'name','-'),'role',coalesce(e->>'role','staff')) into recorder
+ from public.freshy_store s, jsonb_array_elements(s.value) e
+ where s.key='employees' and e->>'id'=coalesce(debts->0->>'createdBy','') limit 1;
+ return jsonb_build_object('customer',customer-'createdBy'-'managedBy'-'responsibleBy','debtors',debts,
+  'business',business-'email','recorder',coalesce(recorder,'{"name":"-","role":"staff"}'::jsonb));
+end $$;
+
 revoke all on function public.freshy_actor() from public,anon,authenticated;
 revoke all on function public.freshy_visible(text,jsonb,jsonb) from public,anon,authenticated;
 revoke all on function public.freshy_owns(jsonb,text) from public,anon,authenticated;
 revoke all on function public.freshy_read() from public,anon;
 revoke all on function public.freshy_apply(jsonb) from public,anon;
+revoke all on function public.freshy_public_qr(text) from public;
 grant execute on function public.freshy_read() to authenticated;
 grant execute on function public.freshy_apply(jsonb) to authenticated;
+grant execute on function public.freshy_public_qr(text) to anon,authenticated;
 commit;
