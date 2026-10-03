@@ -46,8 +46,14 @@ function dayDiff(iso){const a=new Date(iso+'T00:00:00');const b=new Date(todaySt
 
 /* ---------- toast ---------- */
 function toast(msg, type){
-  const w=$('#toastWrap'); const t=document.createElement('div');
+  const w=$('#toastWrap');
+  // Keep repeated network errors readable: update the existing notice instead
+  // of filling the screen when a user taps the sync badge more than once.
+  const existing=[...w.children].find(x=>x.dataset.message===String(msg));
+  if(existing){existing.dataset.repeated=String((+existing.dataset.repeated||1)+1);return;}
+  const t=document.createElement('div');
   t.className='toast '+(type||'');
+  t.dataset.message=String(msg);t.dataset.repeated='1';
   t.innerHTML='<i data-lucide="'+(type==='error'?'circle-alert':type==='success'?'check-circle-2':'info')+'"></i><span>'+esc(msg)+'</span>';
   w.appendChild(t); if(window.lucide)lucide.createIcons();
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3200);
@@ -140,7 +146,7 @@ function dbLoad(){
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
 const SUPA_COLS=FreshySync.collections;
 const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
-let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncBlocked=false;
+let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0;
 function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
 function authFor(cfg){
  if(!window.supabase)throw Error('โหลดระบบล็อกอินไม่สำเร็จ');
@@ -200,22 +206,30 @@ async function supabaseFetch(){
  finally{syncBusy=false;}
 }
 async function flushOnline(){
- if(!authIdentity||!remoteBase||syncBusy||syncBlocked)return false;
+ if(syncPromise)return syncPromise;
+ if(!authIdentity||!remoteBase||syncBlocked)return false;
  const snapshot=FreshySync.shared(DB),changes=FreshySync.diff(remoteBase,snapshot);
  if(!changes.length)return true;
  syncBusy=true;setStatus('กำลังบันทึกออนไลน์ '+changes.length+' รายการ','warn');
- try{
+ syncPromise=(async()=>{try{
   const payload=await rpc('freshy_apply',{changes});
   const edits=FreshySync.diff(snapshot,FreshySync.shared(DB));
-  installRemote(payload,edits);setStatus('บันทึกออนไลน์แล้ว','ok');
+  installRemote(payload,edits);syncRetryCount=0;clearTimeout(syncRetryTimer);setStatus('บันทึกออนไลน์แล้ว','ok');
   if(edits.length)supabasePush();
   return true;
  }catch(e){
   syncBlocked=/CONFLICT|FORBIDDEN|ONLY|REQUIRED|IMMUTABLE|INVALID|CLOSED|DUPLICATE|PGRST202|MEMBER_NOT_FOUND/.test(e.message);
-  safeCache();setStatus('ยังไม่บันทึกออนไลน์ · '+e.message,'err');
+  safeCache();
   if(syncBlocked)toast('บันทึกถูกปฏิเสธ ข้อมูลรอส่งยังอยู่ในเครื่อง กดปุ่มจัดการข้อมูลรอส่ง','error');
+  else{
+   syncRetryCount=Math.min(syncRetryCount+1,6);
+   const wait=Math.min(60000,2000*Math.pow(2,syncRetryCount-1));
+   setStatus('เก็บข้อมูลไว้แล้ว · จะส่งซ้ำอัตโนมัติ','warn');
+   clearTimeout(syncRetryTimer);syncRetryTimer=setTimeout(()=>flushOnline(),wait);
+  }
   return false;
- }finally{syncBusy=false;}
+ }finally{syncBusy=false;syncPromise=null;}})();
+ return syncPromise;
 }
 function supabasePush(){if(!authIdentity||!remoteBase)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>flushOnline(),350);}
 async function supabaseTest(cfg){
