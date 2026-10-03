@@ -237,6 +237,34 @@ async function resolvePending(){
  $('#discardPending').onclick=async()=>{if(!confirm('ยืนยันใช้ข้อมูลออนไลน์แทนรายการรอส่งในเครื่องนี้? ควรดาวน์โหลดสำเนาก่อน'))return;try{const payload=await rpc('freshy_read');installRemote(payload,[]);syncBlocked=false;closeModal();renderPage();setStatus('ใช้ข้อมูลออนไลน์แล้ว','ok');}catch(e){toast(e.message,'error');}};
 }
 window.resolvePending=resolvePending;
+function downloadSystemSnapshot(data,label){
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=(label||'freshywater-backup')+'-'+todayStr()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);
+}
+function openRealReset(){
+ if(!isAdmin()){toast('เฉพาะผู้ดูแลระบบเท่านั้น','error');return;}
+ openModal(`<div class="modal-head"><h3><i data-lucide="shield-alert"></i> รีเซ็ตข้อมูลใช้งานจริงทั้งระบบ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+ <div class="modal-body"><div class="reset-warning"><b>ข้อมูลที่จะถูกล้างจาก Supabase จริง</b><ul><li>ลูกค้าและทะเบียนลูกหนี้ทั้งหมด</li><li>รายการค้าง รับชำระ และยอดขายเงินสดทั้งหมด</li><li>คำขออนุมัติ ประวัติอีเมล หมู่บ้าน และสินค้า</li><li>บัญชีพนักงานอื่น เหลือเฉพาะแอดมินที่กำลังใช้งาน</li></ul><p>ระบบจะดาวน์โหลดไฟล์สำรองก่อนล้างอัตโนมัติ ส่วน Audit Log จะเก็บไว้เพื่อการตรวจสอบย้อนหลัง</p></div><div class="field"><label>พิมพ์คำว่า RESET เพื่อยืนยัน</label><input id="resetConfirmText" autocomplete="off" placeholder="RESET"></div></div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmRealReset"><i data-lucide="trash-2"></i> ล้างข้อมูลจริงทั้งระบบ</button></div>`);
+ $('#confirmRealReset').addEventListener('click',resetRealSystemData);
+}
+async function resetRealSystemData(){
+ if($('#resetConfirmText').value.trim()!=='RESET'){toast('กรุณาพิมพ์ RESET ให้ถูกต้อง','error');return;}
+ if(!authIdentity||!remoteBase){toast('ฐานข้อมูลจริงยังไม่เชื่อมต่อ กรุณารอให้สถานะออนไลน์ก่อน','error');return;}
+ const btn=$('#confirmRealReset');btn.disabled=true;btn.textContent='กำลังสำรองและล้างข้อมูล...';
+ const snapshot=FreshySync.clone(FreshySync.shared(DB)),config=DB.settings.db,actor=FreshySync.clone(me()),defaults=seed();
+ downloadSystemSnapshot({exportedAt:new Date().toISOString(),source:'Supabase ก่อนรีเซ็ต',data:snapshot},'freshywater-before-reset');
+ try{
+  DB.settings=defaultSettings();DB.settings.db=config;DB.employees=[actor];DB.products=defaults.products;DB.villages=defaults.villages;
+  DB.customers=[];DB.debtors=[];DB.cashsales=[];DB.approvals=[];DB.sentEmails=[];
+  syncBlocked=false;safeCache();
+  if(!(await flushOnline()))throw Error('ฐานข้อมูลปฏิเสธหรือยังไม่ตอบสนอง');
+  closeModal();toast('รีเซ็ตข้อมูลจริงสำเร็จแล้ว','success');currentPage='dashboard';renderNav();renderPage();
+ }catch(e){
+  for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),snapshot.settings||{});else DB[k]=snapshot[k]||[];}
+  DB.settings.db=config;safeCache();btn.disabled=false;btn.innerHTML='<i data-lucide="trash-2"></i> ลองล้างข้อมูลอีกครั้ง';if(window.lucide)lucide.createIcons();toast('รีเซ็ตไม่สำเร็จ: '+e.message,'error');
+ }
+}
 function configureLogin(){
  const online=DB.settings.db.mode==='supabase';
  const deploymentLocked=!!(window.FRESHY_CONFIG&&window.FRESHY_CONFIG.mode==='supabase');
@@ -1044,7 +1072,7 @@ function renderSettings(){
       <button class="btn btn-navy" id="backupBtn"><i data-lucide="download"></i> สำรองข้อมูลที่เลือก (JSON)</button>
       <button class="btn btn-ghost" id="restoreBtn"><i data-lucide="upload"></i> กู้คืนจากไฟล์สำรอง</button>
       <input type="file" id="restoreFile" accept="application/json" style="display:none">
-      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> รีเซ็ตข้อมูลทั้งหมด</button>
+      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> รีเซ็ตข้อมูลใช้งานจริงทั้งระบบ</button>
     </div>
     <div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.length} รายการ)</h4>
     ${DB.sentEmails.slice(0,5).map(e=>'<div class="audit-item"><span class="ts">'+thDateTime(e.ts)+'</span><span><b>'+esc(e.subject)+'</b> — '+esc(e.status)+'</span></div>').join('')||'<span style="color:var(--muted);font-size:12.5px">ยังไม่มี</span>'}</div>
@@ -1114,7 +1142,7 @@ function renderSettings(){
       }catch(err){toast('ไฟล์สำรองไม่ถูกต้อง: '+err.message,'error');}
     };rd.readAsText(f);
   });
-  bind('#resetBtn',()=>{if(DB.settings.db.mode==='supabase'){toast('ปุ่มนี้ใช้รีเซ็ตโหมดสาธิตเท่านั้น ข้อมูลออนไลน์จะไม่ถูกลบ','info');return;}if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
+  bind('#resetBtn',()=>{if(DB.settings.db.mode==='supabase'){openRealReset();return;}if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดในโหมดสาธิตจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
   if(window.lucide)lucide.createIcons();
 }
 function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=u.name;$('#userRole').textContent=u.role==='admin'?'แอดมินระบบ':'พนักงาน';$('#userAvatar').textContent=u.name.charAt(0);}
