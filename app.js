@@ -1,7 +1,7 @@
 /* ============================================================
    ระบบจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์ — app.js
    - ฐานข้อมูล: Supabase Auth + protected RPC หรือโหมดสาธิต localStorage
-   - real time polling, แยกจ่ายแล้ว/ค้างชำระ, แยกบ้านนาไฮ/บ้านอื่น
+   - realtime broadcast, แยกจ่ายแล้ว/ค้างชำระ, แยกบ้านนาไฮ/บ้านอื่น
    ============================================================ */
 (function(){
 'use strict';
@@ -155,7 +155,7 @@ function authFor(cfg){
   // Preserve an existing session from earlier versions that used sessionStorage.
   for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
   // localStorage keeps the authenticated session available when a QR report opens in a new tab.
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(30000)}))}});
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(45000)}))}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
@@ -208,14 +208,29 @@ async function supabaseFetch(){
 async function flushOnline(){
  if(syncPromise)return syncPromise;
  if(!authIdentity||!remoteBase||syncBlocked)return false;
- const snapshot=FreshySync.shared(DB),changes=FreshySync.diff(remoteBase,snapshot);
- if(!changes.length)return true;
- syncBusy=true;setStatus('กำลังบันทึกออนไลน์ '+changes.length+' รายการ','warn');
+ const initialChanges=FreshySync.diff(remoteBase,FreshySync.shared(DB));
+ if(!initialChanges.length)return true;
+ const initialTotal=initialChanges.length;
+ syncBusy=true;setStatus('กำลังส่งข้อมูล 0/'+initialTotal+' รายการ','warn');
  syncPromise=(async()=>{try{
-  const payload=await rpc('freshy_apply',{changes});
-  const edits=FreshySync.diff(snapshot,FreshySync.shared(DB));
-  installRemote(payload,edits);syncRetryCount=0;clearTimeout(syncRetryTimer);setStatus('บันทึกออนไลน์แล้ว','ok');
-  if(edits.length)supabasePush();
+  let completed=0;
+  while(true){
+   const before=FreshySync.shared(DB);
+   const pending=FreshySync.diff(remoteBase,before);
+   if(!pending.length)break;
+   // Small batches prevent one slow request from holding every unsent record.
+   const chunk=pending.slice(0,3);
+   setStatus('กำลังส่งข้อมูล '+completed+'/'+Math.max(initialTotal,completed+pending.length)+' รายการ','warn');
+   const payload=await rpc('freshy_apply',{changes:chunk});
+   // Keep both records not included in this chunk and edits made while it was in flight.
+   const during=FreshySync.diff(before,FreshySync.shared(DB));
+   installRemote(payload,pending.slice(chunk.length).concat(during));
+   completed+=chunk.length;
+   broadcastOnlineChange();
+   const left=FreshySync.diff(remoteBase,FreshySync.shared(DB)).length;
+   if(left)setStatus('บันทึกแล้ว '+completed+' รายการ · เหลือ '+left+' รายการ','warn');
+  }
+  syncRetryCount=0;clearTimeout(syncRetryTimer);setStatus('บันทึกออนไลน์ครบ '+completed+' รายการ','ok');
   return true;
  }catch(e){
   syncBlocked=/CONFLICT|FORBIDDEN|ONLY|REQUIRED|IMMUTABLE|INVALID|CLOSED|DUPLICATE|PGRST202|MEMBER_NOT_FOUND/.test(e.message);
@@ -236,12 +251,18 @@ async function startRealtime(){
  if(!authIdentity||!supaCfg())return;
  const client=authFor(supaCfg());
  if(realtimeChannel){try{await client.removeChannel(realtimeChannel);}catch(e){}}
- realtimeChannel=client.channel('freshy-data-'+authIdentity.id)
-  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'freshy_signal'},()=>{
+ // Broadcast carries no business data; receivers fetch only after a successful commit.
+ // This avoids the high CPU cost of decoding Postgres WAL on small Supabase plans.
+ realtimeChannel=client.channel('freshy-data-v1',{config:{broadcast:{self:false}}})
+  .on('broadcast',{event:'freshy-updated'},()=>{
    clearTimeout(realtimeRefreshTimer);
    realtimeRefreshTimer=setTimeout(()=>{if(document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},700);
   })
   .subscribe(status=>{if(status==='SUBSCRIBED'&&session)setStatus('เชื่อมต่อฐานข้อมูลแบบเรียลไทม์','ok');});
+}
+function broadcastOnlineChange(){
+ if(!realtimeChannel)return;
+ try{realtimeChannel.send({type:'broadcast',event:'freshy-updated',payload:{at:Date.now()}});}catch(e){}
 }
 async function supabaseTest(cfg){
  try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
