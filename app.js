@@ -1339,7 +1339,9 @@ setInterval(()=>{
   if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
 },15000);
-setInterval(()=>{if(DB&&DB.settings.db.mode==='supabase'&&session)supabaseFetch();},30000);
+// No background polling: the previous timer could multiply across stale browser tabs
+// and overload a Nano database. Writes still sync immediately; users can tap the
+// database status badge to request a fresh read when needed.
 
 /* ============================================================
    INIT
@@ -1362,6 +1364,7 @@ window.addEventListener('offline',()=>setStatus('ไม่มีการเช�
 if(!navigator.onLine)setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต','err');
 if(DB.settings.db.mode==='supabase')setStatus('ออนไลน์ · กรุณาเข้าสู่ระบบ','info');
 const tbtn=$('#themeToggle');if(tbtn)tbtn.addEventListener('click',cycleTheme);
+const syncBadge=$('#modeTag');if(syncBadge){syncBadge.title='แตะเพื่อซิงก์ฐานข้อมูล';syncBadge.style.cursor='pointer';syncBadge.addEventListener('click',()=>{if(!authIdentity){toast('กรุณาเข้าสู่ระบบออนไลน์ก่อน','error');return;}setStatus('กำลังซิงก์ฐานข้อมูล','warn');supabaseFetch().then(ok=>toast(ok?'อัปเดตข้อมูลจากฐานจริงแล้ว':'ฐานข้อมูลยังไม่ตอบสนอง',ok?'success':'error'));});}
 /* กด Enter บนหน้าลูกหนี้ = เปิดฟอร์มเพิ่มรายการลูกหนี้ทันที (หลังบันทึกเสร็จ กด Enter อีกครั้ง = เพิ่มรายต่อไป) */
 document.addEventListener('keydown',e=>{
   if(e.key!=='Enter')return;
