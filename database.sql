@@ -5,6 +5,31 @@ create table if not exists public.freshy_store (
  key text primary key, value jsonb not null default '[]'::jsonb,
  updated_at timestamptz not null default now()
 );
+create table if not exists public.freshy_signal (
+ id boolean primary key default true check (id),
+ version bigint not null default 0,
+ updated_at timestamptz not null default now()
+);
+insert into public.freshy_signal(id) values(true) on conflict do nothing;
+alter table public.freshy_signal enable row level security;
+drop policy if exists freshy_signal_authenticated_read on public.freshy_signal;
+create policy freshy_signal_authenticated_read on public.freshy_signal for select to authenticated using (true);
+revoke all on public.freshy_signal from public,anon;
+grant select on public.freshy_signal to authenticated;
+create or replace function public.freshy_emit_signal() returns trigger
+language plpgsql security definer set search_path=pg_catalog,public as $$
+begin
+ insert into public.freshy_signal(id,version,updated_at) values(true,1,now())
+ on conflict(id) do update set version=public.freshy_signal.version+1,updated_at=now();
+ return new;
+end $$;
+drop trigger if exists freshy_store_emit_signal on public.freshy_store;
+create trigger freshy_store_emit_signal after insert or update or delete on public.freshy_store
+for each statement execute function public.freshy_emit_signal();
+do $$ begin
+ alter publication supabase_realtime add table public.freshy_signal;
+exception when duplicate_object then null;
+end $$;
 -- Bound the append-only audit JSON so reads and writes stay fast on Nano plans.
 create or replace function public.freshy_cap_audit() returns trigger
 language plpgsql set search_path=pg_catalog,public as $$
