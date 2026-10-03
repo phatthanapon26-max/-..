@@ -946,16 +946,27 @@ function printEmployeeReport(empId){
   $('#printArea').innerHTML='<div class="doc-page">'+body+'</div>';
   setTimeout(()=>window.print(),200);
 }
-function renderPublicQrReport(cid){
-  const c=DB.customers.find(x=>x.id===cid);
+async function openPublicQrReport(cid){
+  document.body.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;padding:24px;font:700 17px Sarabun,sans-serif;color:#17384e;background:#f3f7fa">กำลังเปิดข้อมูลเอกสาร…</div>';
+  try{
+    const cfg=supaCfg();let payload=null;
+    if(cfg){
+      const res=await fetch(cfg.url+'/rest/v1/rpc/freshy_public_qr',{method:'POST',headers:{apikey:cfg.key,'Content-Type':'application/json'},body:JSON.stringify({customer_id:cid}),signal:AbortSignal.timeout(20000)});
+      if(!res.ok)throw Error('เปิดข้อมูล QR ไม่สำเร็จ');payload=await res.json();
+    }
+    renderPublicQrReport(cid,payload);
+  }catch(e){document.body.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center;font-family:Sarabun,sans-serif;background:#f3f7fa;color:#17384e"><div><h2>ไม่สามารถเปิดข้อมูลเอกสารได้</h2><p>กรุณาสแกน QR Code ใหม่อีกครั้ง</p></div></div>';}
+}
+function renderPublicQrReport(cid,payload){
+  const c=payload&&payload.customer?payload.customer:DB.customers.find(x=>x.id===cid);
   if(!c){document.body.innerHTML='<div style="padding:40px;font-family:Sarabun,sans-serif"><h2>ไม่พบข้อมูลลูกหนี้</h2><p>รหัสลูกหนี้ไม่ถูกต้อง</p></div>';return;}
-  const debts=DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid').sort((a,b)=>a.debtDate<b.debtDate?-1:1);
+  const debts=(payload&&payload.debtors?payload.debtors:DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid')).sort((a,b)=>a.debtDate<b.debtDate?-1:1);
   const first=debts[0]||{};
-  const emp=DB.employees.find(e=>e.id===first.createdBy)||{};
-  const docNo=nextDocNo(DB.settings.docPrefix.debtor);
-  const qrUrl=location.href.split('?')[0]+'?qr='+cid;
-  const qrImg='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data='+encodeURIComponent(qrUrl);
-  const cs=creditStatus(cid);
+  const emp=payload&&payload.recorder?payload.recorder:(DB.employees.find(e=>e.id===first.createdBy)||{});
+  const biz=payload&&payload.business?payload.business:DB.settings.business;
+  const docNo=new URLSearchParams(location.search).get('doc')||'QR-'+String(c.code||cid).toUpperCase();
+  const oldest=debts.reduce((n,d)=>Math.max(n,Math.max(0,Math.floor((new Date()-new Date(d.debtDate))/86400000))),0);
+  const cs=oldest>100?{txt:'เครดิตไม่ดี'}:oldest>30?{txt:'เครดิตเฝ้าระวัง'}:oldest>10?{txt:'เครดิตดี'}:{txt:'เครดิตดีเยี่ยม'};
   const total=debts.reduce((s,d)=>s+d.total,0);
   const days=(iso)=>Math.max(0,Math.floor((new Date()-new Date(iso))/86400000));
   let rows='';
@@ -969,11 +980,10 @@ function renderPublicQrReport(cid){
   @media print{body{background:#fff!important}.no-print{display:none!important}.qr-page{max-width:none;padding:0}.qr-sheet{padding:0;border:0;box-shadow:none}.qr-mobile-list{display:none!important}.qr-table-wrap{display:block!important}.qr-signs{display:flex!important}@page{size:A4;margin:14mm 12mm}}
   </style>
   <div class="qr-page">
-    <div class="qr-actions no-print"><button class="qr-btn primary" onclick="window.print()">พิมพ์เอกสาร / บันทึก PDF</button><button class="qr-btn back" onclick="location.replace(location.pathname)">กลับสู่ระบบ</button></div>
     <div class="qr-sheet">
       <div class="qr-hero">
-        <div class="brand">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>
-        <div class="contact">นครราชสีมา · โทร. 08X-XXX-XXXX</div>
+        <div class="brand">${esc(biz.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์')}</div>
+        <div class="contact">${esc(biz.address||'')} ${biz.phone?'· โทร. '+esc(biz.phone):''}</div>
         <div class="title">ทะเบียนติดตามลูกหนี้ค้างชำระ</div>
       </div>
       <div class="qr-meta"><div><b>เลขที่เอกสาร</b>${docNo}</div><div><b>วันที่เปิดรายงาน</b>${thDateTimeSec(new Date().toISOString())}</div><div><b>รหัสลูกหนี้</b>${esc(c.code)}</div><div><b>ชื่อลูกหนี้</b>${esc(c.name)}</div><div><b>ผู้บันทึก</b>${esc(emp.name||'-')}</div><div><b>ตำแหน่ง</b>${emp.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน'}</div><div><b>จำนวนค้าง</b>${debts.length} รายการ</div><div><b>เครดิต</b>${cs.txt}</div></div>
@@ -981,7 +991,6 @@ function renderPublicQrReport(cid){
       <div class="qr-mobile-list">${mobileRows||'<div style="text-align:center;padding:20px">ไม่มีรายการค้าง</div>'}</div>
       <div class="qr-summary">
         <div class="copy">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้<br>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · เลขที่เอกสาร <b>${docNo}</b><div class="amount">ยอดค้างรวม ${fmtN(total)} บาท</div></div>
-        <img class="qr-code" src="${qrImg}" alt="QR Code รายงานลูกหนี้">
       </div>
       <div class="qr-signs">
         ${sign('ผู้จัดการข้อมูล')}${sign('ผู้กรอกข้อมูล')}${sign('ผู้ออก QR Code')}${sign('ผู้ตรวจสอบ')}${sign('หัวหน้า / ผู้บริหาร')}
@@ -1392,7 +1401,7 @@ document.addEventListener('keydown',e=>{
 });
 // Approval links identify the request; only an authenticated admin can decide in the approvals page.
 const _qr=new URLSearchParams(location.search).get('qr');
-if(_qr&&DB.settings.db.mode!=='supabase'){renderPublicQrReport(_qr);return;}
+if(_qr){openPublicQrReport(_qr);return;}
 try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
 if(DB.settings.db.mode==='supabase'){session=null;configureLogin();resumeOnline();}else{configureLogin();if(session&&DB.employees.find(e=>e.id===session.empId))enterApp();}
 if(window.lucide)lucide.createIcons();
