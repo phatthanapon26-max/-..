@@ -5,6 +5,20 @@ create table if not exists public.freshy_store (
  key text primary key, value jsonb not null default '[]'::jsonb,
  updated_at timestamptz not null default now()
 );
+-- Bound the append-only audit JSON so reads and writes stay fast on Nano plans.
+create or replace function public.freshy_cap_audit() returns trigger
+language plpgsql set search_path=pg_catalog,public as $$
+begin
+ if new.key='audit' and jsonb_typeof(new.value)='array' and jsonb_array_length(new.value)>2000 then
+  select coalesce(jsonb_agg(x order by ord),'[]'::jsonb) into new.value
+  from jsonb_array_elements(new.value) with ordinality as a(x,ord)
+  where ord>jsonb_array_length(new.value)-1000;
+ end if;
+ return new;
+end $$;
+drop trigger if exists freshy_cap_audit_trigger on public.freshy_store;
+create trigger freshy_cap_audit_trigger before insert or update on public.freshy_store
+for each row execute function public.freshy_cap_audit();
 alter table public.freshy_store enable row level security;
 do $$ declare p record; begin
  for p in select policyname from pg_policies where schemaname='public' and tablename='freshy_store' loop
@@ -26,10 +40,10 @@ begin
  select value into existing from public.freshy_store where key='employees' for update;
  select x into person from jsonb_array_elements(existing) x where lower(x->>'email')=lower(admin_email) limit 1;
  if person is null then
-  person := jsonb_build_object('id','emp_'||gen_random_uuid()::text,'email',lower(admin_email),'name','ผู้ดูแลระบบ','code','ADMIN','role','admin','permissions',jsonb_build_object('pages','{}'::jsonb,'canPrint',true,'canEmail',true));
+  person := jsonb_build_object('id','emp_'||gen_random_uuid()::text,'email',lower(admin_email),'name','ผู้ดูแลระบบ','code','7716','role','admin','permissions',jsonb_build_object('pages','{}'::jsonb,'canPrint',true,'canEmail',true));
   existing := existing || jsonb_build_array(person);
  else
-  existing := (select jsonb_agg(case when x->>'id'=person->>'id' then x||'{"role":"admin"}'::jsonb else x end) from jsonb_array_elements(existing) x);
+  existing := (select jsonb_agg(case when x->>'id'=person->>'id' then x||'{"role":"admin","code":"7716"}'::jsonb else x end) from jsonb_array_elements(existing) x);
  end if;
  update public.freshy_store set value=existing where key='employees';
 end $$;
