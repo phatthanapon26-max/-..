@@ -867,6 +867,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
   .tbl thead th{background:#0c78ae!important;color:#fff}.tbl tbody tr:nth-child(even){background:#f5f9fc}.tbl tbody tr:hover{background:#fff8dc}
   .modal-head{background:#f5fafc!important}.modal-foot{background:#f5f8fa!important}.qr-wrap{background:#f1f8fc!important}
   .payment-cards{display:none}
+  .reset-warning{margin-bottom:16px;padding:14px 16px;border:1px solid #f0b9bf;border-left:6px solid #d94152;border-radius:12px;background:#fff5f6;color:#6d2630}.reset-warning b{display:block;margin-bottom:7px;color:#a72e3b}.reset-warning ul{margin:0 0 8px;padding-left:20px}.reset-warning li{margin:4px 0}.reset-warning p{margin:0;font-size:12.5px;line-height:1.55}
 }
 
 /* Dark mode is independent, high-contrast, and never reuses the light palette. */
@@ -887,6 +888,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
   [data-theme="dark"] .tbl tbody td{color:#dcebf5;border-color:#29475c}[data-theme="dark"] .tbl tbody tr:nth-child(even){background:#122b3d}[data-theme="dark"] .tbl tbody tr:hover{background:#203a47}
   [data-theme="dark"] .field label{color:#cdeaff}[data-theme="dark"] .field input::placeholder,[data-theme="dark"] .search-box input::placeholder{color:#7892a5}
   [data-theme="dark"] .btn-ghost{background:#17364a;color:#e9f7ff;border-color:#416077}[data-theme="dark"] .qr-wrap{background:#17364a!important}[data-theme="dark"] .dc-foot{background:#102638;color:#dcebf5}
+  [data-theme="dark"] .reset-warning{background:#371d27;border-color:#74404a;color:#ffd8dc}[data-theme="dark"] .reset-warning b{color:#ff8995}
 }
 
 @media screen and (max-width:700px){
@@ -901,9 +903,9 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 /* Print only the document. Hidden application layout must not create blank pages. */
 @media print{
   html,body{margin:0!important;padding:0!important;background:#fff!important;background-image:none!important;height:auto!important;min-height:0!important}
-  body>*:not(.print-area){display:none!important}
+  body>*:not(.print-area):not(.qr-page){display:none!important}
   .print-area{display:block!important;position:static!important;inset:auto!important;width:auto!important;margin:0!important;padding:0!important;background:#fff!important;background-image:none!important}
-  .print-area,.print-area *,.doc-page,.doc-page *{visibility:visible!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important}
+  .print-area,.print-area *,.doc-page,.doc-page *,.qr-page,.qr-page *{visibility:visible!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important}
   .doc-page{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;min-height:0!important;height:auto!important;background:#fff!important;color:#000!important}
   .doc-head,.doc-meta,.doc-section-title,.doc-table,.doc-table th,.doc-table td,.doc-summary,.sign-row,.sign-box,.doc-foot{background-color:#fff!important;color:#000!important}
   .doc-table th{background-color:#e5e5e5!important;color:#000!important}
@@ -993,6 +995,6 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 <script src="deploy-config.js"></script>
 <script src="database-config.js"></script>
 <script src="sync.js"></script>
-<script src="app.js?v=7.0.0"></script>
+<script src="app.js?v=7.1.0"></script>
 </body>
 </html>
