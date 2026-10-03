@@ -146,7 +146,7 @@ function dbLoad(){
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
 const SUPA_COLS=FreshySync.collections;
 const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
-let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0;
+let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null;
 function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
 function authFor(cfg){
  if(!window.supabase)throw Error('โหลดระบบล็อกอินไม่สำเร็จ');
@@ -232,6 +232,17 @@ async function flushOnline(){
  return syncPromise;
 }
 function supabasePush(){if(!authIdentity||!remoteBase)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>flushOnline(),350);}
+async function startRealtime(){
+ if(!authIdentity||!supaCfg())return;
+ const client=authFor(supaCfg());
+ if(realtimeChannel){try{await client.removeChannel(realtimeChannel);}catch(e){}}
+ realtimeChannel=client.channel('freshy-data-'+authIdentity.id)
+  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'freshy_signal'},()=>{
+   clearTimeout(realtimeRefreshTimer);
+   realtimeRefreshTimer=setTimeout(()=>{if(document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},700);
+  })
+  .subscribe(status=>{if(status==='SUBSCRIBED'&&session)setStatus('เชื่อมต่อฐานข้อมูลแบบเรียลไทม์','ok');});
+}
 async function supabaseTest(cfg){
  try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
  if(!data.session)return {ok:false,error:'บันทึก URL/Key แล้ว ออกจากระบบสาธิตและเข้าสู่ระบบด้วยอีเมล/รหัสผ่านจริง'};
@@ -1288,8 +1299,8 @@ const overlay=$('#privacyOverlay');
 function showPrivacy(){if(!session)return;overlay.classList.remove('hidden');}
 function hidePrivacy(){overlay.classList.add('hidden');}
 window.addEventListener('blur',showPrivacy);
-window.addEventListener('focus',hidePrivacy);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)showPrivacy();else hidePrivacy();});
+window.addEventListener('focus',()=>{hidePrivacy();if(authIdentity){clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(()=>supabaseFetch(),500);}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)showPrivacy();else{hidePrivacy();if(authIdentity){clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(()=>supabaseFetch(),500);}}});
 document.addEventListener('keydown',e=>{
   if(e.key==='PrintScreen'||(e.ctrlKey&&(e.key==='p'||e.key==='P'||e.key==='s'||e.key==='S'))||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))){
     e.preventDefault();showPrivacy();toast('สงวนสิทธิ์ ไม่สามารถแคปหน้าจอหรือเปิดซ้อนหน้าจอได้','error');
@@ -1327,6 +1338,7 @@ function enterApp(){
   if(qrCustomer){renderPublicQrReport(qrCustomer);return;}
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
+  if(authIdentity)startRealtime();
   refreshUserChip();
   const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else setStatus(_m==='supabase'?'พร้อมใช้งาน · ซิงก์เบื้องหลัง':'โหมดสาธิต','info');
   navigate(new URLSearchParams(location.search).has('approval')&&isAdmin()?'approvals':'dashboard');
@@ -1339,7 +1351,7 @@ $('#logoutBtn').addEventListener('click',()=>{
     if(authIdentity){const pending=FreshySync.diff(remoteBase||{},FreshySync.shared(DB));if(pending.length&&!(await flushOnline())){toast('ยังมีข้อมูลรอส่ง กรุณาจัดการก่อนออกจากระบบ','error');return;}}
     const u=me();
     if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')await sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
-    if(authIdentity){await flushOnline();await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
+    if(authIdentity){await flushOnline();if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch(e){}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
     session=null;localStorage.removeItem(SESSKEY);
     closeModal();$('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#loginCode').value='';
     toast('ออกจากระบบแล้ว','success');
@@ -1365,6 +1377,7 @@ setInterval(()=>{
 // No background polling: the previous timer could multiply across stale browser tabs
 // and overload a Nano database. Writes still sync immediately; users can tap the
 // database status badge to request a fresh read when needed.
+setInterval(()=>{if(authIdentity&&document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},120000);
 
 /* ============================================================
    INIT
