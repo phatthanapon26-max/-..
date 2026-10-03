@@ -24,11 +24,12 @@ begin
  return new;
 end $$;
 drop trigger if exists freshy_store_emit_signal on public.freshy_store;
-create trigger freshy_store_emit_signal after insert or update or delete on public.freshy_store
-for each statement execute function public.freshy_emit_signal();
+-- Cross-device refresh now uses lightweight Realtime Broadcast from the app.
+-- Do not publish database rows: WAL decoding can saturate Nano compute.
 do $$ begin
- alter publication supabase_realtime add table public.freshy_signal;
-exception when duplicate_object then null;
+ if exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='freshy_signal') then
+  alter publication supabase_realtime drop table public.freshy_signal;
+ end if;
 end $$;
 -- Bound the append-only audit JSON so reads and writes stay fast on Nano plans.
 create or replace function public.freshy_cap_audit() returns trigger
