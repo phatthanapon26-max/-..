@@ -155,7 +155,7 @@ function authFor(cfg){
   // Preserve an existing session from earlier versions that used sessionStorage.
   for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
   // localStorage keeps the authenticated session available when a QR report opens in a new tab.
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(15000)}))}});
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(30000)}))}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
