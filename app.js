@@ -1501,6 +1501,7 @@ document.addEventListener('keydown',e=>{
 const _qr=new URLSearchParams(location.search).get('qr');
 if(_qr){openPublicQrReport(_qr);return;}
 try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
+if(window.FRESHY_PREVIEW)session={empId:'emp_admin',loginAt:new Date().toISOString()};
 if(DB.settings.db.mode==='supabase'){session=null;configureLogin();resumeOnline();}else{configureLogin();if(session&&DB.employees.find(e=>e.id===session.empId))enterApp();}
 if(window.lucide)lucide.createIcons();
 lastDataHash=dataHash();
