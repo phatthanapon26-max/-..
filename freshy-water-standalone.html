@@ -555,6 +555,7 @@ body{font-size:16px;background-image:radial-gradient(ellipse at 85% 0%,rgba(65,1
 }
 
 @media screen {.connection-setup{margin-top:18px;border:1px solid var(--border);border-radius:14px;padding:14px}.connection-setup summary{cursor:pointer;font-size:15px;font-weight:600;color:var(--navy);margin-bottom:12px}input,select,textarea{font-size:16px!important}.login-card{max-width:480px}.login-foot{font-size:13px}.status-tag{max-width:340px;white-space:normal}.topbar .rt-dot .dot{background:var(--blue)}.nav-item{font-size:15px!important}.tbl{font-size:14px!important}.sidebar .user-chip .un{font-size:15px}button:disabled{opacity:.6;cursor:wait}@media(max-width:600px){.status-tag{max-width:130px;font-size:12px}.topbar{flex-wrap:wrap;height:auto}.topbar .page-title{max-width:75%}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}}
+
 /* Production visual system: clearer hierarchy, richer color and responsive sizing. */
 body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 .content{width:100%;max-width:1540px;margin:0 auto;padding:28px clamp(18px,3vw,42px) 72px}
@@ -571,6 +572,361 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
 @media(max-width:900px){.sidebar{width:270px;left:-282px}.content{padding:20px 16px 60px}.command-bar{align-items:flex-start;flex-direction:column}.command-actions{width:100%}.command-actions .btn{flex:1}.report-schedule{align-items:flex-start;flex-wrap:wrap}.report-schedule .status-tag{margin-left:62px}}
 @media(max-width:540px){.content{padding:16px 12px 50px}.stats-grid{grid-template-columns:1fr}.stat-card{min-height:126px}.page-head h2{font-size:23px}.command-actions{display:grid;grid-template-columns:1fr}.report-schedule .status-tag{margin-left:0}.doc-page{font-size:11px}.topbar{padding:10px 12px}}
 
+/* Mobile clarity refresh: brighter surfaces, stronger layers, less vertical crowding. */
+@media screen {
+  :root,[data-theme="light"]{
+    --bg:#f5faff;--card:#ffffff;--text:#17324d;--muted:#65788b;
+    --navy:#103f70;--navy2:#1477ce;--navy3:#21a7df;--navy-soft:#eaf5ff;
+    --border:#d9e9f6;--shadow:0 8px 26px rgba(34,103,158,.10);
+    --shadow-lg:0 18px 50px rgba(25,84,136,.18)
+  }
+  body{background:linear-gradient(180deg,#f9fcff 0,#f1f8ff 48%,#f7fcfb 100%);background-attachment:fixed}
+  .panel,.stat-card,.debtor-card{border:1px solid rgba(205,228,244,.85);box-shadow:0 10px 28px rgba(25,91,145,.09)}
+  .panel{position:relative;background:rgba(255,255,255,.96)}
+  .panel:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+  .qr-wrap{text-decoration:none;color:inherit;border-radius:14px;padding:5px;transition:transform .18s,background .18s,box-shadow .18s}
+  .qr-wrap:hover,.qr-wrap:focus-visible{background:#eaf6ff;box-shadow:0 7px 18px rgba(21,111,184,.16);transform:translateY(-2px);outline:none}
+  .qr-mini{box-shadow:0 5px 14px rgba(25,82,126,.14)}
+  .mobile-nav-scrim{display:none}
+}
+@media(max-width:600px){
+  body{font-size:15px;background:linear-gradient(180deg,#fbfdff 0,#f0f8ff 56%,#f7fcfb 100%)}
+  .marquee{display:none}
+  .topbar{height:64px!important;min-height:64px!important;padding:8px 12px!important;gap:8px!important;flex-wrap:nowrap!important;overflow:visible!important;background:rgba(255,255,255,.96);border-bottom:1px solid #d8e9f6;box-shadow:0 5px 22px rgba(26,91,145,.08)}
+  .menu-toggle{width:44px;height:44px;padding:0;border-radius:14px;align-items:center;justify-content:center;background:linear-gradient(145deg,#edf7ff,#fff);border:1px solid #d7e9f7;box-shadow:0 5px 14px rgba(26,91,145,.10)}
+  .menu-toggle svg{width:24px;height:24px}
+  .topbar .page-title{font-size:17px!important;max-width:none!important;min-width:0;flex:1;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar .page-title svg{display:block!important;width:19px;height:19px;color:#19a3d7}
+  #themeToggle{width:44px;height:44px;min-height:44px;padding:0;border-radius:14px;flex:0 0 auto}
+  #themeLabel,.pending-btn,#modeTagText,#rtText{display:none!important}
+  #modeTag{width:36px;height:36px;min-width:36px;padding:0!important;display:grid;place-items:center;overflow:visible!important;border:0;background:#eaf7ff;color:#1675bc}
+  #modeTag svg{width:18px;height:18px}
+  .rt-dot{position:absolute;right:10px;bottom:7px;width:10px;height:10px;display:block!important}
+  .rt-dot .dot{display:block;width:8px;height:8px}
+  .content{padding:18px 14px calc(44px + env(safe-area-inset-bottom));overflow:hidden}
+  .page-head{margin-bottom:16px;gap:5px}.page-head h2{font-size:21px!important;line-height:1.32}.page-head .desc{font-size:13px;line-height:1.45}
+  .command-bar{padding:15px;border-radius:22px;background:linear-gradient(145deg,#ffffff,#eef8ff);color:var(--navy);border:1px solid #d4e9f7;box-shadow:0 12px 30px rgba(29,103,158,.11);gap:12px;margin-bottom:18px}
+  .command-bar b{font-size:16px;color:#124b7f}.command-bar span{font-size:12px;color:var(--muted);opacity:1}
+  .command-actions{width:100%;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px}
+  .command-actions .btn{min-width:0;min-height:68px;padding:9px 6px;white-space:normal;line-height:1.2;flex-direction:column;border-radius:15px;font-size:12.5px;box-shadow:none}
+  .command-actions .btn svg{width:20px;height:20px}.command-actions .btn-primary{background:linear-gradient(145deg,#1789e3,#0f65bd)}.command-actions .btn-success{background:linear-gradient(145deg,#22ad69,#0d8b67)}
+  .stats-grid{display:flex!important;gap:12px!important;overflow-x:auto;padding:2px 2px 13px;margin:0 -2px 14px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .stats-grid::-webkit-scrollbar{display:none}.stat-card{flex:0 0 min(78vw,300px);min-height:118px!important;padding:17px 18px!important;border-radius:21px;scroll-snap-align:start;border-left-width:5px!important}
+  .stat-card .label{font-size:13px}.stat-card .value{font-size:29px!important;margin-top:8px}.stat-card .sub{font-size:12px}
+  .panel{border-radius:22px;margin-bottom:16px}.panel-head{padding:15px 16px;background:linear-gradient(100deg,#edf7ff,#fff)}.panel-head h3{font-size:16px}.panel-body{padding:15px!important}
+  .dash-grid{gap:14px!important}.tbl-wrap{border:1px solid #e1edf6;border-radius:14px}
+  .report-schedule{padding:15px;border-radius:20px;gap:11px}.report-clock{width:42px;height:42px;border-radius:13px}.report-schedule b{font-size:15px}.report-schedule p{font-size:12px}.report-schedule .status-tag{width:auto;height:auto;margin-left:0;padding:5px 9px!important;display:inline-flex}
+  .sidebar{left:-290px!important;width:282px!important;box-shadow:18px 0 45px rgba(4,35,65,.28);transition:left .24s ease!important}.sidebar.open{left:0!important}
+  .sidebar.open + .mobile-nav-scrim{display:block;position:fixed;inset:0;background:rgba(8,38,66,.34);backdrop-filter:blur(3px);z-index:45}
+  .sidebar-brand{min-height:80px}.nav-item{font-size:15px!important;padding:12px 14px}
+  .debtor-card .dc-head{padding:12px;flex-wrap:wrap}.debtor-card .dc-head .pay-btn,.debtor-card .dc-head>.btn{margin-left:auto}.qr-wrap{margin-left:0;width:100%;justify-content:flex-end;background:#f1f8fd;border:1px solid #dcecf7;padding:8px 10px}.qr-wrap small{max-width:none;font-size:12px}.qr-mini{width:64px;height:64px}
+  .modal-backdrop{padding:10px}.modal{max-height:94vh;border-radius:22px}.modal-body{padding:15px}
+}
+
+/* Brighter Freshy palette and touch-first data entry. */
+@media screen {
+  .sidebar{background:linear-gradient(165deg,#0a4f91 0%,#087db3 58%,#14a8b7 125%)}
+  .sidebar-brand .logo{background:linear-gradient(145deg,#ffd84d,#f5a817);box-shadow:0 8px 22px rgba(239,166,16,.35)}
+  .nav-group-label{color:#ffd76b;font-size:11px;letter-spacing:.06em}
+  .nav-item{color:#e7f5ff}.nav-item svg{color:#ffd36a}.nav-item:hover{background:rgba(255,255,255,.13)}
+  .nav-item.active{background:linear-gradient(135deg,#fffdf4,#fff);color:#07548d;box-shadow:0 9px 23px rgba(0,38,76,.23)}
+  .nav-item.active svg{color:#f0a914}
+  .btn-gold{background:linear-gradient(135deg,#ffbf22,#f07c18);border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(240,124,24,.24)}
+  .command-actions .btn-ghost{background:linear-gradient(145deg,#fff9e7,#fff2c5);color:#9a5707;border-color:#ffd56a}
+  .stat-card.green{background:linear-gradient(140deg,#fff,#e9fff1)}
+  .stat-card.red{background:linear-gradient(140deg,#fff,#fff0ec)}
+  .stat-card.blue{background:linear-gradient(140deg,#fff,#eaf5ff)}
+  .stat-card.purple{background:linear-gradient(140deg,#fff,#f4efff)}
+  .stat-card.gold{background:linear-gradient(140deg,#fff,#fff7d8)}
+  .page-head h2:after{content:"";display:block;width:54px;height:5px;margin-top:7px;border-radius:6px;background:linear-gradient(90deg,#ffbd24,#f47c20,#24aee1)}
+  .debt-product-group{border:1px solid #d8e9f6;border-radius:17px;padding:13px;background:linear-gradient(145deg,#f8fcff,#fff);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .debt-product-group.jug-group{border-left:5px solid #1e91dc}.debt-product-group.pack-group{border-left:5px solid #f2a91c;background:linear-gradient(145deg,#fffaf0,#fff)}
+  .debt-product-group .field{margin:0}.debt-total-preview{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 15px;border-radius:15px;background:linear-gradient(135deg,#0d70bd,#16a7bb);color:#fff;margin-top:2px}
+  .debt-total-preview span{font-size:13px}.debt-total-preview strong{font-size:22px;font-variant-numeric:tabular-nums}
+}
+@media(max-width:600px){
+  .sidebar{background:linear-gradient(165deg,#075697 0%,#087fb7 58%,#14a8b7 125%)}
+  .debt-entry-modal{height:min(94vh,820px);display:flex;flex-direction:column;overflow:hidden;border-radius:24px 24px 0 0!important;align-self:flex-end}
+  .debt-entry-modal .modal-head{flex:0 0 auto;padding:15px 16px;background:linear-gradient(105deg,#eef8ff,#fff8df);border-bottom:1px solid #dcebf5}
+  .debt-entry-modal .modal-head h3{font-size:17px}.debt-entry-modal .modal-body{flex:1;overflow-y:auto;padding:14px 14px 120px!important}
+  .debt-entry-modal .modal-foot{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(16px);box-shadow:0 -8px 28px rgba(16,72,116,.12);display:grid;grid-template-columns:100px 1fr;z-index:5}
+  .debt-entry-modal .modal-foot .btn{min-height:50px;font-size:15px;border-radius:15px}
+  .debt-form-grid{display:block!important}.debt-form-grid>.field{margin-bottom:11px}.debt-product-group{margin-bottom:11px;padding:11px;gap:8px}.debt-product-group input{min-height:48px;text-align:center;font-size:18px!important;font-weight:700}
+  .debt-product-group label{font-size:12px}.debt-total-preview{position:sticky;bottom:0;z-index:3;margin-top:10px;box-shadow:0 8px 22px rgba(13,112,189,.20)}
+}
+
+/* ============================================================
+   MAJOR V4 REDESIGN — Freshy Aurora / mobile-first enterprise UI
+   ============================================================ */
+@media screen {
+  :root,[data-theme="light"]{
+    --bg:#f5f9ff;--card:#fff;--text:#122f49;--muted:#64788d;--border:#d8e8f5;
+    --navy:#073f74;--navy2:#086fbd;--navy3:#19a8df;--navy-soft:#eaf6ff;
+    --gold:#ffbd24;--orange:#ff7a1a;--coral:#ff5f67;--green:#16ad65;--violet:#7957e8;
+    --shadow:0 14px 38px rgba(28,91,145,.12);--shadow-lg:0 24px 70px rgba(17,69,116,.20)
+  }
+  body{color:var(--text);background:
+    radial-gradient(circle at 8% 4%,rgba(255,194,44,.14),transparent 25%),
+    radial-gradient(circle at 94% 18%,rgba(26,174,222,.14),transparent 28%),
+    linear-gradient(180deg,#fbfdff 0%,#f2f8ff 54%,#f7fcff 100%)}
+  .main:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.32;background-image:radial-gradient(#82bce4 1px,transparent 1px);background-size:22px 22px;mask-image:linear-gradient(to bottom,black,transparent 55%)}
+  .topbar{position:relative;z-index:12;background:rgba(255,255,255,.88);border-bottom:1px solid rgba(189,220,241,.9);box-shadow:0 7px 26px rgba(34,91,139,.08)}
+  .topbar .page-title{color:#0a477b;font-weight:800}.topbar .page-title svg{color:#f6aa12}
+  .content{position:relative;z-index:1;max-width:1500px;width:100%;margin:0 auto}
+  .page-head{padding:22px 24px;border:1px solid rgba(204,228,245,.9);border-radius:24px;background:linear-gradient(120deg,rgba(255,255,255,.97),rgba(235,248,255,.94) 62%,rgba(255,248,219,.8));box-shadow:var(--shadow)}
+  .page-head h2{color:#083f70;font-weight:900}.page-head h2:after{width:86px;background:linear-gradient(90deg,#ffbd24,#ff7c22,#25afe2)}
+  .page-head .desc{color:#60768a}
+  .panel,.debtor-card,.stat-card{border:1px solid rgba(208,229,244,.95);box-shadow:var(--shadow);overflow:hidden}
+  .panel{border-radius:24px;background:rgba(255,255,255,.96)}
+  .panel-head{min-height:62px;padding:16px 20px;background:linear-gradient(105deg,#eaf6ff 0%,#fff 58%,#fff6d8 130%);border-bottom:1px solid #dcebf6}
+  .panel-head h3{font-size:18px;font-weight:800;color:#0a477b}.panel-head h3 svg{color:#f2a711}
+  .panel-body{padding:20px}
+  .stat-card{border-radius:24px!important;padding:22px!important;transition:transform .2s,box-shadow .2s}
+  .stat-card:hover{transform:translateY(-3px);box-shadow:0 20px 42px rgba(30,90,140,.16)}
+  .stat-card .label{font-weight:750;color:#567087}.stat-card .value{font-weight:900;letter-spacing:-1px}
+  .stat-card.green{border-left:0;background:linear-gradient(140deg,#fff 20%,#e5fff0);box-shadow:inset 0 5px 0 #20b968,var(--shadow)}
+  .stat-card.red{border-left:0;background:linear-gradient(140deg,#fff 20%,#fff0ed);box-shadow:inset 0 5px 0 #ff655e,var(--shadow)}
+  .stat-card.blue{border-left:0;background:linear-gradient(140deg,#fff 20%,#e5f5ff);box-shadow:inset 0 5px 0 #1c9ce1,var(--shadow)}
+  .stat-card.purple{border-left:0;background:linear-gradient(140deg,#fff 20%,#f2edff);box-shadow:inset 0 5px 0 #7d60e8,var(--shadow)}
+  .stat-card.gold{border-left:0;background:linear-gradient(140deg,#fff 20%,#fff5cf);box-shadow:inset 0 5px 0 #ffb819,var(--shadow)}
+  .btn{min-height:42px;border-radius:13px;font-weight:750;transition:transform .16s,box-shadow .16s,filter .16s}.btn:hover{transform:translateY(-1px);filter:saturate(1.08)}
+  .btn-primary{border:0;background:linear-gradient(135deg,#168de0,#075eb4);box-shadow:0 7px 18px rgba(12,107,189,.23)}
+  .btn-success{border:0;background:linear-gradient(135deg,#24bd70,#078c60);box-shadow:0 7px 18px rgba(8,145,96,.22)}
+  .btn-danger{border:0;background:linear-gradient(135deg,#ff6964,#e43d54);box-shadow:0 7px 18px rgba(224,59,82,.20)}
+  .btn-gold{background:linear-gradient(135deg,#ffc931,#f47b17);box-shadow:0 7px 18px rgba(244,123,23,.22)}
+  .tbl-wrap{position:relative;border:1px solid #dbe9f4;border-radius:18px;overflow:auto;background:#fff;box-shadow:inset 0 1px 0 #fff}
+  .tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+  .tbl thead th{position:sticky;top:0;z-index:2;padding:13px 12px;background:linear-gradient(135deg,#0b568f,#087cb3);color:#fff;border:0;border-right:1px solid rgba(255,255,255,.13);font-weight:800;white-space:nowrap}
+  .tbl thead th:first-child{border-radius:16px 0 0 0}.tbl thead th:last-child{border-radius:0 16px 0 0}
+  .tbl tbody td{padding:13px 12px;border:0;border-bottom:1px solid #e7f0f7;color:#27445d;vertical-align:middle}
+  .tbl tbody tr:nth-child(even){background:#f7fbff}.tbl tbody tr:hover{background:#fff8df}.tbl tbody tr:last-child td{border-bottom:0}
+  .status-tag,.badge{border-radius:999px;font-weight:750;box-shadow:inset 0 0 0 1px rgba(255,255,255,.32)}
+  .field{margin-bottom:15px}.field label{display:flex;align-items:center;gap:6px;margin-bottom:7px;color:#244c6d;font-size:13px;font-weight:800}
+  .field input,.field select,.field textarea{min-height:48px;border:1.5px solid #cfe0ed;border-radius:14px;background:#fbfdff;color:#173a57;padding:11px 13px;font-size:15px;box-shadow:inset 0 1px 2px rgba(15,65,104,.04);transition:border .16s,box-shadow .16s,background .16s}
+  .field input:hover,.field select:hover,.field textarea:hover{border-color:#91c5e7;background:#fff}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:#158fd5;background:#fff;box-shadow:0 0 0 4px rgba(25,158,218,.13)}
+  .modal-backdrop{background:rgba(5,39,68,.50);backdrop-filter:blur(7px)}
+  .modal{border:1px solid rgba(255,255,255,.9);border-radius:25px;box-shadow:var(--shadow-lg);overflow:hidden}
+  .modal-head{padding:17px 20px;background:linear-gradient(108deg,#e7f5ff,#fff 60%,#fff2c4);border-bottom:1px solid #d8e8f4}.modal-head h3{font-weight:900;color:#084879}
+  .modal-foot{background:#f7fbff;border-top:1px solid #dceaf5;padding:14px 20px}
+  .command-bar{border:1px solid rgba(255,255,255,.5);background:linear-gradient(120deg,#075399,#078cc0 60%,#13a978);box-shadow:0 16px 38px rgba(8,103,158,.22)}
+  .sidebar{background:linear-gradient(170deg,#063f79 0%,#0876ab 54%,#12a7a9 110%);box-shadow:12px 0 40px rgba(6,51,91,.17)}
+  .sidebar-brand{background:linear-gradient(110deg,rgba(255,255,255,.1),rgba(255,199,42,.09));border-bottom:1px solid rgba(255,255,255,.12)}
+  .sidebar-brand .logo{background:linear-gradient(145deg,#ffdd4e,#f59a16);box-shadow:0 8px 22px rgba(238,161,18,.38)}
+  .nav-item{border:1px solid transparent}.nav-item:hover{border-color:rgba(255,255,255,.11)}
+  .nav-item.active{background:linear-gradient(135deg,#fff9d9,#fff);color:#075184;box-shadow:0 11px 26px rgba(0,35,69,.24)}
+  .login-card{border:1px solid rgba(255,255,255,.9);border-radius:30px;box-shadow:0 30px 90px rgba(8,62,105,.24);background:rgba(255,255,255,.94);backdrop-filter:blur(20px)}
+  .login-logo{background:linear-gradient(145deg,#19aee4,#0870c0 60%,#0dac8d);box-shadow:0 14px 30px rgba(12,130,186,.28)}
+}
+@media screen and (max-width:700px){
+  .content{padding:14px 12px calc(42px + env(safe-area-inset-bottom))}
+  .page-head{padding:16px;border-radius:20px;margin-bottom:14px}.page-head h2{font-size:21px!important}.page-head .desc{font-size:13px}
+  .panel{border-radius:20px}.panel-head{min-height:56px;padding:14px 15px}.panel-head h3{font-size:16px}.panel-body{padding:14px!important}
+  .stats-grid{margin-right:-12px!important;padding-right:12px}.stat-card{flex-basis:82vw!important;border-radius:20px!important}
+  .tbl-wrap{margin:0 -2px;border-radius:15px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl{min-width:680px;font-size:13px}.tbl thead th,.tbl tbody td{padding:11px 10px}
+  .modal-backdrop{padding:0;align-items:flex-end}.modal{width:100%;max-width:none;max-height:94dvh;border-radius:25px 25px 0 0;border-bottom:0}
+  .modal-head{position:sticky;top:0;z-index:4;padding:15px 16px}.modal-body{padding:14px 14px 100px!important;overflow-y:auto}.modal-foot{position:sticky;bottom:0;z-index:4;padding:12px 14px calc(12px + env(safe-area-inset-bottom))}
+  .modal-foot .btn{min-height:50px}
+  .field input,.field select,.field textarea{min-height:52px;font-size:16px}
+  .form-grid,.grid-2,.grid-3{grid-template-columns:1fr!important;gap:0!important}
+  .debtor-card{border-radius:20px}.debtor-card .dc-head{background:linear-gradient(115deg,#f0f8ff,#fff9df)}
+  .qr-wrap{border:1.5px dashed #58afd9;background:linear-gradient(120deg,#e9f8ff,#fff9de);box-shadow:0 7px 18px rgba(23,113,167,.10)}
+}
+
+/* Formal controlled documents: screen preview and A4 print share one visual language. */
+.doc-page{color:#12283c;font-family:'Sarabun',sans-serif;background:#fff;font-size:12.5px}
+.doc-head{position:relative;display:grid;grid-template-columns:74px 1fr 150px;gap:14px;align-items:center;padding:14px 16px;margin:0;border:2px solid #123f68;border-radius:0;background:#fff}
+.doc-head:after{display:none}.doc-logo{width:62px;height:62px;display:grid;place-items:center;border:1px solid #b7c7d5;border-radius:4px}.doc-logo img{max-width:54px;max-height:54px}
+.doc-title{text-align:left}.doc-title .factory{font-size:21px;font-weight:900;color:#0b365c;line-height:1.2}.doc-title .factory-sub{font-size:10.5px;color:#4d5f70;margin-top:4px}.doc-title .report-name{font-size:16px;font-weight:900;color:#142d44;margin-top:8px;text-transform:none}
+.doc-control{align-self:stretch;border-left:1px solid #9eb1c2;padding-left:13px;display:flex;flex-direction:column;justify-content:center;gap:4px}.doc-control .control-label{font-size:9px;font-weight:800;letter-spacing:.08em;color:#8a6810}.doc-control strong{font-size:11px;color:#163b5d}.doc-control span{font-size:10px;color:#526779}
+.doc-meta{display:grid;grid-template-columns:1fr 1fr 1fr;margin:0 0 14px;padding:8px 12px;border:2px solid #123f68;border-top:0;background:#f2f6f9;font-size:10.5px}.doc-meta>div{padding:0 8px;border-right:1px solid #b7c6d2}.doc-meta>div:last-child{border-right:0;text-align:right}.doc-meta .doc-no{font-weight:900;color:#0b365c}
+.doc-section-title{margin:14px 0 7px;padding:6px 9px;border-left:5px solid #d9a617;background:#f2f5f7;color:#123d63;font-size:13px;font-weight:900;break-after:avoid}
+.doc-table{width:100%;border-collapse:collapse;margin:0;font-size:10.5px;font-variant-numeric:tabular-nums}.doc-table thead{display:table-header-group}.doc-table th{padding:7px 5px!important;background:#123f68!important;color:#fff!important;border:1px solid #123f68!important;font-weight:800;text-align:center}.doc-table td{padding:6px 5px!important;border:1px solid #9babb8!important;color:#1d3449;background:#fff}.doc-table tbody tr:nth-child(even) td{background:#f3f6f8}.doc-table tr{break-inside:avoid}.doc-table .l{text-align:left}.doc-table .r{text-align:right}
+.doc-summary{padding:7px 10px;border:1px solid #8fa2b3;border-top:0;background:#eef3f6;color:#123854;text-align:right;font-weight:900}.doc-gap{height:10px}
+.sign-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:42px 4px 18px;break-inside:avoid}.sign-box{text-align:center;font-size:10px}.sign-box .line{padding-bottom:5px;border-bottom:1px solid #344d62;min-height:20px}.sign-box .role{margin-top:5px;color:#405669}.sign-box .sign-date{margin-top:12px;color:#5c6f7e}
+.doc-foot{display:flex;justify-content:space-between;gap:10px;padding-top:7px;border-top:2px solid #123f68;color:#40576b;font-size:9px}.doc-foot strong{color:#153b5c}
+@media print{
+  @page{size:A4 portrait;margin:12mm 11mm 12mm}
+  .doc-page{font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.doc-head{grid-template-columns:68px 1fr 145px;padding:11px 13px}.doc-title .factory{font-size:19px}.doc-title .report-name{font-size:15px}.doc-table{font-size:9.5px}.doc-table th,.doc-table td{padding:5px 4px!important}.sign-row{margin-top:36px}.doc-foot{position:relative;bottom:auto}
+}
+
+/* ============================================================
+   V5 — MODERN GOVERNMENT COMMAND UI
+   สุขุม เข้ม ทันสมัย อ่านง่ายสำหรับงานภาครัฐและองค์กร
+   ============================================================ */
+@media screen{
+  :root,[data-theme="light"],[data-theme="dark"]{
+    --bg:#eaf0f5;--card:#fff;--text:#122536;--muted:#617284;--border:#cad7e2;
+    --navy:#0a2740;--navy2:#123f61;--navy3:#167594;--navy-soft:#e8f1f6;
+    --gold:#d5a72b;--gold2:#a8790a;--orange:#c96a21;--green:#168262;--red:#ba3c45;
+    --shadow:0 10px 28px rgba(8,37,61,.10);--shadow-lg:0 28px 76px rgba(3,24,42,.28)
+  }
+  body{background:linear-gradient(135deg,#e7eef4 0%,#f5f8fa 48%,#e9f0f4 100%);color:var(--text)}
+  .main:before{opacity:.14;background-image:linear-gradient(rgba(16,57,86,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(16,57,86,.18) 1px,transparent 1px);background-size:36px 36px;mask-image:linear-gradient(to bottom,black,transparent 65%)}
+  .marquee{height:28px;background:#061d31;color:#d8e7f1;border-bottom:1px solid #31536b;font-size:11px;letter-spacing:.025em}
+  .sidebar{background:linear-gradient(180deg,#061d31 0%,#0a2e49 52%,#0b4054 100%);border-right:1px solid #33566d;box-shadow:14px 0 42px rgba(4,25,42,.20)}
+  .sidebar-brand{background:rgba(255,255,255,.025);border-bottom:1px solid rgba(178,207,224,.16)}
+  .sidebar-brand .logo{background:linear-gradient(145deg,#e0b83e,#a9780c);color:#071e31;border:1px solid #efd56d;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+  .sidebar-brand .name{font-weight:850;letter-spacing:.01em}.sidebar-brand .name small{color:#9fb5c5}
+  .nav-group-label{color:#c9a846;letter-spacing:.12em}.nav-item{color:#cbd9e3;border-radius:9px}.nav-item svg{color:#89aabc}
+  .nav-item:hover{background:#123b56;border-color:#31556b;color:#fff}.nav-item.active{background:linear-gradient(90deg,#d4ad38,#e4c75d);color:#071f33;border-color:#f0dc8e;box-shadow:0 9px 24px rgba(0,0,0,.25)}.nav-item.active svg{color:#102e43}
+  .sidebar-foot{background:rgba(3,18,30,.32);border-top:1px solid rgba(186,210,225,.14)}
+  .topbar{background:rgba(248,251,253,.95);border-bottom:1px solid #bdccd7;box-shadow:0 7px 24px rgba(6,37,61,.09)}
+  .topbar .page-title{color:#0a2c47;letter-spacing:.01em}.topbar .page-title svg{color:#a97d13}
+  .content{max-width:1480px;padding-top:24px}
+  .page-head{padding:21px 24px;border-radius:12px;border:1px solid #bdccd7;border-left:7px solid #0c3b5b;background:linear-gradient(110deg,#fff 0%,#f3f7f9 70%,#e6eef3 100%);box-shadow:var(--shadow)}
+  .page-head h2{color:#092a45;font-weight:900;letter-spacing:.005em}.page-head h2:after{height:3px;width:72px;background:#caa02a;border-radius:0}.page-head .desc{color:#5b6d7d}
+  .command-bar{border-radius:12px;border:1px solid #315a72;background:linear-gradient(112deg,#082741,#0b3c5c 62%,#0d5965);box-shadow:0 15px 35px rgba(5,38,61,.20)}
+  .panel,.debtor-card,.stat-card{border:1px solid #c8d5df;border-radius:12px!important;background:#fff;box-shadow:var(--shadow)}
+  .panel-head{min-height:60px;background:linear-gradient(105deg,#e8eff4,#f9fbfc 70%,#f3ead0);border-bottom:1px solid #c6d4de}.panel-head h3{color:#0b334f}
+  .stat-card{border:1px solid #c3d1dc!important;border-left:6px solid #244f6a!important;background:linear-gradient(140deg,#fff,#f3f7f9)!important;box-shadow:var(--shadow)!important}
+  .stat-card.green{border-left-color:#168262!important}.stat-card.red{border-left-color:#b83d48!important}.stat-card.blue{border-left-color:#187296!important}.stat-card.purple{border-left-color:#60558c!important}.stat-card.gold{border-left-color:#bd8f1d!important}
+  .stat-card:after{border-radius:4px;transform:rotate(35deg);opacity:.035}.stat-card .label{color:#54697a;text-transform:none}.stat-card .value{color:#0a2b45}
+  .btn{border-radius:8px;font-weight:800;box-shadow:none}.btn-primary{background:#0b4c73;border:1px solid #0b4c73}.btn-primary:hover{background:#083c5d}.btn-success{background:#147657;border:1px solid #147657}.btn-danger{background:#ab3541;border:1px solid #ab3541}.btn-gold{background:#c99c25;border:1px solid #aa7c0e;color:#13293a}.btn-ghost{background:#fff;border:1px solid #b6c7d3;color:#153b55}
+  .tbl-wrap{border-radius:10px;border:1px solid #b9c9d5}.tbl thead th{background:#0c3552;color:#fff;border-right:1px solid #49667a;font-weight:850}.tbl thead th:first-child{border-radius:8px 0 0}.tbl thead th:last-child{border-radius:0 8px 0 0}.tbl tbody td{color:#20394c;border-bottom:1px solid #d9e2e8}.tbl tbody tr:nth-child(even){background:#f3f6f8}.tbl tbody tr:hover{background:#edf3d9}
+  .field label{color:#163e59}.field input,.field select,.field textarea{border-radius:8px;border:1.5px solid #b9cad6;background:#f9fbfc}.field input:focus,.field select:focus,.field textarea:focus{border-color:#1b698d;box-shadow:0 0 0 3px rgba(17,99,136,.14)}
+  .modal{border-radius:14px;border:1px solid #9fb3c1;box-shadow:var(--shadow-lg)}.modal-head{background:linear-gradient(100deg,#dce7ee,#f8fafb);border-bottom:1px solid #b7c8d4}.modal-head h3{color:#092e49}.modal-foot{background:#edf2f5;border-top:1px solid #c1d0da}
+  .status-tag{border-radius:6px}.chip{border-radius:7px}.chip.active{background:#0c466b;color:#fff;border-color:#0c466b}
+  .qr-wrap{border-radius:8px;border:1px solid #9fb9ca;background:#edf4f7}.qr-wrap:hover{background:#e0edf2;box-shadow:0 8px 18px rgba(10,52,81,.14)}
+  .login-card{border-radius:16px;border:1px solid #aebfcb;background:rgba(249,251,252,.97);box-shadow:0 34px 100px rgba(2,24,41,.32)}.login-logo{border-radius:12px;background:linear-gradient(145deg,#0c486e,#092a43);border:1px solid #476b82;box-shadow:0 12px 26px rgba(5,39,63,.27)}
+  .login-card h1{color:#082a44}.connection-setup.hidden{display:none!important}
+}
+@media screen and (max-width:700px){
+  .marquee{display:none}.topbar{background:#f8fbfd}.content{padding:14px 11px calc(42px + env(safe-area-inset-bottom))}.page-head{padding:15px;border-radius:10px;border-left-width:5px}
+  .panel,.debtor-card,.stat-card{border-radius:10px!important}.command-bar{border-radius:10px}.panel-head{border-radius:0}
+  .stats-grid{gap:10px!important}.stat-card{flex-basis:84vw!important;min-height:112px!important}.stat-card .value{font-size:27px!important}
+  .modal{border-radius:14px 14px 0 0}.modal-head{border-radius:0}.field input,.field select,.field textarea{border-radius:8px}
+  .command-actions .btn{border-radius:8px}.qr-wrap{width:100%;justify-content:space-between;padding:9px}.qr-mini{width:58px;height:58px}
+}
+
+/* เอกสารมาตรฐานงานสารบรรณ — พิมพ์ขาวดำได้ชัดเจน */
+.doc-page{font-family:'Sarabun',sans-serif;color:#000;background:#fff}.doc-head{border:1.6px solid #000;background:#fff;grid-template-columns:70px 1fr 160px;padding:11px 13px}.doc-logo{border:1px solid #555;border-radius:0}.doc-title .factory{color:#000;font-size:20px}.doc-title .factory-sub{color:#222}.doc-title .report-name{color:#000;font-size:16px;text-decoration:underline;text-underline-offset:4px}.doc-control{border-left:1px solid #000}.doc-control .control-label{color:#000}.doc-control strong,.doc-control span{color:#000}.doc-meta{border:1.6px solid #000;border-top:0;background:#fff;color:#000}.doc-meta>div{border-right:1px solid #555}.doc-meta .doc-no{color:#000}.doc-section-title{border-left:5px solid #000;background:#e8e8e8;color:#000}.doc-table th{background:#263746!important;color:#fff!important;border:1px solid #000!important}.doc-table td{border:1px solid #444!important;color:#000}.doc-table tbody tr:nth-child(even) td{background:#f1f1f1}.doc-summary{border-color:#444;background:#e9e9e9;color:#000}.sign-box .line{border-color:#000}.sign-box .role,.sign-box .sign-date{color:#000}.doc-foot{border-color:#000;color:#000}.doc-foot strong{color:#000}
+@media print{
+  @page{size:A4 portrait;margin:15mm 13mm 14mm}.doc-page{font-size:10.5pt;color:#000}.doc-head{grid-template-columns:18mm 1fr 41mm;min-height:27mm}.doc-title .factory{font-size:16pt}.doc-title .report-name{font-size:13pt}.doc-meta{font-size:8.5pt}.doc-table{font-size:8.5pt}.doc-table th{background:#263746!important;color:#fff!important}.doc-table tr{page-break-inside:avoid}.doc-section-title{page-break-after:avoid}.sign-row{page-break-inside:avoid;margin-top:18mm}.doc-foot{font-size:7.5pt}
+}
+
+/* ============================================================
+   V6 — FRESHY SPECTRUM: fast, bright, modern and touch-first
+   ============================================================ */
+@media screen{
+  :root,[data-theme="light"],[data-theme="dark"]{
+    --bg:#f1f7fc;--card:#ffffff;--text:#123451;--muted:#60768a;--border:#d4e5f2;
+    --navy:#0b4778;--navy2:#0878c5;--navy3:#22b3df;--navy-soft:#eaf7ff;
+    --gold:#ffc62f;--gold2:#e99912;--orange:#ff7b2f;--green:#16aa68;--red:#ee5360;
+    --shadow:0 10px 28px rgba(21,91,145,.11);--shadow-lg:0 24px 60px rgba(10,67,111,.20)
+  }
+  body{background:linear-gradient(135deg,#f8fcff 0%,#eef7ff 48%,#f7fbff 100%);color:var(--text)}
+  .main:before{display:none}.marquee{height:30px;background:linear-gradient(90deg,#075ba2,#0799c0,#0aa68c);color:#fff;border:0}
+  .sidebar{background:linear-gradient(180deg,#075493 0%,#087cb5 58%,#09a49f 118%);border:0;box-shadow:12px 0 32px rgba(5,66,107,.18)}
+  .sidebar-brand{background:rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.18)}
+  .sidebar-brand .logo{background:linear-gradient(145deg,#ffe15a,#ffad1f);color:#805000;border:0;box-shadow:0 8px 18px rgba(111,69,0,.20)}
+  .sidebar-brand .name small{color:#d8f3ff}.nav-group-label{color:#ffe477}.nav-item{color:#e9f7ff;border-radius:12px}.nav-item svg{color:#ffdc62}
+  .nav-item:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.14)}.nav-item.active{background:#fff;color:#07568d;border:0;box-shadow:0 9px 22px rgba(1,55,89,.20)}.nav-item.active svg{color:#f1a514}
+  .topbar{background:#fff;border-bottom:1px solid #d5e7f3;box-shadow:0 5px 18px rgba(18,91,146,.08);backdrop-filter:none!important}.topbar .page-title{color:#0a4a7b}.topbar .page-title svg{color:#f2ab18}
+  .content{max-width:1500px;padding-top:20px}
+  .page-head{padding:20px 22px;border:1px solid #d1e6f4;border-left:0;border-radius:20px;background:linear-gradient(110deg,#fff 0%,#eef9ff 72%,#fff7d9 100%);box-shadow:var(--shadow)}
+  .page-head h2{color:#0a4878}.page-head h2:after{width:86px;height:5px;border-radius:10px;background:linear-gradient(90deg,#15a8dd,#ffc328,#ff7831)}
+  .command-bar{border-radius:20px;border:0;background:linear-gradient(115deg,#075db0,#0a96c7 58%,#10aa83);box-shadow:0 15px 32px rgba(8,111,169,.20)}
+  .panel,.debtor-card,.stat-card{border:1px solid #d6e8f4;border-radius:20px!important;background:#fff;box-shadow:var(--shadow)}
+  .panel-head{min-height:62px;background:linear-gradient(100deg,#edf8ff,#fff 63%,#fff7dc);border-bottom:1px solid #dcebf5}.panel-head h3{color:#0a4a7a}.panel-head h3 svg{color:#efa716}
+  .stat-card{border:1px solid #d8e8f3!important;border-left:0!important;background:#fff!important;box-shadow:var(--shadow)!important;overflow:hidden}
+  .stat-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:7px;background:#159adb}.stat-card.green:before{background:#18b46b}.stat-card.red:before{background:#f05b63}.stat-card.blue:before{background:#189fe0}.stat-card.purple:before{background:#7a66e6}.stat-card.gold:before{background:#f5b719}
+  .stat-card:after{width:92px;height:92px;border-radius:50%;transform:none;opacity:.06}.stat-card .label{color:#5d7184}.stat-card .value{color:#0b4674}
+  .btn{border-radius:12px;font-weight:800;box-shadow:none}.btn-primary{background:linear-gradient(135deg,#168fdc,#075eb7);border:0;box-shadow:0 6px 15px rgba(8,103,183,.18)}.btn-success{background:linear-gradient(135deg,#22b96f,#0b8b5e);border:0}.btn-danger{background:linear-gradient(135deg,#f26668,#d94055);border:0}.btn-gold{background:linear-gradient(135deg,#ffd044,#f39a19);border:0;color:#704300}.btn-ghost{background:#fff;border:1px solid #c8deed;color:#15527d}
+  .tbl-wrap{border-radius:15px;border:1px solid #d4e5f1;box-shadow:0 5px 15px rgba(24,89,137,.05)}.tbl thead th{background:linear-gradient(135deg,#0869ad,#078db9);color:#fff;border-right:1px solid rgba(255,255,255,.16)}.tbl thead th:first-child{border-radius:14px 0 0}.tbl thead th:last-child{border-radius:0 14px 0 0}.tbl tbody td{color:#28485f;border-bottom:1px solid #e1edf5}.tbl tbody tr:nth-child(even){background:#f5fbff}.tbl tbody tr:hover{background:#fff8dd}
+  .field label{color:#1c5479}.field input,.field select,.field textarea{border-radius:12px;border:1.5px solid #c8ddeb;background:#fbfdff}.field input:focus,.field select:focus,.field textarea:focus{border-color:#189bd6;box-shadow:0 0 0 4px rgba(21,157,216,.12)}
+  .modal-backdrop{background:rgba(6,51,83,.42);backdrop-filter:none!important}.modal{border-radius:22px;border:1px solid #d1e4f1;box-shadow:var(--shadow-lg)}.modal-head{background:linear-gradient(100deg,#ebf8ff,#fff 65%,#fff4cf);border-bottom:1px solid #d6e7f2}.modal-head h3{color:#0b4c7b}.modal-foot{background:#f4f9fc;border-top:1px solid #d8e7f1}
+  .login-card{border-radius:26px;border:1px solid rgba(255,255,255,.9);background:#fff;box-shadow:0 28px 75px rgba(10,81,132,.22);backdrop-filter:none!important}.login-logo{border-radius:18px;background:linear-gradient(145deg,#1ab3e4,#0874c3 58%,#0bad8d);border:0;box-shadow:0 12px 25px rgba(10,130,185,.24)}.login-card h1{color:#0a4777}
+  #privacyOverlay{backdrop-filter:none!important;background:rgba(233,243,250,.96)}
+}
+@media screen and (max-width:700px){
+  body{font-size:15px}.topbar{height:62px!important;min-height:62px!important}.content{padding:13px 11px calc(36px + env(safe-area-inset-bottom))}.page-head{padding:15px;border-radius:17px}.page-head h2{font-size:21px!important}
+  .command-bar{border-radius:18px;padding:14px}.command-actions{grid-template-columns:repeat(3,minmax(0,1fr))!important}.command-actions .btn{min-height:66px;border-radius:13px}
+  .panel,.debtor-card,.stat-card{border-radius:17px!important}.panel-head{min-height:55px;padding:13px 14px}.panel-body{padding:13px!important}
+  .stats-grid{gap:10px!important;margin-right:-11px!important}.stat-card{flex-basis:82vw!important;min-height:112px!important;padding:17px!important}.stat-card .value{font-size:28px!important}
+  .tbl-wrap{border-radius:13px;margin:0;box-shadow:none}.tbl{min-width:660px}.tbl thead th,.tbl tbody td{padding:11px 9px}
+  .modal{height:auto;max-height:96dvh;border-radius:22px 22px 0 0}.modal-body{padding:13px 13px 94px!important}.modal-foot{display:grid;grid-template-columns:minmax(90px,.45fr) 1fr;gap:8px}.modal-foot .btn{min-height:52px}
+  .field{margin-bottom:12px}.field label{font-size:13px}.field input,.field select,.field textarea{min-height:54px;font-size:16px!important;border-radius:12px}
+  .debt-product-group{grid-template-columns:1fr 1fr}.qr-wrap{border-radius:13px;background:linear-gradient(110deg,#eaf8ff,#fff7d9);border:1px solid #bcdbea}
+}
+
+/* V6 official A4 document system — clean Thai administrative register */
+.doc-page{font-family:'Sarabun',sans-serif;color:#000;background:#fff}.doc-head{border:2px solid #000;grid-template-columns:22mm 1fr 46mm;min-height:31mm;padding:4mm;border-radius:0}.doc-logo{width:18mm;height:18mm;border:1px solid #000;border-radius:0}.doc-title{text-align:center!important}.doc-title .factory{font-size:17pt;color:#000;font-weight:800}.doc-title .factory-sub{font-size:8.5pt;color:#000;line-height:1.45}.doc-title .report-name{font-size:13pt;color:#000;font-weight:800;text-decoration:none;border-top:1px solid #000;padding-top:2mm;margin-top:2mm}.doc-control{border-left:1px solid #000;padding-left:3mm}.doc-control .control-label{font-size:7.5pt;color:#000}.doc-control strong{font-size:9pt;color:#000}.doc-control span{font-size:7.5pt;color:#000}.doc-meta{grid-template-columns:1fr 1.2fr 1fr;border:2px solid #000;border-top:0;background:#fff;padding:2mm 0;margin-bottom:4mm;font-size:8.5pt}.doc-meta>div{border-right:1px solid #000;padding:0 3mm}.doc-meta>div:last-child{border:0}.doc-section-title{margin:4mm 0 2mm;padding:1.5mm 2mm;border:1px solid #000;border-left:5px solid #000;background:#e7e7e7;font-size:10pt;color:#000}.doc-table{font-size:8.5pt}.doc-table th{background:#d9d9d9!important;color:#000!important;border:1px solid #000!important;padding:2mm 1mm!important}.doc-table td{border:1px solid #000!important;color:#000;padding:1.7mm 1mm!important}.doc-table tbody tr:nth-child(even) td{background:#f5f5f5}.doc-summary{border:1px solid #000;border-top:0;background:#eee;color:#000;padding:2mm 3mm}.sign-row{margin-top:18mm;gap:8mm}.sign-box .line{border-bottom:0;border-top:1px solid #000;padding-top:2mm}.sign-box .role,.sign-box .sign-date{color:#000}.doc-foot{border-top:2px solid #000;color:#000;padding-top:2mm}
+@media print{
+  @page{size:A4 portrait;margin:12mm 12mm 14mm}.doc-page{font-size:9pt}.doc-head{break-inside:avoid}.doc-table thead{display:table-header-group}.doc-table tr{break-inside:avoid;page-break-inside:avoid}.doc-section-title{break-after:avoid}.sign-row{break-inside:avoid;page-break-inside:avoid}.doc-foot{break-inside:avoid}
+}
+
+/* ============================================================
+   V7 — CLEAN MODERN UI / TRUE DARK MODE / ONE-PAGE PRINT FIX
+   ============================================================ */
+@media screen{
+  :root,[data-theme="light"]{
+    --bg:#f4f8fb;--card:#fff;--text:#15344d;--muted:#61788b;--border:#d6e3ec;
+    --navy:#0b4e7e;--navy2:#0878bc;--navy3:#16a9d3;--navy-soft:#edf7fc;
+    --gold:#f5b719;--gold2:#d58b08;--orange:#f47732;--green:#159a62;--red:#d94152;
+    --shadow:0 8px 24px rgba(22,73,109,.09);--shadow-lg:0 24px 60px rgba(12,53,82,.20)
+  }
+  body{background:#f4f8fb!important;color:var(--text)}
+  .marquee{background:#0b5d91;color:#fff}
+  .sidebar{background:#0877ae!important}.sidebar-brand{background:#076a9d!important}.sidebar-brand .logo{background:#ffc52d!important;color:#744500}.nav-item:hover{background:#0a6797}.nav-item.active{background:#fff!important;color:#07547f}.nav-group-label{color:#ffe27b}
+  .topbar{background:#fff!important}.page-head{background:#fff!important;border:1px solid var(--border);border-top:5px solid #19a7d1;border-radius:16px;box-shadow:var(--shadow)}
+  .page-head h2:after{background:#f5b719!important;height:4px;width:68px}
+  .panel,.debtor-card,.stat-card{background:#fff!important;border-color:var(--border);box-shadow:var(--shadow)}
+  .panel-head{background:#f7fbfd!important}.stat-card:after{display:none}.stat-card{border-radius:16px!important}
+  .command-bar{background:#fff!important;color:#123d5c!important;border:1px solid #d1e2ec;border-left:6px solid #0d8fc2;box-shadow:var(--shadow);border-radius:16px}
+  .command-bar b,.command-bar span{color:#123d5c!important;opacity:1!important}.command-bar b svg{color:#f0aa14}
+  .command-actions .btn-primary{background:#137fc2!important;color:#fff}.command-actions .btn-success{background:#16965f!important;color:#fff}.command-actions .btn-ghost{background:#fff7dd!important;color:#875400!important;border-color:#f1c558!important}
+  .btn-danger,.btn-danger span,.btn-danger svg{color:#fff!important}.btn-danger{background:#db4655!important;border-color:#c93646!important;opacity:1!important;text-shadow:none!important}.btn-danger:disabled{color:#fff!important;opacity:.62!important}
+  .tbl thead th{background:#0c78ae!important;color:#fff}.tbl tbody tr:nth-child(even){background:#f5f9fc}.tbl tbody tr:hover{background:#fff8dc}
+  .modal-head{background:#f5fafc!important}.modal-foot{background:#f5f8fa!important}.qr-wrap{background:#f1f8fc!important}
+  .payment-cards{display:none}
+  .reset-warning{margin-bottom:16px;padding:14px 16px;border:1px solid #f0b9bf;border-left:6px solid #d94152;border-radius:12px;background:#fff5f6;color:#6d2630}.reset-warning b{display:block;margin-bottom:7px;color:#a72e3b}.reset-warning ul{margin:0 0 8px;padding-left:20px}.reset-warning li{margin:4px 0}.reset-warning p{margin:0;font-size:12.5px;line-height:1.55}
+}
+
+/* Dark mode is independent, high-contrast, and never reuses the light palette. */
+@media screen{
+  [data-theme="dark"]{
+    --bg:#071725;--card:#102638;--text:#edf7ff;--muted:#a8bed0;--border:#29475c;
+    --navy:#9ad9ff;--navy2:#31a9df;--navy3:#42c7de;--navy-soft:#16364b;
+    --gold:#ffd052;--gold2:#f6bd35;--orange:#ff9555;--green:#35c987;--red:#ff7180;
+    --shadow:0 9px 26px rgba(0,0,0,.27);--shadow-lg:0 25px 65px rgba(0,0,0,.48)
+  }
+  [data-theme="dark"] body{background:#071725!important;color:#edf7ff}
+  [data-theme="dark"] .main{background:#071725}[data-theme="dark"] .topbar{background:#0d2232!important;border-color:#28465b}[data-theme="dark"] .topbar .page-title{color:#eaf7ff}
+  [data-theme="dark"] .page-head,[data-theme="dark"] .panel,[data-theme="dark"] .debtor-card,[data-theme="dark"] .stat-card,[data-theme="dark"] .command-bar{background:#102638!important;border-color:#29475c;color:#edf7ff}
+  [data-theme="dark"] .page-head h2,[data-theme="dark"] .panel-head h3,[data-theme="dark"] .stat-card .value,[data-theme="dark"] .command-bar b,[data-theme="dark"] .command-bar span{color:#edf7ff!important}
+  [data-theme="dark"] .page-head .desc,[data-theme="dark"] .stat-card .label,[data-theme="dark"] .stat-card .sub{color:#a8bed0}
+  [data-theme="dark"] .panel-head,[data-theme="dark"] .modal-head,[data-theme="dark"] .modal-foot{background:#153044!important;border-color:#29475c}
+  [data-theme="dark"] .tbl-wrap,[data-theme="dark"] .modal,[data-theme="dark"] .field input,[data-theme="dark"] .field select,[data-theme="dark"] .field textarea,[data-theme="dark"] .search-box{background:#0d2232;color:#edf7ff;border-color:#34556b}
+  [data-theme="dark"] .tbl tbody td{color:#dcebf5;border-color:#29475c}[data-theme="dark"] .tbl tbody tr:nth-child(even){background:#122b3d}[data-theme="dark"] .tbl tbody tr:hover{background:#203a47}
+  [data-theme="dark"] .field label{color:#cdeaff}[data-theme="dark"] .field input::placeholder,[data-theme="dark"] .search-box input::placeholder{color:#7892a5}
+  [data-theme="dark"] .btn-ghost{background:#17364a;color:#e9f7ff;border-color:#416077}[data-theme="dark"] .qr-wrap{background:#17364a!important}[data-theme="dark"] .dc-foot{background:#102638;color:#dcebf5}
+  [data-theme="dark"] .reset-warning{background:#371d27;border-color:#74404a;color:#ffd8dc}[data-theme="dark"] .reset-warning b{color:#ff8995}
+}
+
+@media screen and (max-width:700px){
+  .page-head{border-radius:14px;padding:15px}.command-bar{border-radius:14px;padding:14px}.command-bar>div:first-child{width:100%}.command-bar b{font-size:16px}.command-bar span{line-height:1.4}
+  .command-actions{grid-template-columns:repeat(3,minmax(0,1fr))!important}.command-actions .btn{min-height:64px;color:inherit!important}.command-actions .btn-primary,.command-actions .btn-success{color:#fff!important}
+  .payment-table{display:none!important}.payment-cards{display:grid;gap:12px}.payment-card{padding:15px;border:1px solid var(--border);border-radius:15px;background:var(--card);box-shadow:0 6px 18px rgba(22,73,109,.07)}
+  .payment-card-head{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}.payment-card-head strong{font-size:20px;color:var(--green)}.payment-card h3{font-size:18px;color:var(--navy);margin:8px 0 11px}
+  .payment-card dl{display:grid;gap:7px;margin:0 0 12px}.payment-card dl div{display:flex;justify-content:space-between;gap:14px;padding-bottom:6px;border-bottom:1px dashed var(--border)}.payment-card dt{color:var(--muted);font-size:12px}.payment-card dd{margin:0;text-align:right;font-weight:700;font-size:13px}.payment-card .btn{width:100%;min-height:50px;justify-content:center}
+  [data-theme="dark"] .payment-card{background:#102638;border-color:#29475c}[data-theme="dark"] .payment-card h3{color:#eaf7ff}
+}
+
+/* Print only the document. Hidden application layout must not create blank pages. */
+@media print{
+  html,body{margin:0!important;padding:0!important;background:#fff!important;background-image:none!important;height:auto!important;min-height:0!important}
+  body>*:not(.print-area):not(.qr-page){display:none!important}
+  .print-area{display:block!important;position:static!important;inset:auto!important;width:auto!important;margin:0!important;padding:0!important;background:#fff!important;background-image:none!important}
+  .print-area,.print-area *,.doc-page,.doc-page *,.qr-page,.qr-page *{visibility:visible!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important}
+  .doc-page{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;min-height:0!important;height:auto!important;background:#fff!important;color:#000!important}
+  .doc-head,.doc-meta,.doc-section-title,.doc-table,.doc-table th,.doc-table td,.doc-summary,.sign-row,.sign-box,.doc-foot{background-color:#fff!important;color:#000!important}
+  .doc-table th{background-color:#e5e5e5!important;color:#000!important}
+  .doc-head{border-color:#000!important}.doc-section-title{border-color:#000!important;background:#eee!important}
+  .doc-gap{height:4mm!important}.sign-row{margin-top:13mm!important}.doc-foot{margin-top:5mm!important}
+  @page{size:A4 portrait;margin:10mm 11mm 11mm}
+}
 </style>
 </head>
 <body>
@@ -593,7 +949,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
     <div id="onlineLogin" class="hidden"><div class="field"><label>อีเมลบัญชีจริง</label><input id="loginEmail" type="email" autocomplete="username"></div><div class="field"><label>รหัสผ่าน</label><input id="loginPassword" type="password" autocomplete="current-password"></div></div>
     <p id="loginPreviewNote" style="font-size:14px;margin-bottom:14px;color:var(--muted)"></p>
     <button class="btn btn-primary btn-block" id="loginBtn"><i data-lucide="log-in"></i> เข้าสู่ระบบ</button>
-    <details class="connection-setup"><summary>ตั้งค่าฐานข้อมูลครั้งแรก</summary><div class="field"><label>Supabase Project URL</label><input id="connectUrl" placeholder="https://xxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><input id="connectKey" autocomplete="off"></div><div class="field"><label>อีเมลผู้ดูแลระบบจริง</label><input id="connectAdmin" type="email"></div><p style="font-size:14px;margin-bottom:12px">สร้างบัญชีแอดมินใน Supabase Authentication → Users ก่อน แล้วดาวน์โหลด SQL ไปรันใน SQL Editor ครั้งเดียว</p><button id="downloadSql" class="btn btn-ghost">ดาวน์โหลด SQL</button><button id="connectSave" class="btn btn-primary">บันทึกการเชื่อมต่อ</button><button id="useDemo" class="btn btn-ghost">ทดลองโหมดสาธิต</button></details>
+    <details class="connection-setup" id="connectionSetup"><summary>ตั้งค่าฐานข้อมูลครั้งแรก</summary><div class="field"><label>Supabase Project URL</label><input id="connectUrl" placeholder="https://xxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><input id="connectKey" autocomplete="off"></div><div class="field"><label>อีเมลผู้ดูแลระบบจริง</label><input id="connectAdmin" type="email"></div><p style="font-size:14px;margin-bottom:12px">สร้างบัญชีแอดมินใน Supabase Authentication → Users ก่อน แล้วดาวน์โหลด SQL ไปรันใน SQL Editor ครั้งเดียว</p><button id="downloadSql" class="btn btn-ghost">ดาวน์โหลด SQL</button><button id="connectSave" class="btn btn-primary">บันทึกการเชื่อมต่อ</button><button id="useDemo" class="btn btn-ghost">ทดลองโหมดสาธิต</button></details>
     <div class="login-foot">© โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ระบบจัดการลูกหนี้และรายงานการส่งน้ำ</div>
   </div>
 </div>
@@ -614,6 +970,7 @@ body{background:linear-gradient(145deg,#edf5ff 0%,#f8fbff 42%,#eef7f5 100%)}
       <button class="btn btn-ghost btn-sm btn-block" id="logoutBtn" style="color:#cdd7e5;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><i data-lucide="log-out"></i> ออกจากระบบ</button>
     </div>
   </aside>
+  <button class="mobile-nav-scrim" id="mobileNavScrim" aria-label="ปิดเมนู"></button>
   <div class="main">
     <div class="marquee"><span>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ทดสอบระบบจัดการลูกหนี้เวอร์ชัน v.1.0 ประจำเดือนกันยายน พุทธศักราช 2569 · ข้อมูลอัปเดตลูกหนี้แบบเรียลไทม์ · ปกป้องข้อมูลส่วนบุคคลตามกฎหมาย &nbsp;✦&nbsp; โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · ทดสอบระบบจัดการลูกหนี้เวอร์ชัน v.1.0 ประจำเดือนกันยายน พุทธศักราช 2569 · ข้อมูลอัปเดตลูกหนี้แบบเรียลไทม์ · ปกป้องข้อมูลส่วนบุคคลตามกฎหมาย &nbsp;✦&nbsp;</span></div>
     <header class="topbar">
@@ -681,7 +1038,17 @@ ${_}`}var O=class extends Error{constructor({message:e,code:r,cause:s,name:n}){v
 
 </script>
 <script>
-window.FRESHY_SQL="-- Freshy Water v2: authenticated RPC access, row-scoped reads, conflict-safe writes.\n-- Change this email to a confirmed user created in Supabase Authentication > Users.\nbegin;\ncreate table if not exists public.freshy_store (\n key text primary key, value jsonb not null default '[]'::jsonb,\n updated_at timestamptz not null default now()\n);\nalter table public.freshy_store enable row level security;\ndo $$ declare p record; begin\n for p in select policyname from pg_policies where schemaname='public' and tablename='freshy_store' loop\n  execute format('drop policy %I on public.freshy_store',p.policyname);\n end loop;\nend $$;\nrevoke all on public.freshy_store from public, anon, authenticated;\ninsert into public.freshy_store(key,value) values('employees','[]') on conflict do nothing;\n-- Bootstrap an actual account. This does not copy demonstration customers or debts.\ndo $$\ndeclare admin_email text := 'CHANGE_ADMIN_EMAIL@example.com'; existing jsonb; person jsonb;\nbegin\n if admin_email = 'CHANGE_ADMIN_EMAIL@example.com' then\n  raise exception 'Replace CHANGE_ADMIN_EMAIL@example.com with the confirmed admin login email first';\n end if;\n if not exists(select 1 from auth.users where lower(email)=lower(admin_email) and email_confirmed_at is not null) then\n  raise exception 'Create and confirm the admin account in Authentication > Users first';\n end if;\n select value into existing from public.freshy_store where key='employees' for update;\n select x into person from jsonb_array_elements(existing) x where lower(x->>'email')=lower(admin_email) limit 1;\n if person is null then\n  person := jsonb_build_object('id','emp_'||gen_random_uuid()::text,'email',lower(admin_email),'name','ผู้ดูแลระบบ','code','ADMIN','role','admin','permissions',jsonb_build_object('pages','{}'::jsonb,'canPrint',true,'canEmail',true));\n  existing := existing || jsonb_build_array(person);\n else\n  existing := (select jsonb_agg(case when x->>'id'=person->>'id' then x||'{\"role\":\"admin\"}'::jsonb else x end) from jsonb_array_elements(existing) x);\n end if;\n update public.freshy_store set value=existing where key='employees';\nend $$;\n\ndo $$ declare r record; begin\n for r in select key,value from public.freshy_store where key<>'settings' and jsonb_typeof(value)='array' loop\n  update public.freshy_store set value=(select coalesce(jsonb_agg(case when x->>'id' is null then x||jsonb_build_object('id',gen_random_uuid()::text) else x end),'[]') from jsonb_array_elements(r.value) x) where key=r.key;\n end loop;\nend $$;\n\ninsert into public.freshy_store(key,value) values('settings','{\"business\": {\"name\": \"โรงน้ำดื่ม เฟรชชี่ วอเตอร์\", \"address\": \"\", \"taxId\": \"\", \"commercialId\": \"\", \"phone\": \"\", \"email\": \"\", \"menuName\": \"ระบบจัดการลูกหนี้\"}, \"header\": {\"showLogo\": true, \"showName\": true, \"logoDataUrl\": \"\"}, \"email\": {\"enabled\": false, \"adminEmail\": \"\", \"provider\": \"resend\", \"fromEmail\": \"\", \"apiKey\": \"\", \"smtpHost\": \"\", \"smtpPort\": \"587\", \"smtpUser\": \"\", \"smtpPass\": \"\", \"alerts\": {\"login\": true, \"logout\": true, \"addDebtor\": true, \"undoRequest\": true}}, \"docPrefix\": {\"debtor\": \"FWD\", \"cash\": \"CSH\", \"customer\": \"CUS\"}, \"doccounters\": {}}'::jsonb) on conflict do nothing;\n\ncreate or replace function public.freshy_actor() returns jsonb\nlanguage plpgsql stable security definer set search_path=pg_catalog,public as $$\ndeclare actor jsonb; email_address text;\nbegin\n if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode='28000'; end if;\n select email into email_address from auth.users where id=auth.uid() and email_confirmed_at is not null;\n select x into actor from public.freshy_store s, jsonb_array_elements(s.value) x\n where s.key='employees' and lower(x->>'email')=lower(email_address)\n and coalesce(x->>'status','active') not in ('inactive','disabled') limit 1;\n if actor is null then raise exception 'MEMBER_NOT_FOUND' using errcode='42501'; end if;\n return actor;\nend $$;\n\ncreate or replace function public.freshy_owns(v jsonb, actor_id text) returns boolean\nlanguage sql immutable set search_path=pg_catalog as $$\n select coalesce(v->>'createdBy'=actor_id,false) or coalesce(v->>'responsibleBy'=actor_id,false)\n or coalesce(v->>'paidBy'=actor_id,false) or coalesce(v->>'userId'=actor_id,false)\n or coalesce(v->>'employeeId'=actor_id,false)\n$$;\n\ncreate or replace function public.freshy_visible(k text,v jsonb,a jsonb) returns boolean\nlanguage sql immutable set search_path=pg_catalog as $$\n select case when k in ('customers','debtors','cashsales','audit') then coalesce((a#>>array['permissions','pages',\n case when k='customers' then case when v->>'area'='nai' then 'customersNai' else 'customersOther' end\n when k='debtors' then case when v->>'status'='paid' then case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end else case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end\n else k end])::boolean,false) else true end\n$$;\n\ncreate or replace function public.freshy_read() returns jsonb\nlanguage plpgsql stable security definer set search_path=pg_catalog,public as $$\ndeclare actor jsonb:=public.freshy_actor(); result jsonb:='{}'; r record; v jsonb; aid text:=actor->>'id';\nbegin\n for r in select key,value from public.freshy_store where key in ('settings','employees','products','villages','customers','debtors','cashsales','audit','approvals','sentEmails') loop\n  if actor->>'role'='admin' then v:=r.value;\n  elsif r.key='settings' then\n   v := r.value - 'db';\n   v := jsonb_set(v,'{email}',coalesce(v->'email','{}') - 'apiKey' - 'smtpPass' - 'serviceKey');\n  elsif r.key='employees' then v:=jsonb_build_array(actor);\n  elsif r.key in ('products','villages') then v:=r.value;\n  else\n   select coalesce(jsonb_agg(x),'[]') into v from jsonb_array_elements(r.value) x where public.freshy_owns(x,aid) and public.freshy_visible(r.key,x,actor);\n  end if;\n  result:=result || jsonb_build_object(r.key,v);\n end loop;\n return jsonb_build_object('actor',actor,'data',result);\nend $$;\n\ncreate or replace function public.freshy_apply(changes jsonb) returns jsonb\nlanguage plpgsql security definer set search_path=pg_catalog,public as $$\ndeclare actor jsonb; aid text; admin boolean;\n c jsonb; k text; rid text; vals jsonb; old jsonb; proposed jsonb; expected jsonb; inserted boolean;\n pages jsonb; page_name text; field_name text; count_admin integer;\nbegin\n if jsonb_typeof(changes)<>'array' or jsonb_array_length(changes)>2500 then raise exception 'INVALID_BATCH'; end if;\n -- Serialize batches for cross-collection transactions; compare expected rows to prevent stale updates.\n perform pg_advisory_xact_lock(7248219);\n actor:=public.freshy_actor();aid:=actor->>'id';admin:=actor->>'role'='admin';pages:=coalesce(actor#>'{permissions,pages}','{}');\n for c in select * from jsonb_array_elements(changes) loop\n  k:=c->>'collection'; rid:=c->>'id'; proposed:=c->'value'; expected:=c->'expected';\n  if k not in ('settings','employees','products','villages','customers','debtors','cashsales','audit','approvals','sentEmails') then raise exception 'INVALID_COLLECTION'; end if;\n  insert into public.freshy_store(key,value) values(k,case when k='settings' then '{}'::jsonb else '[]'::jsonb end) on conflict do nothing;\n  select value into vals from public.freshy_store where key=k for update;\n  if k='settings' then old:=vals;\n  else\n   if rid is null or length(rid)>160 then raise exception 'INVALID_ID'; end if;\n   select x into old from jsonb_array_elements(vals) x where x->>'id'=rid limit 1;\n  end if;\n  inserted := old is null;\n  if coalesce(old,'null'::jsonb) is distinct from coalesce(expected,'null'::jsonb) then\n   raise exception 'CONFLICT:%:%',k,coalesce(rid,'settings') using errcode='40001';\n  end if;\n  if proposed='null'::jsonb then proposed:=null; end if;\n  if proposed is not null and jsonb_typeof(proposed)<>'object' then raise exception 'INVALID_VALUE'; end if;\n  if k<>'settings' and proposed is not null and proposed->>'id' is distinct from rid then raise exception 'ID_IMMUTABLE'; end if;\n  if not admin then\n   if proposed is null then raise exception 'ADMIN_ONLY_DELETE' using errcode='42501'; end if;\n   if k in ('settings','products','villages') then raise exception 'ADMIN_ONLY' using errcode='42501'; end if;\n   if k='employees' then\n    if rid<>aid or (proposed - 'name' - 'avatarUrl' - 'code') is distinct from (old - 'name' - 'avatarUrl' - 'code') then raise exception 'PROFILE_ONLY' using errcode='42501'; end if;\n   elsif k='audit' then\n    if not inserted or proposed->>'userId' is distinct from aid then raise exception 'AUDIT_APPEND_ONLY'; end if;\n   elsif k='sentEmails' then\n    if proposed->>'createdBy' is distinct from aid or (not inserted and not public.freshy_owns(old,aid)) then raise exception 'MAIL_LOG_OWNER'; end if;\n   elsif k='approvals' then\n    if not inserted or proposed->>'employeeId' is distinct from aid or proposed->>'status' is distinct from 'pending' then raise exception 'APPROVAL_REQUEST_ONLY'; end if;\n   else\n    page_name := case k when 'cashsales' then 'cashsales'\n     when 'customers' then case when proposed->>'area'='nai' then 'customersNai' else 'customersOther' end\n     else case when proposed->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end;\n    if not coalesce((pages->>page_name)::boolean,false) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;\n    if inserted then\n     if proposed->>'createdBy' is distinct from aid then raise exception 'OWNER_REQUIRED'; end if;\n     if k='debtors' and proposed->>'status' is distinct from 'unpaid' then raise exception 'NEW_DEBT_UNPAID'; end if;\n     if k='cashsales' and proposed->>'responsibleBy' is distinct from aid then raise exception 'OWNER_REQUIRED'; end if;\n    else\n     if not public.freshy_owns(old,aid) then raise exception 'ROW_FORBIDDEN' using errcode='42501'; end if;\n     if proposed->>'createdBy' is distinct from old->>'createdBy' or proposed->>'createdAt' is distinct from old->>'createdAt'\n      or proposed->>'responsibleBy' is distinct from old->>'responsibleBy' then raise exception 'OWNER_IMMUTABLE'; end if;\n     if k='cashsales' and (now()-(old->>'createdAt')::timestamptz)>interval '2 minutes' then raise exception 'EDIT_WINDOW_CLOSED'; end if;\n     if k='debtors' and old->>'status'='paid' and proposed is distinct from old then raise exception 'ADMIN_ONLY_UNDO'; end if;\n     if k='debtors' and proposed->>'paidBy' is not null and proposed->>'paidBy' is distinct from aid then raise exception 'PAYMENT_ACTOR_REQUIRED'; end if;\n     if k='debtors' and proposed->>'status'='paid' and old->>'status'<>'paid' then proposed:=proposed||jsonb_build_object('paidBy',aid,'paidByName',actor->>'name','paidAt',now()); end if;\n    end if;\n   end if;\n  end if;\n  if k='debtors' and proposed is not null and coalesce(proposed->>'status','') not in ('paid','unpaid') then raise exception 'INVALID_DEBT_STATUS'; end if;\n  if k in ('debtors','cashsales') and proposed is not null then\n   foreach field_name in array array['jugs','packs','jugAmount','packAmount'] loop\n    if jsonb_typeof(proposed->field_name) is distinct from 'number' or (proposed->>field_name)::numeric < 0 then raise exception 'INVALID_AMOUNT:%',field_name; end if;\n   end loop;\n   if (proposed->>'jugs')::numeric<>trunc((proposed->>'jugs')::numeric) or (proposed->>'packs')::numeric<>trunc((proposed->>'packs')::numeric) then raise exception 'INVALID_QUANTITY'; end if;\n   if k='debtors' and (jsonb_typeof(proposed->'total') is distinct from 'number' or (proposed->>'total')::numeric<>(proposed->>'jugAmount')::numeric+(proposed->>'packAmount')::numeric) then raise exception 'INVALID_TOTAL'; end if;\n   if inserted and not admin then proposed:=jsonb_set(proposed,'{createdAt}',to_jsonb(now())); end if;\n  end if;\n  if k='employees' and proposed is not null then\n   if coalesce(proposed->>'role','') not in ('admin','staff') or coalesce(proposed->>'email','')='' then raise exception 'EMPLOYEE_EMAIL_ROLE_REQUIRED'; end if;\n   if not exists(select 1 from auth.users where lower(email)=lower(proposed->>'email') and email_confirmed_at is not null) then raise exception 'CONFIRMED_AUTH_ACCOUNT_REQUIRED'; end if;\n   if exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and lower(x->>'email')=lower(proposed->>'email')) then raise exception 'DUPLICATE_EMAIL'; end if;\n  end if;\n  if k='audit' and old is not null then raise exception 'AUDIT_IMMUTABLE'; end if;\n  if k='audit' and proposed is not null then proposed:=proposed||jsonb_build_object('userId',aid,'userName',actor->>'name','ts',now()); end if;\n  if k='settings' then\n   if proposed is null then raise exception 'SETTINGS_REQUIRED'; end if;\n   vals:=proposed - 'db';\n  else\n   select coalesce(jsonb_agg(x),'[]') into vals from jsonb_array_elements(vals) x where x->>'id'<>rid;\n   if proposed is not null then vals:=vals||jsonb_build_array(proposed); end if;\n  end if;\n  if k='employees' then\n   select count(*) into count_admin from jsonb_array_elements(vals) x where x->>'role'='admin' and coalesce(x->>'status','active') not in ('inactive','disabled');\n   if count_admin=0 then raise exception 'LAST_ADMIN_REQUIRED'; end if;\n  end if;\n  update public.freshy_store set value=vals,updated_at=now() where key=k;\n  if k<>'audit' then\n   insert into public.freshy_store(key,value) values('audit','[]') on conflict do nothing;\n   update public.freshy_store set value=value||jsonb_build_array(jsonb_build_object('id',gen_random_uuid()::text,'ts',now(),'userId',aid,'userName',actor->>'name','action','บันทึกออนไลน์','detail',k||':'||coalesce(rid,'settings'))),updated_at=now() where key='audit';\n  end if;\n end loop;\n return public.freshy_read();\nend $$;\n\nrevoke all on function public.freshy_actor() from public,anon,authenticated;\nrevoke all on function public.freshy_visible(text,jsonb,jsonb) from public,anon,authenticated;\nrevoke all on function public.freshy_owns(jsonb,text) from public,anon,authenticated;\nrevoke all on function public.freshy_read() from public,anon;\nrevoke all on function public.freshy_apply(jsonb) from public,anon;\ngrant execute on function public.freshy_read() to authenticated;\ngrant execute on function public.freshy_apply(jsonb) to authenticated;\ncommit;\n";
+/* Public deployment configuration. Never put a Secret or Service Role key here. */
+window.FRESHY_CONFIG = Object.freeze({
+  mode: 'supabase',
+  supabaseUrl: 'https://meghhulgnhkbmqakrtgp.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lZ2hodWxnbmhrYm1xYWtydGdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2OTM3ODcsImV4cCI6MjEwNjI2OTc4N30.cdEIzdEFUfcVlhnUMW0L3xB6bX7KqgrpvnXS-rUQ4ok',
+  adminEmail: 'phatthanapon26@gmail.com'
+});
+
+</script>
+<script>
+window.FRESHY_SQL="-- Freshy Water v2: authenticated RPC access, row-scoped reads, conflict-safe writes.\n-- Change this email to a confirmed user created in Supabase Authentication > Users.\nbegin;\ncreate table if not exists public.freshy_store (\n key text primary key, value jsonb not null default '[]'::jsonb,\n updated_at timestamptz not null default now()\n);\ncreate table if not exists public.freshy_signal (\n id boolean primary key default true check (id),\n version bigint not null default 0,\n updated_at timestamptz not null default now()\n);\ninsert into public.freshy_signal(id) values(true) on conflict do nothing;\nalter table public.freshy_signal enable row level security;\ndrop policy if exists freshy_signal_authenticated_read on public.freshy_signal;\ncreate policy freshy_signal_authenticated_read on public.freshy_signal for select to authenticated using (true);\nrevoke all on public.freshy_signal from public,anon;\ngrant select on public.freshy_signal to authenticated;\ncreate or replace function public.freshy_emit_signal() returns trigger\nlanguage plpgsql security definer set search_path=pg_catalog,public as $$\nbegin\n insert into public.freshy_signal(id,version,updated_at) values(true,1,now())\n on conflict(id) do update set version=public.freshy_signal.version+1,updated_at=now();\n return new;\nend $$;\ndrop trigger if exists freshy_store_emit_signal on public.freshy_store;\n-- Cross-device refresh now uses lightweight Realtime Broadcast from the app.\n-- Do not publish database rows: WAL decoding can saturate Nano compute.\ndo $$ begin\n if exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='freshy_signal') then\n  alter publication supabase_realtime drop table public.freshy_signal;\n end if;\nend $$;\n-- Bound the append-only audit JSON so reads and writes stay fast on Nano plans.\ncreate or replace function public.freshy_cap_audit() returns trigger\nlanguage plpgsql set search_path=pg_catalog,public as $$\nbegin\n if new.key='audit' and jsonb_typeof(new.value)='array' and jsonb_array_length(new.value)>2000 then\n  select coalesce(jsonb_agg(x order by ord),'[]'::jsonb) into new.value\n  from jsonb_array_elements(new.value) with ordinality as a(x,ord)\n  where ord>jsonb_array_length(new.value)-1000;\n end if;\n return new;\nend $$;\ndrop trigger if exists freshy_cap_audit_trigger on public.freshy_store;\ncreate trigger freshy_cap_audit_trigger before insert or update on public.freshy_store\nfor each row execute function public.freshy_cap_audit();\nalter table public.freshy_store enable row level security;\ndo $$ declare p record; begin\n for p in select policyname from pg_policies where schemaname='public' and tablename='freshy_store' loop\n  execute format('drop policy %I on public.freshy_store',p.policyname);\n end loop;\nend $$;\nrevoke all on public.freshy_store from public, anon, authenticated;\ninsert into public.freshy_store(key,value) values('employees','[]') on conflict do nothing;\n-- Bootstrap an actual account. This does not copy demonstration customers or debts.\ndo $$\ndeclare admin_email text := 'phatthanapon26@gmail.com'; existing jsonb; person jsonb;\nbegin\n if admin_email = 'CHANGE_ADMIN_EMAIL@example.com' then\n  raise exception 'Replace CHANGE_ADMIN_EMAIL@example.com with the confirmed admin login email first';\n end if;\n if not exists(select 1 from auth.users where lower(email)=lower(admin_email) and email_confirmed_at is not null) then\n  raise exception 'Create and confirm the admin account in Authentication > Users first';\n end if;\n select value into existing from public.freshy_store where key='employees' for update;\n select x into person from jsonb_array_elements(existing) x where lower(x->>'email')=lower(admin_email) limit 1;\n if person is null then\n  person := jsonb_build_object('id','emp_'||gen_random_uuid()::text,'email',lower(admin_email),'name','ผู้ดูแลระบบ','code','7716','role','admin','permissions',jsonb_build_object('pages','{}'::jsonb,'canPrint',true,'canEmail',true));\n  existing := existing || jsonb_build_array(person);\n else\n  existing := (select jsonb_agg(case when x->>'id'=person->>'id' then x||'{\"role\":\"admin\",\"code\":\"7716\"}'::jsonb else x end) from jsonb_array_elements(existing) x);\n end if;\n update public.freshy_store set value=existing where key='employees';\nend $$;\n\ndo $$ declare r record; begin\n for r in select key,value from public.freshy_store where key<>'settings' and jsonb_typeof(value)='array' loop\n  update public.freshy_store set value=(select coalesce(jsonb_agg(case when x->>'id' is null then x||jsonb_build_object('id',gen_random_uuid()::text) else x end),'[]') from jsonb_array_elements(r.value) x) where key=r.key;\n end loop;\nend $$;\n\ninsert into public.freshy_store(key,value) values('settings','{\"business\": {\"name\": \"โรงน้ำดื่ม เฟรชชี่ วอเตอร์\", \"address\": \"\", \"taxId\": \"\", \"commercialId\": \"\", \"phone\": \"\", \"email\": \"\", \"menuName\": \"ระบบจัดการลูกหนี้\"}, \"header\": {\"showLogo\": true, \"showName\": true, \"logoDataUrl\": \"\"}, \"email\": {\"enabled\": false, \"adminEmail\": \"\", \"provider\": \"resend\", \"fromEmail\": \"\", \"apiKey\": \"\", \"smtpHost\": \"\", \"smtpPort\": \"587\", \"smtpUser\": \"\", \"smtpPass\": \"\", \"alerts\": {\"login\": true, \"logout\": true, \"addDebtor\": true, \"undoRequest\": true}}, \"docPrefix\": {\"debtor\": \"FWD\", \"cash\": \"CSH\", \"customer\": \"CUS\"}, \"doccounters\": {}}'::jsonb) on conflict do nothing;\n\ncreate or replace function public.freshy_actor() returns jsonb\nlanguage plpgsql stable security definer set search_path=pg_catalog,public as $$\ndeclare actor jsonb; email_address text;\nbegin\n if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode='28000'; end if;\n select email into email_address from auth.users where id=auth.uid() and email_confirmed_at is not null;\n select x into actor from public.freshy_store s, jsonb_array_elements(s.value) x\n where s.key='employees' and lower(x->>'email')=lower(email_address)\n and coalesce(x->>'status','active') not in ('inactive','disabled') limit 1;\n if actor is null then raise exception 'MEMBER_NOT_FOUND' using errcode='42501'; end if;\n return actor;\nend $$;\n\ncreate or replace function public.freshy_owns(v jsonb, actor_id text) returns boolean\nlanguage sql immutable set search_path=pg_catalog as $$\n select coalesce(v->>'createdBy'=actor_id,false) or coalesce(v->>'responsibleBy'=actor_id,false)\n or coalesce(v->>'paidBy'=actor_id,false) or coalesce(v->>'userId'=actor_id,false)\n or coalesce(v->>'employeeId'=actor_id,false)\n$$;\n\ncreate or replace function public.freshy_visible(k text,v jsonb,a jsonb) returns boolean\nlanguage sql immutable set search_path=pg_catalog as $$\n select case when k in ('customers','debtors','cashsales','audit') then coalesce((a#>>array['permissions','pages',\n case when k='customers' then case when v->>'area'='nai' then 'customersNai' else 'customersOther' end\n when k='debtors' then case when v->>'status'='paid' then case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end else case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end\n else k end])::boolean,false) else true end\n$$;\n\ncreate or replace function public.freshy_read() returns jsonb\nlanguage plpgsql stable security definer set search_path=pg_catalog,public as $$\ndeclare actor jsonb:=public.freshy_actor(); result jsonb:='{}'; r record; v jsonb; aid text:=actor->>'id';\nbegin\n for r in select key,value from public.freshy_store where key in ('settings','employees','products','villages','customers','debtors','cashsales','audit','approvals','sentEmails') loop\n  if actor->>'role'='admin' then v:=r.value;\n  elsif r.key='settings' then\n   v := r.value - 'db';\n   v := jsonb_set(v,'{email}',coalesce(v->'email','{}') - 'apiKey' - 'smtpPass' - 'serviceKey');\n  elsif r.key='employees' then v:=jsonb_build_array(actor);\n  elsif r.key in ('products','villages') then v:=r.value;\n  else\n   select coalesce(jsonb_agg(x),'[]') into v from jsonb_array_elements(r.value) x where public.freshy_owns(x,aid) and public.freshy_visible(r.key,x,actor);\n  end if;\n  result:=result || jsonb_build_object(r.key,v);\n end loop;\n return jsonb_build_object('actor',actor,'data',result);\nend $$;\n\ncreate or replace function public.freshy_apply(changes jsonb) returns jsonb\nlanguage plpgsql security definer set search_path=pg_catalog,public as $$\ndeclare actor jsonb; aid text; admin boolean;\n c jsonb; k text; rid text; vals jsonb; old jsonb; proposed jsonb; expected jsonb; inserted boolean;\n pages jsonb; page_name text; field_name text; count_admin integer;\nbegin\n if jsonb_typeof(changes)<>'array' or jsonb_array_length(changes)>2500 then raise exception 'INVALID_BATCH'; end if;\n -- Serialize batches for cross-collection transactions; compare expected rows to prevent stale updates.\n perform pg_advisory_xact_lock(7248219);\n actor:=public.freshy_actor();aid:=actor->>'id';admin:=actor->>'role'='admin';pages:=coalesce(actor#>'{permissions,pages}','{}');\n for c in select * from jsonb_array_elements(changes) loop\n  k:=c->>'collection'; rid:=c->>'id'; proposed:=c->'value'; expected:=c->'expected';\n  if k not in ('settings','employees','products','villages','customers','debtors','cashsales','audit','approvals','sentEmails') then raise exception 'INVALID_COLLECTION'; end if;\n  insert into public.freshy_store(key,value) values(k,case when k='settings' then '{}'::jsonb else '[]'::jsonb end) on conflict do nothing;\n  select value into vals from public.freshy_store where key=k for update;\n  if k='settings' then old:=vals;\n  else\n   if rid is null or length(rid)>160 then raise exception 'INVALID_ID'; end if;\n   select x into old from jsonb_array_elements(vals) x where x->>'id'=rid limit 1;\n  end if;\n  inserted := old is null;\n  if coalesce(old,'null'::jsonb) is distinct from coalesce(expected,'null'::jsonb) then\n   raise exception 'CONFLICT:%:%',k,coalesce(rid,'settings') using errcode='PT409';\n  end if;\n  if proposed='null'::jsonb then proposed:=null; end if;\n  if proposed is not null and jsonb_typeof(proposed)<>'object' then raise exception 'INVALID_VALUE'; end if;\n  if k<>'settings' and proposed is not null and proposed->>'id' is distinct from rid then raise exception 'ID_IMMUTABLE'; end if;\n  if not admin then\n   if proposed is null then raise exception 'ADMIN_ONLY_DELETE' using errcode='42501'; end if;\n   if k in ('settings','products','villages') then raise exception 'ADMIN_ONLY' using errcode='42501'; end if;\n   if k='employees' then\n    if rid<>aid or (proposed - 'name' - 'avatarUrl' - 'code') is distinct from (old - 'name' - 'avatarUrl' - 'code') then raise exception 'PROFILE_ONLY' using errcode='42501'; end if;\n   elsif k='audit' then\n    if not inserted or proposed->>'userId' is distinct from aid then raise exception 'AUDIT_APPEND_ONLY'; end if;\n   elsif k='sentEmails' then\n    if proposed->>'createdBy' is distinct from aid or (not inserted and not public.freshy_owns(old,aid)) then raise exception 'MAIL_LOG_OWNER'; end if;\n   elsif k='approvals' then\n    if not inserted or proposed->>'employeeId' is distinct from aid or proposed->>'status' is distinct from 'pending' then raise exception 'APPROVAL_REQUEST_ONLY'; end if;\n   else\n    page_name := case k when 'cashsales' then 'cashsales'\n     when 'customers' then case when proposed->>'area'='nai' then 'customersNai' else 'customersOther' end\n     else case when proposed->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end;\n    if not coalesce((pages->>page_name)::boolean,false) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;\n    if inserted then\n     if proposed->>'createdBy' is distinct from aid then raise exception 'OWNER_REQUIRED'; end if;\n     if k='debtors' and proposed->>'status' is distinct from 'unpaid' then raise exception 'NEW_DEBT_UNPAID'; end if;\n     if k='cashsales' and proposed->>'responsibleBy' is distinct from aid then raise exception 'OWNER_REQUIRED'; end if;\n    else\n     if not public.freshy_owns(old,aid) then raise exception 'ROW_FORBIDDEN' using errcode='42501'; end if;\n     if proposed->>'createdBy' is distinct from old->>'createdBy' or proposed->>'createdAt' is distinct from old->>'createdAt'\n      or proposed->>'responsibleBy' is distinct from old->>'responsibleBy' then raise exception 'OWNER_IMMUTABLE'; end if;\n     if k='cashsales' and (now()-(old->>'createdAt')::timestamptz)>interval '2 minutes' then raise exception 'EDIT_WINDOW_CLOSED'; end if;\n     if k='debtors' and old->>'status'='paid' and proposed is distinct from old then raise exception 'ADMIN_ONLY_UNDO'; end if;\n     if k='debtors' and proposed->>'paidBy' is not null and proposed->>'paidBy' is distinct from aid then raise exception 'PAYMENT_ACTOR_REQUIRED'; end if;\n     if k='debtors' and proposed->>'status'='paid' and old->>'status'<>'paid' then proposed:=proposed||jsonb_build_object('paidBy',aid,'paidByName',actor->>'name','paidAt',now()); end if;\n    end if;\n   end if;\n  end if;\n  if k='debtors' and proposed is not null and coalesce(proposed->>'status','') not in ('paid','unpaid') then raise exception 'INVALID_DEBT_STATUS'; end if;\n  if k in ('debtors','cashsales') and proposed is not null then\n   foreach field_name in array array['jugs','packs','jugAmount','packAmount'] loop\n    if jsonb_typeof(proposed->field_name) is distinct from 'number' or (proposed->>field_name)::numeric < 0 then raise exception 'INVALID_AMOUNT:%',field_name; end if;\n   end loop;\n   if (proposed->>'jugs')::numeric<>trunc((proposed->>'jugs')::numeric) or (proposed->>'packs')::numeric<>trunc((proposed->>'packs')::numeric) then raise exception 'INVALID_QUANTITY'; end if;\n   if k='debtors' and (jsonb_typeof(proposed->'total') is distinct from 'number' or (proposed->>'total')::numeric<>(proposed->>'jugAmount')::numeric+(proposed->>'packAmount')::numeric) then raise exception 'INVALID_TOTAL'; end if;\n   if inserted and not admin then proposed:=jsonb_set(proposed,'{createdAt}',to_jsonb(now())); end if;\n  end if;\n  if k='employees' and proposed is not null then\n   if coalesce(proposed->>'role','') not in ('admin','staff') or coalesce(proposed->>'email','')='' then raise exception 'EMPLOYEE_EMAIL_ROLE_REQUIRED'; end if;\n   if not exists(select 1 from auth.users where lower(email)=lower(proposed->>'email') and email_confirmed_at is not null) then raise exception 'CONFIRMED_AUTH_ACCOUNT_REQUIRED'; end if;\n   if exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and lower(x->>'email')=lower(proposed->>'email')) then raise exception 'DUPLICATE_EMAIL'; end if;\n  end if;\n  if k='audit' and old is not null then raise exception 'AUDIT_IMMUTABLE'; end if;\n  if k='audit' and proposed is not null then proposed:=proposed||jsonb_build_object('userId',aid,'userName',actor->>'name','ts',now()); end if;\n  if k='settings' then\n   if proposed is null then raise exception 'SETTINGS_REQUIRED'; end if;\n   vals:=proposed - 'db';\n  else\n   select coalesce(jsonb_agg(x),'[]') into vals from jsonb_array_elements(vals) x where x->>'id'<>rid;\n   if proposed is not null then vals:=vals||jsonb_build_array(proposed); end if;\n  end if;\n  if k='employees' then\n   select count(*) into count_admin from jsonb_array_elements(vals) x where x->>'role'='admin' and coalesce(x->>'status','active') not in ('inactive','disabled');\n   if count_admin=0 then raise exception 'LAST_ADMIN_REQUIRED'; end if;\n  end if;\n  update public.freshy_store set value=vals,updated_at=now() where key=k;\n  if k<>'audit' then\n   insert into public.freshy_store(key,value) values('audit','[]') on conflict do nothing;\n   update public.freshy_store set value=value||jsonb_build_array(jsonb_build_object('id',gen_random_uuid()::text,'ts',now(),'userId',aid,'userName',actor->>'name','action','บันทึกออนไลน์','detail',k||':'||coalesce(rid,'settings'))),updated_at=now() where key='audit';\n  end if;\n end loop;\n return public.freshy_read();\nend $$;\n\ncreate or replace function public.freshy_public_qr(customer_id text) returns jsonb\nlanguage plpgsql stable security definer set search_path=pg_catalog,public as $$\ndeclare customer jsonb; debts jsonb; business jsonb; recorder jsonb;\nbegin\n if customer_id is null or length(customer_id)>160 then return null; end if;\n select x into customer from public.freshy_store s, jsonb_array_elements(s.value) x\n where s.key='customers' and x->>'id'=customer_id limit 1;\n if customer is null then return null; end if;\n select coalesce(jsonb_agg(x order by x->>'debtDate'),'[]'::jsonb) into debts\n from public.freshy_store s, jsonb_array_elements(s.value) x\n where s.key='debtors' and x->>'customerId'=customer_id and x->>'status'='unpaid';\n select coalesce(value->'business','{}'::jsonb) into business from public.freshy_store where key='settings';\n select jsonb_build_object('name',coalesce(e->>'name','-'),'role',coalesce(e->>'role','staff')) into recorder\n from public.freshy_store s, jsonb_array_elements(s.value) e\n where s.key='employees' and e->>'id'=coalesce(debts->0->>'createdBy','') limit 1;\n return jsonb_build_object('customer',customer-'createdBy'-'managedBy'-'responsibleBy','debtors',debts,\n  'business',business-'email','recorder',coalesce(recorder,'{\"name\":\"-\",\"role\":\"staff\"}'::jsonb));\nend $$;\n\nrevoke all on function public.freshy_actor() from public,anon,authenticated;\nrevoke all on function public.freshy_visible(text,jsonb,jsonb) from public,anon,authenticated;\nrevoke all on function public.freshy_owns(jsonb,text) from public,anon,authenticated;\nrevoke all on function public.freshy_read() from public,anon;\nrevoke all on function public.freshy_apply(jsonb) from public,anon;\nrevoke all on function public.freshy_public_qr(text) from public;\ngrant execute on function public.freshy_read() to authenticated;\ngrant execute on function public.freshy_apply(jsonb) to authenticated;\ngrant execute on function public.freshy_public_qr(text) to anon,authenticated;\ncommit;\n";
 
 </script>
 <script>
@@ -695,23 +1062,35 @@ function equal(a,b){return canonical(a)===canonical(b);}
 function shared(db){const out={};for(const k of collections){out[k]=clone(k==='settings'?db.settings||{}:db[k]||[]);}delete out.settings.db;return out;}
 function diff(base,current){const result=[];for(const k of collections){if(k==='settings'){if(!equal(base[k]||{},current[k]||{}))result.push({collection:k,id:'settings',expected:base[k]||{},value:current[k]||{}});continue;}const before=new Map((base[k]||[]).map(v=>[v.id,v]));const after=new Map((current[k]||[]).map(v=>[v.id,v]));for(const [id,value] of after){if(!id)throw Error('รายการ '+k+' ไม่มีรหัส');const expected=before.get(id)||null;if(!equal(expected,value))result.push({collection:k,id,expected,value});}for(const [id,value] of before){if(!after.has(id))result.push({collection:k,id,expected:value,value:null});}}return clone(result);}
 function overlay(remote,changes){const out=clone(remote);for(const c of changes){if(c.collection==='settings'){out.settings=clone(c.value);continue;}out[c.collection]=(out[c.collection]||[]).filter(x=>x.id!==c.id);if(c.value)out[c.collection].push(clone(c.value));}return out;}
-const api={collections,clone,equal,shared,diff,overlay};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FreshySync=api;
+function mergeSettings(old,wanted,latest,path){
+ if(equal(old,wanted))return latest;
+ if(equal(old,latest)||equal(wanted,latest))return wanted;
+ if(path.startsWith('doccounters.')&&[old,wanted,latest].every(v=>v===undefined||typeof v==='number'))return Math.max(old||0,wanted||0,latest||0);
+ if([old,wanted,latest].every(v=>v&&typeof v==='object'&&!Array.isArray(v))){const out=clone(latest);for(const key of new Set([...Object.keys(old),...Object.keys(wanted)])){if(key==='db')continue;const value=mergeSettings(old[key],wanted[key],latest[key],path?path+'.'+key:key);if(value===undefined)delete out[key];else out[key]=value;}return out;}
+ throw Error('CONFLICT:settings:'+path);
+}
+function committed(c,current){
+ if(equal(c.value,current))return true;
+ if(!current||!c.value||c.expected!==null)return false;
+ if(c.collection==='audit')return current.id===c.id;
+ if(!['debtors','cashsales'].includes(c.collection))return false;
+ const a=clone(c.value),b=clone(current);delete a.createdAt;delete b.createdAt;return equal(a,b);
+}
+function rebase(remote,changes){const out=[];for(const c of changes){const latest=c.collection==='settings'?remote.settings||{}:(remote[c.collection]||[]).find(x=>x.id===c.id)||null;
+ if(c.collection==='settings'){const old=clone(c.expected||{}),wanted=clone(c.value||{}),current=clone(latest);delete old.db;delete wanted.db;delete current.db;const value=mergeSettings(old,wanted,current,'');if(!equal(value,current))out.push({...c,expected:current,value});continue;}
+ if(committed(c,latest))continue;
+ if(!equal(c.expected,latest))throw Error('CONFLICT:'+c.collection+':'+c.id);
+ out.push({...c,expected:latest});
+ }return out;}
+const api={collections,clone,equal,shared,diff,overlay,rebase};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FreshySync=api;
 })(typeof window!=='undefined'?window:globalThis);
 
 </script>
 <script>
-/* Public deployment configuration. Never put a Secret or Service Role key here. */
-window.FRESHY_CONFIG = Object.freeze({
-  mode: 'supabase',
-  supabaseUrl: 'https://meghhulgnhkbmqakrtgp.supabase.co',
-  supabaseKey: 'sb_publishable_ltaNA7nnVozoSCOcZIjg',
-  adminEmail: 'phatthanapon26@gmail.com'
-});
-
 /* ============================================================
    ระบบจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์ — app.js
    - ฐานข้อมูล: Supabase Auth + protected RPC หรือโหมดสาธิต localStorage
-   - real time polling, แยกจ่ายแล้ว/ค้างชำระ, แยกบ้านนาไฮ/บ้านอื่น
+   - realtime broadcast, แยกจ่ายแล้ว/ค้างชำระ, แยกบ้านนาไฮ/บ้านอื่น
    ============================================================ */
 (function(){
 'use strict';
@@ -756,8 +1135,14 @@ function dayDiff(iso){const a=new Date(iso+'T00:00:00');const b=new Date(todaySt
 
 /* ---------- toast ---------- */
 function toast(msg, type){
-  const w=$('#toastWrap'); const t=document.createElement('div');
+  const w=$('#toastWrap');
+  // Keep repeated network errors readable: update the existing notice instead
+  // of filling the screen when a user taps the sync badge more than once.
+  const existing=[...w.children].find(x=>x.dataset.message===String(msg));
+  if(existing){existing.dataset.repeated=String((+existing.dataset.repeated||1)+1);return;}
+  const t=document.createElement('div');
   t.className='toast '+(type||'');
+  t.dataset.message=String(msg);t.dataset.repeated='1';
   t.innerHTML='<i data-lucide="'+(type==='error'?'circle-alert':type==='success'?'check-circle-2':'info')+'"></i><span>'+esc(msg)+'</span>';
   w.appendChild(t); if(window.lucide)lucide.createIcons();
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3200);
@@ -765,10 +1150,11 @@ function toast(msg, type){
 
 /* ---------- modal ---------- */
 function openModal(html){
-  $('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
+  $('#modalBox').className='modal';$('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
   if(window.lucide)lucide.createIcons();
 }
-function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').innerHTML='';}
+function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').className='modal';$('#modalBox').innerHTML='';}
+function modalIsOpen(){return !$('#modalBackdrop').classList.contains('hidden');}
 $('#modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal();});
 
 /* ============================================================
@@ -849,13 +1235,16 @@ function dbLoad(){
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
 const SUPA_COLS=FreshySync.collections;
 const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
-let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncBlocked=false;
+let authClient=null,authIdentity=null,remoteBase=null,remoteSettings=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null;
 function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
 function authFor(cfg){
  if(!window.supabase)throw Error('โหลดระบบล็อกอินไม่สำเร็จ');
  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(cfg.url))throw Error('กรอก URL โครงการ Supabase แบบ https://ชื่อโครงการ.supabase.co');
  if(!authClient||authClient._freshyUrl!==cfg.url||authClient._freshyKey!==cfg.key){
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(20000)}))}});
+  // Preserve an existing session from earlier versions that used sessionStorage.
+  for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
+  // localStorage keeps the authenticated session available when a QR report opens in a new tab.
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(45000)}))}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
@@ -864,7 +1253,7 @@ function safeCache(){
  const config=DB.settings.db;
  localStorage.setItem('freshywater_dbconfig_v1',JSON.stringify(config));
  if(config.mode!=='supabase'){localStorage.setItem(DBKEY,JSON.stringify(DB));return;}
- if(authIdentity&&remoteBase)localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,data:FreshySync.shared(DB)}));
+ if(authIdentity&&remoteBase)localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,data:FreshySync.shared(DB)}));
 }
 function draftKey(){return 'freshy_draft_v2_'+authIdentity.id+'_'+supaCfg().url;}
 function installRemote(payload,preserve){
@@ -872,10 +1261,11 @@ function installRemote(payload,preserve){
  const cfg=DB.settings.db;
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
- data.settings=Object.assign(defaults,data.settings||{});
+ remoteSettings=FreshySync.clone(data.settings||{});
+ data.settings=Object.assign(defaults,remoteSettings);delete data.settings.db;
  remoteBase=FreshySync.clone(data);
  const merged=FreshySync.overlay(data,preserve||[]);
- for(const k of SUPA_COLS){if(k==='settings')Object.assign(DB.settings,merged[k]);else DB[k]=merged[k];}
+ for(const k of SUPA_COLS){if(k==='settings')DB.settings=FreshySync.clone(merged[k]);else DB[k]=merged[k];}
  DB.settings.db=cfg;
  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
@@ -884,13 +1274,15 @@ function installRemote(payload,preserve){
 async function rpc(name,body){
  const cfg=supaCfg();if(!cfg||!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');
  const client=authFor(cfg);
- const {data,error}=await client.rpc(name,body||{});
- if(error)throw Error(error.message||'คำขอฐานข้อมูลล้มเหลว');
+ const request=FreshySync.clone(body||{});
+ if(name==='freshy_apply')for(const c of request.changes||[])if(c.collection==='settings')c.expected=FreshySync.clone(remoteSettings||c.expected||{});
+ const {data,error}=await client.rpc(name,request);
+ if(error){const failure=Error(error.message||'คำขอฐานข้อมูลล้มเหลว');failure.code=error.code;throw failure;}
  return data;
 }
 async function supabaseFetch(){
  if(!supaCfg()||!authIdentity||syncBusy||syncBlocked)return false;
- if(currentPage==='settings'||document.querySelector('#modalBox:not(.hidden)'))return false;
+ if(currentPage==='settings'||modalIsOpen())return false;
  if(remoteBase&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)return flushOnline();
  syncBusy=true;
  try{
@@ -898,31 +1290,86 @@ async function supabaseFetch(){
   const payload=await rpc('freshy_read');
   const edits=remoteBase?FreshySync.diff(snapshot,FreshySync.shared(DB)):[];
   installRemote(payload,edits);
+  const changed=!FreshySync.equal(snapshot,FreshySync.shared(DB));
   setStatus('เชื่อมต่อออนไลน์ · อัปเดตข้อมูลแล้ว','ok');
-  if(session){refreshUserChip();if(currentPage!=='settings'&&!document.querySelector('#modalBox:not(.hidden)')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
+  if(session){refreshUserChip();if(changed&&currentPage!=='settings'&&!modalIsOpen()&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))renderPage();}
   return true;
  }catch(e){setStatus('เชื่อมต่อไม่สำเร็จ · '+e.message,'err');return false;}
  finally{syncBusy=false;}
 }
 async function flushOnline(){
- if(!authIdentity||!remoteBase||syncBusy||syncBlocked)return false;
- const snapshot=FreshySync.shared(DB),changes=FreshySync.diff(remoteBase,snapshot);
- if(!changes.length)return true;
- syncBusy=true;setStatus('กำลังบันทึกออนไลน์ '+changes.length+' รายการ','warn');
- try{
-  const payload=await rpc('freshy_apply',{changes});
-  const edits=FreshySync.diff(snapshot,FreshySync.shared(DB));
-  installRemote(payload,edits);setStatus('บันทึกออนไลน์แล้ว','ok');
-  if(edits.length)supabasePush();
+ if(syncPromise)return syncPromise;
+ if(!authIdentity||!remoteBase||syncBlocked)return false;
+ const initialChanges=FreshySync.diff(remoteBase,FreshySync.shared(DB));
+ if(!initialChanges.length)return true;
+ const initialTotal=initialChanges.length;
+ syncBusy=true;setStatus('กำลังส่งข้อมูล 0/'+initialTotal+' รายการ','warn');
+ syncPromise=(async()=>{try{
+  let completed=0;
+  while(true){
+   const before=FreshySync.shared(DB);
+   const pending=FreshySync.diff(remoteBase,before);
+   if(!pending.length)break;
+   // Send a normal mobile work session in one request. The server still caps
+   // every RPC at 2,500 changes, while groups of 10 keep retries lightweight.
+   const chunk=pending.slice(0,10);
+   setStatus('กำลังส่งข้อมูล '+completed+'/'+Math.max(initialTotal,completed+pending.length)+' รายการ','warn');
+   let payload;
+   try{payload=await rpc('freshy_apply',{changes:chunk});}
+   catch(e){
+    if(/CONFLICT:/.test(e.message||'')){
+     const latest=await rpc('freshy_read');
+     // Include edits made while the request was running. Reconcile only
+     // disjoint changes or records already committed by a timed-out request.
+     const allPending=FreshySync.diff(remoteBase,FreshySync.shared(DB));
+     const rebased=FreshySync.rebase(latest.data,allPending);
+     installRemote(latest,rebased);
+     continue;
+    }
+    throw e;
+   }
+   // Keep both records not included in this chunk and edits made while it was in flight.
+   const during=FreshySync.diff(before,FreshySync.shared(DB));
+   installRemote(payload,pending.slice(chunk.length).concat(during));
+   completed+=chunk.length;
+   broadcastOnlineChange();
+   const left=FreshySync.diff(remoteBase,FreshySync.shared(DB)).length;
+   if(left)setStatus('บันทึกแล้ว '+completed+' รายการ · เหลือ '+left+' รายการ','warn');
+  }
+  syncRetryCount=0;clearTimeout(syncRetryTimer);setStatus('บันทึกออนไลน์ครบ '+completed+' รายการ','ok');
   return true;
  }catch(e){
   syncBlocked=/CONFLICT|FORBIDDEN|ONLY|REQUIRED|IMMUTABLE|INVALID|CLOSED|DUPLICATE|PGRST202|MEMBER_NOT_FOUND/.test(e.message);
-  safeCache();setStatus('ยังไม่บันทึกออนไลน์ · '+e.message,'err');
+  safeCache();
   if(syncBlocked)toast('บันทึกถูกปฏิเสธ ข้อมูลรอส่งยังอยู่ในเครื่อง กดปุ่มจัดการข้อมูลรอส่ง','error');
+  else{
+   syncRetryCount=Math.min(syncRetryCount+1,6);
+   const wait=Math.min(60000,2000*Math.pow(2,syncRetryCount-1));
+   setStatus('เก็บข้อมูลไว้แล้ว · จะส่งซ้ำอัตโนมัติ','warn');
+   clearTimeout(syncRetryTimer);syncRetryTimer=setTimeout(()=>flushOnline(),wait);
+  }
   return false;
- }finally{syncBusy=false;}
+ }finally{syncBusy=false;syncPromise=null;}})();
+ return syncPromise;
 }
 function supabasePush(){if(!authIdentity||!remoteBase)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>flushOnline(),350);}
+async function startRealtime(){
+ if(!authIdentity||!supaCfg())return;
+ const client=authFor(supaCfg());
+ if(realtimeChannel){try{await client.removeChannel(realtimeChannel);}catch(e){}}
+ // Broadcast carries no business data; receivers fetch only after a successful commit.
+ // This avoids the high CPU cost of decoding Postgres WAL on small Supabase plans.
+ realtimeChannel=client.channel('freshy-data-v1',{config:{broadcast:{self:false}}})
+  .on('broadcast',{event:'freshy-updated'},()=>{
+   clearTimeout(realtimeRefreshTimer);
+   realtimeRefreshTimer=setTimeout(()=>{if(document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},700);
+  })
+  .subscribe(status=>{if(status==='SUBSCRIBED'&&session&&!syncBusy&&!syncBlocked&&!FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)setStatus('เชื่อมต่อฐานข้อมูลแบบเรียลไทม์','ok');});
+}
+function broadcastOnlineChange(){
+ if(!realtimeChannel)return;
+ try{realtimeChannel.send({type:'broadcast',event:'freshy-updated',payload:{at:Date.now()}});}catch(e){}
+}
 async function supabaseTest(cfg){
  try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
  if(!data.session)return {ok:false,error:'บันทึก URL/Key แล้ว ออกจากระบบสาธิตและเข้าสู่ระบบด้วยอีเมล/รหัสผ่านจริง'};
@@ -942,12 +1389,42 @@ async function resolvePending(){
  $('#discardPending').onclick=async()=>{if(!confirm('ยืนยันใช้ข้อมูลออนไลน์แทนรายการรอส่งในเครื่องนี้? ควรดาวน์โหลดสำเนาก่อน'))return;try{const payload=await rpc('freshy_read');installRemote(payload,[]);syncBlocked=false;closeModal();renderPage();setStatus('ใช้ข้อมูลออนไลน์แล้ว','ok');}catch(e){toast(e.message,'error');}};
 }
 window.resolvePending=resolvePending;
+function downloadSystemSnapshot(data,label){
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=(label||'freshywater-backup')+'-'+todayStr()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);
+}
+function openRealReset(){
+ if(!isAdmin()){toast('เฉพาะผู้ดูแลระบบเท่านั้น','error');return;}
+ openModal(`<div class="modal-head"><h3><i data-lucide="shield-alert"></i> รีเซ็ตข้อมูลใช้งานจริงทั้งระบบ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+ <div class="modal-body"><div class="reset-warning"><b>ข้อมูลที่จะถูกล้างจาก Supabase จริง</b><ul><li>ลูกค้าและทะเบียนลูกหนี้ทั้งหมด</li><li>รายการค้าง รับชำระ และยอดขายเงินสดทั้งหมด</li><li>คำขออนุมัติ ประวัติอีเมล หมู่บ้าน และสินค้า</li><li>บัญชีพนักงานอื่น เหลือเฉพาะแอดมินที่กำลังใช้งาน</li></ul><p>ระบบจะดาวน์โหลดไฟล์สำรองก่อนล้างอัตโนมัติ ส่วน Audit Log จะเก็บไว้เพื่อการตรวจสอบย้อนหลัง</p></div><div class="field"><label>พิมพ์คำว่า RESET เพื่อยืนยัน</label><input id="resetConfirmText" autocomplete="off" placeholder="RESET"></div></div>
+ <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmRealReset"><i data-lucide="trash-2"></i> ล้างข้อมูลจริงทั้งระบบ</button></div>`);
+ $('#confirmRealReset').addEventListener('click',resetRealSystemData);
+}
+async function resetRealSystemData(){
+ if($('#resetConfirmText').value.trim()!=='RESET'){toast('กรุณาพิมพ์ RESET ให้ถูกต้อง','error');return;}
+ if(!authIdentity||!remoteBase){toast('ฐานข้อมูลจริงยังไม่เชื่อมต่อ กรุณารอให้สถานะออนไลน์ก่อน','error');return;}
+ const btn=$('#confirmRealReset');btn.disabled=true;btn.textContent='กำลังสำรองและล้างข้อมูล...';
+ const snapshot=FreshySync.clone(FreshySync.shared(DB)),config=DB.settings.db,actor=FreshySync.clone(me()),defaults=seed();
+ downloadSystemSnapshot({exportedAt:new Date().toISOString(),source:'Supabase ก่อนรีเซ็ต',data:snapshot},'freshywater-before-reset');
+ try{
+  DB.settings=defaultSettings();DB.settings.db=config;DB.employees=[actor];DB.products=defaults.products;DB.villages=defaults.villages;
+  DB.customers=[];DB.debtors=[];DB.cashsales=[];DB.approvals=[];DB.sentEmails=[];
+  syncBlocked=false;safeCache();
+  if(!(await flushOnline()))throw Error('ฐานข้อมูลปฏิเสธหรือยังไม่ตอบสนอง');
+  closeModal();toast('รีเซ็ตข้อมูลจริงสำเร็จแล้ว','success');currentPage='dashboard';renderNav();renderPage();
+ }catch(e){
+  for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),snapshot.settings||{});else DB[k]=snapshot[k]||[];}
+  DB.settings.db=config;safeCache();btn.disabled=false;btn.innerHTML='<i data-lucide="trash-2"></i> ลองล้างข้อมูลอีกครั้ง';if(window.lucide)lucide.createIcons();toast('รีเซ็ตไม่สำเร็จ: '+e.message,'error');
+ }
+}
 function configureLogin(){
  const online=DB.settings.db.mode==='supabase';
  const deploymentLocked=!!(window.FRESHY_CONFIG&&window.FRESHY_CONFIG.mode==='supabase');
+ const configured=!!supaCfg();
  $('#onlineLogin').classList.toggle('hidden',!online);
  $('#demoLoginField').classList.toggle('hidden',online);
  $('#useDemo').classList.toggle('hidden',deploymentLocked);
+ $('#connectionSetup').classList.toggle('hidden',configured||deploymentLocked);
  $('#loginPreviewNote').textContent=online?'โหมดออนไลน์ · ยืนยันบัญชีจริงผ่าน Supabase':'โหมดสาธิต · ข้อมูลตัวอย่างในเครื่องนี้';
  $('#connectUrl').value=DB.settings.db.supabaseUrl||'';$('#connectKey').value=DB.settings.db.supabaseKey||'';
  $('#connectAdmin').value=DB.settings.db.adminEmail||'';
@@ -958,16 +1435,37 @@ async function startOnline(email,password){
  const {data,error}=await client.auth.signInWithPassword({email,password});
  if(error)throw error;
  authIdentity=data.user;
- try{await hydrateOnline();}catch(e){await client.auth.signOut();authIdentity=null;session=null;throw e;}
+ // Returning users must never wait for a slow database pool before the UI opens.
+ // The cached snapshot is a copy of the last successful real Supabase response.
+ if(resumeCachedOnline(data.user)){
+  enterApp();setStatus('เข้าสู่ระบบแล้ว · กำลังซิงก์ฐานข้อมูลเบื้องหลัง','warn');
+  hydrateOnline().catch(()=>{setStatus('ใช้งานข้อมูลล่าสุด · รายการใหม่จะรอส่งอัตโนมัติ','warn');});
+  return;
+ }
+ try{await hydrateOnline();}catch(e){
+  // Authentication succeeded. Never destroy a valid session merely because the
+  // database connection pool is temporarily busy; restore the last real snapshot.
+  if(resumeCachedOnline(data.user)){enterApp();setStatus('เข้าสู่ระบบแล้ว · ฐานข้อมูลกำลังเชื่อมต่อใหม่','warn');toast('ยืนยันบัญชีสำเร็จ ใช้ข้อมูลล่าสุดในเครื่องชั่วคราว','info');setTimeout(()=>supabaseFetch(),2500);return;}
+  throw Error('ยืนยันบัญชีสำเร็จ แต่ฐานข้อมูลยังไม่ตอบสนอง กรุณากดเข้าสู่ระบบอีกครั้งในอีกสักครู่ ('+(e.message||'connection timeout')+')');
+ }
+}
+function resumeCachedOnline(user){
+ let cached=null;try{cached=JSON.parse(localStorage.getItem(draftKey()));}catch(e){}
+ if(!cached||!cached.base||!cached.data)return false;
+ const data=cached.data,employee=(data.employees||[]).find(e=>String(e.email||'').toLowerCase()===String(user.email||'').toLowerCase());
+ if(!employee)return false;
+ const cfg=DB.settings.db;
+ for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),data.settings||{});else DB[k]=data[k]||[];}
+ DB.settings.db=cfg;remoteBase=FreshySync.shared(cached.base);remoteSettings=FreshySync.clone(cached.rawSettings||remoteBase.settings);session={empId:employee.id,loginAt:new Date().toISOString(),online:true,cached:true};
+ return true;
 }
 async function hydrateOnline(){
  const payload=await rpc('freshy_read');
  let cached=null;try{cached=JSON.parse(localStorage.getItem(draftKey()));}catch(e){}
  if(cached&&cached.base&&cached.data&&FreshySync.diff(cached.base,cached.data).length){
-  const cfg=DB.settings.db;for(const k of SUPA_COLS)DB[k]=cached.data[k]||payload.data[k]||(k==='settings'?defaultSettings():[]);
-  DB.settings.db=cfg;remoteBase=cached.base;
-  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
-  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
+  const pending=FreshySync.diff(FreshySync.shared(cached.base),FreshySync.shared(cached.data));
+  const rebased=FreshySync.rebase(payload.data,pending);
+  installRemote(payload,rebased);
   await flushOnline();
  }else installRemote(payload,[]);
  enterApp();
@@ -976,9 +1474,19 @@ async function resumeOnline(){
  const cfg=supaCfg();if(!cfg)return;
  try{const client=authFor(cfg);const {data,error}=await client.auth.getSession();if(error)throw error;
  if(!data.session)return;
- const verified=await client.auth.getUser();if(verified.error)throw verified.error;
- authIdentity=verified.data.user;await hydrateOnline();
- }catch(e){authIdentity=null;session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('เข้าสู่ระบบใหม่: '+e.message,'error');}
+ // getSession reads the verified Supabase session from local storage instantly.
+ // Do not block the first screen on an additional network getUser request.
+ authIdentity=data.session.user;
+ if(resumeCachedOnline(authIdentity)){
+  enterApp();setStatus('เปิดระบบจากข้อมูลจริงล่าสุด · กำลังซิงก์เบื้องหลัง','warn');
+  client.auth.getUser().then(v=>{if(v.error)throw v.error;return hydrateOnline();}).catch(()=>setStatus('ใช้งานข้อมูลล่าสุด · ฐานข้อมูลจะเชื่อมต่อซ้ำอัตโนมัติ','warn'));
+  return;
+ }
+ const verified=await client.auth.getUser();if(verified.error)throw verified.error;authIdentity=verified.data.user;await hydrateOnline();
+ }catch(e){
+  if(authIdentity&&resumeCachedOnline(authIdentity)){enterApp();setStatus('ฐานข้อมูลกำลังเชื่อมต่อใหม่ · ใช้ข้อมูลล่าสุดในเครื่อง','warn');setTimeout(()=>supabaseFetch(),2500);return;}
+  session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('ยืนยันบัญชีแล้ว แต่ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง','error');
+ }
 }
 function dbAdd(col,doc){doc.id=doc.id||uid();DB[col].push(doc);dbSave();return doc;}
 function dbUpdate(col,id,patch){const i=DB[col].findIndex(x=>x.id===id);if(i>=0){Object.assign(DB[col][i],patch);dbSave();return DB[col][i];}return null;}
@@ -1159,7 +1667,7 @@ function renderDebtors(area){
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
       <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
-      <div class="qr-wrap"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" onclick="window.open('${qrUrl}','_blank')" title="สแกนดูรายงานลูกหนี้"><small>สแกน<br>ดูรายงาน</small></div></div>
+      <a class="qr-wrap" href="${qrUrl}" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>เปิดเอกสารลูกหนี้</b><br>แสดงในหน้าปัจจุบัน</small></a></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
@@ -1205,22 +1713,22 @@ function openAddDebtor(area){
   openModal(`
     <div class="modal-head"><h3><i data-lucide="plus-circle"></i> เพิ่มรายการลูกหนี้ค้างจ่าย ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">พิมพ์ชื่อลูกหนี้แล้วกด <b>Enter</b> เพื่อย้ายไปช่องถัดไป ระบบจะแสดงรหัสลูกหนี้และหมู่/หมู่บ้านให้อัตโนมัติ (แก้ไขได้)</p>
-      <div class="form-grid">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">เลือกชื่อลูกหนี้ กรอกจำนวนและยอดเงิน แล้วกดปุ่มบันทึกด้านล่าง</p>
+      <div class="form-grid debt-form-grid">
         <div class="field full" style="position:relative"><label>ชื่อลูกหนี้ <span style="color:var(--red)">*</span></label>
           <input id="f_name" class="f-step" autocomplete="off" placeholder="พิมพ์ชื่อลูกหนี้...">
           <div class="search-suggest hidden" id="f_nameSug" style="position:absolute;top:auto;left:0;right:0;z-index:40"></div>
         </div>
         <div class="field"><label>รหัสลูกหนี้ (ระบบรันอัตโนมัติ)</label><input id="f_code" readonly style="background:#f1f3f6;font-weight:700;color:var(--navy2)" value="รอพิมพ์ชื่อ"></div>
         <div class="field"><label>${area==='nai'?'หมู่ที่ (พิมพ์ 7 หรือ 16 ได้)':'ชื่อบ้าน / หมู่บ้าน'}</label><input id="f_area" class="f-step" autocomplete="off" placeholder="${area==='nai'?'เช่น 7 หรือ 16':'เลือก/พิมพ์หมู่บ้าน'}"></div>
-        <div class="field"><label>จำนวนถังที่ค้าง</label><input type="number" id="f_jugs" class="f-step" value="0" min="0"></div>
-        <div class="field"><label>เงินค้างน้ำถัง (บาท)</label><input type="number" id="f_ja" class="f-step" value="0" min="0"></div>
-        <div class="field"><label>จำนวนแพ็คที่ค้าง</label><input type="number" id="f_packs" class="f-step" value="0" min="0"></div>
-        <div class="field"><label>เงินค้างน้ำแพ็ค (บาท)</label><input type="number" id="f_pa" class="f-step" value="0" min="0"></div>
-        <div class="field full"><label>วันที่ค้างชำระ (กด Enter เพื่อบันทึก)</label><input type="date" id="f_date" class="f-step" value="${todayStr()}"></div>
+        <div class="debt-product-group jug-group full"><div class="field"><label>จำนวนถังที่ค้าง</label><input type="number" inputmode="numeric" id="f_jugs" class="f-step" value="0" min="0"></div><div class="field"><label>เงินค้างน้ำถัง (บาท)</label><input type="number" inputmode="decimal" id="f_ja" class="f-step debt-money" value="0" min="0"></div></div>
+        <div class="debt-product-group pack-group full"><div class="field"><label>จำนวนแพ็คที่ค้าง</label><input type="number" inputmode="numeric" id="f_packs" class="f-step" value="0" min="0"></div><div class="field"><label>เงินค้างน้ำแพ็ค (บาท)</label><input type="number" inputmode="decimal" id="f_pa" class="f-step debt-money" value="0" min="0"></div></div>
+        <div class="field full"><label>วันที่ค้างชำระ</label><input type="date" id="f_date" class="f-step" value="${todayStr()}"></div>
+        <div class="debt-total-preview full"><span>ยอดค้างรวมที่จะบันทึก</span><strong id="debtTotalPreview">0 บาท</strong></div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="saveDebtor"><i data-lucide="save"></i> บันทึกลูกหนี้</button></div>`);
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="saveDebtor"><i data-lucide="save"></i> ยืนยันบันทึกลูกหนี้</button></div>`);
+  $('#modalBox').classList.add('debt-entry-modal');
   let selectedCustId=null;
   const nameI=$('#f_name'), sug=$('#f_nameSug'), codeI=$('#f_code'), areaI=$('#f_area');
   function applyCustomer(c){
@@ -1258,6 +1766,9 @@ function openAddDebtor(area){
     });
   });
   nameI.focus();
+  const refreshDebtTotal=()=>{$('#debtTotalPreview').textContent=fmtN((+$('#f_ja').value||0)+(+$('#f_pa').value||0))+' บาท';};
+  ['#f_ja','#f_pa'].forEach(sel=>$(sel).addEventListener('input',refreshDebtTotal));
+  $('#modalBox').querySelectorAll('input[type="number"]').forEach(el=>el.addEventListener('focus',()=>el.select()));
   $('#saveDebtor').addEventListener('click',()=>{
     const name=nameI.value.trim(); if(!name){toast('กรุณาพิมพ์ชื่อลูกหนี้','error');nameI.focus();return;}
     const jugs=+$('#f_jugs').value||0, packs=+$('#f_packs').value||0, ja=+$('#f_ja').value||0, pa=+$('#f_pa').value||0;
@@ -1285,12 +1796,14 @@ function renderPayments(area){
   let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='paid');
   if(paySearch)rows=rows.filter(d=>d.customerName.includes(paySearch));
   rows.sort((a,b)=>a.paidAt<b.paidAt?1:-1);
-  let html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
+  let html='<div class="tbl-wrap payment-table"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
+  let mobile='<div class="payment-cards">';
   rows.forEach((d,i)=>{
     html+=`<tr><td>${i+1}</td><td><b>${esc(d.customerName)}</b></td><td class="num" style="color:var(--green);font-weight:700">${fmtN(d.total)} บาท</td><td>${thDate(d.debtDate)}</td><td>${thDateTimeSec(d.paidAt)}</td><td>${esc(d.paidByName||'-')}</td>
     <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}"><i data-lucide="rotate-ccw"></i> ยกเลิก กลับไปค้าง</button></td></tr>`;
+    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}"><i data-lucide="rotate-ccw"></i><span>ยกเลิกและกลับไปค้าง</span></button></article>`;
   });
-  html+='</tbody></table></div>';
+  html+='</tbody></table></div>';mobile+='</div>';html+=mobile;
   if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ</p></div>';
   $('#pageContent').innerHTML=`
   <div class="page-head"><h2>ประวัติรับชำระ ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h2><span class="desc">รายการที่จ่ายแล้ว แยกจากหน้าลูกหนี้ค้างชำระอัตโนมัติ</span></div>
@@ -1570,42 +2083,53 @@ function printEmployeeReport(empId){
   $('#printArea').innerHTML='<div class="doc-page">'+body+'</div>';
   setTimeout(()=>window.print(),200);
 }
-function renderPublicQrReport(cid){
-  const c=DB.customers.find(x=>x.id===cid);
+async function openPublicQrReport(cid){
+  document.body.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;padding:24px;font:700 17px Sarabun,sans-serif;color:#17384e;background:#f3f7fa">กำลังเปิดข้อมูลเอกสาร…</div>';
+  try{
+    const cfg=supaCfg();let payload=null;
+    if(cfg){
+      const res=await fetch(cfg.url+'/rest/v1/rpc/freshy_public_qr',{method:'POST',headers:{apikey:cfg.key,'Content-Type':'application/json'},body:JSON.stringify({customer_id:cid}),signal:AbortSignal.timeout(20000)});
+      if(!res.ok)throw Error('เปิดข้อมูล QR ไม่สำเร็จ');payload=await res.json();
+    }
+    renderPublicQrReport(cid,payload);
+  }catch(e){document.body.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center;font-family:Sarabun,sans-serif;background:#f3f7fa;color:#17384e"><div><h2>ไม่สามารถเปิดข้อมูลเอกสารได้</h2><p>กรุณาสแกน QR Code ใหม่อีกครั้ง</p></div></div>';}
+}
+function renderPublicQrReport(cid,payload){
+  const c=payload&&payload.customer?payload.customer:DB.customers.find(x=>x.id===cid);
   if(!c){document.body.innerHTML='<div style="padding:40px;font-family:Sarabun,sans-serif"><h2>ไม่พบข้อมูลลูกหนี้</h2><p>รหัสลูกหนี้ไม่ถูกต้อง</p></div>';return;}
-  const debts=DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid').sort((a,b)=>a.debtDate<b.debtDate?-1:1);
+  const debts=(payload&&payload.debtors?payload.debtors:DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid')).sort((a,b)=>a.debtDate<b.debtDate?-1:1);
   const first=debts[0]||{};
-  const emp=DB.employees.find(e=>e.id===first.createdBy)||{};
-  const docNo=nextDocNo(DB.settings.docPrefix.debtor);
-  const qrUrl=location.href.split('?')[0]+'?qr='+cid;
-  const qrImg='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data='+encodeURIComponent(qrUrl);
-  const cs=creditStatus(cid);
+  const emp=payload&&payload.recorder?payload.recorder:(DB.employees.find(e=>e.id===first.createdBy)||{});
+  const biz=payload&&payload.business?payload.business:DB.settings.business;
+  const docNo=new URLSearchParams(location.search).get('doc')||'QR-'+String(c.code||cid).toUpperCase();
+  const oldest=debts.reduce((n,d)=>Math.max(n,Math.max(0,Math.floor((new Date()-new Date(d.debtDate))/86400000))),0);
+  const cs=oldest>100?{txt:'เครดิตไม่ดี'}:oldest>30?{txt:'เครดิตเฝ้าระวัง'}:oldest>10?{txt:'เครดิตดี'}:{txt:'เครดิตดีเยี่ยม'};
   const total=debts.reduce((s,d)=>s+d.total,0);
   const days=(iso)=>Math.max(0,Math.floor((new Date()-new Date(iso))/86400000));
   let rows='';
   debts.forEach((d,i)=>{rows+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td class="num">${days(d.debtDate)}</td><td>${cs.txt}</td><td class="num">${d.jugs||0}</td><td class="num">${fmtN(d.jugAmount||0)}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.packAmount||0)}</td><td class="num">${fmtN(d.total)}</td></tr>`;});
+  const mobileRows=debts.map((d,i)=>`<article class="qr-debt-card"><div class="qr-debt-head"><b>รายการที่ ${i+1}</b><span>${thDate(d.debtDate)}</span></div><div class="qr-debt-grid"><span>ค้างมา <b>${days(d.debtDate)} วัน</b></span><span>เครดิต <b>${cs.txt}</b></span><span>น้ำถัง <b>${d.jugs||0} ถัง · ${fmtN(d.jugAmount||0)} บาท</b></span><span>น้ำแพ็ค <b>${d.packs||0} แพ็ค · ${fmtN(d.packAmount||0)} บาท</b></span></div><div class="qr-debt-total">ยอดรายการ <b>${fmtN(d.total)} บาท</b></div></article>`).join('');
   const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
   document.body.innerHTML=`
-  <style>@media print{body *{visibility:visible!important}.no-print{display:none!important}body{background:#fff!important}@page{size:A4;margin:14mm 12mm}}</style>
-  <div style="max-width:820px;margin:0 auto;padding:16px;font-family:'Sarabun',sans-serif">
-    <div class="no-print" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button onclick="window.print()" style="padding:9px 18px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">พิมพ์ / บันทึกเป็น PDF</button><button onclick="location.href=location.pathname" style="padding:9px 18px;background:#6b7280;color:#fff;border:none;border-radius:8px;cursor:pointer">กลับเข้าระบบ</button></div>
-    <div style="background:#fff;padding:32px;color:#1f2a37;border:1px solid #e2e7ee;border-radius:10px">
-      <div style="text-align:center;border-bottom:2px solid #1e3a5f;padding-bottom:12px;margin-bottom:14px">
-        <div style="font-size:20px;font-weight:800;color:#1e3a5f">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>
-        <div style="font-size:12px;color:#6b7684">นครราชสีมา · โทร. 08X-XXX-XXXX</div>
-        <div style="font-size:16px;font-weight:700;margin-top:8px;color:#b8860b">รายงานประวัติลูกหนี้ (สแกน QR Code)</div>
+  <style>
+  *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#dfe7ed,#f6f8f9);color:#102739;font-family:'Sarabun',sans-serif}.qr-page{max-width:940px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#e6ecef 70%,transparent)}.qr-btn{padding:11px 17px;border:1px solid #254a62;border-radius:7px;font:800 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:#0a3b5b;color:#fff}.qr-btn.back{background:#fff;color:#153a52}.qr-sheet{background:#fff;padding:30px;color:#111;border:1px solid #8fa2af;border-radius:8px;box-shadow:0 20px 55px rgba(4,32,51,.18)}.qr-hero{text-align:center;border:1.5px solid #111;border-bottom:4px double #111;padding:14px;margin-bottom:0}.qr-hero:before{content:'เอกสารควบคุมของหน่วยงาน';display:block;font-size:10px;font-weight:800;letter-spacing:.12em;text-align:right}.qr-hero .brand{font-size:23px;font-weight:900;color:#000}.qr-hero .contact{font-size:12px;color:#222}.qr-hero .title{font-size:17px;font-weight:900;margin-top:9px;color:#000;text-decoration:underline;text-underline-offset:4px}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:15px;border:1px solid #333;border-top:0}.qr-meta div{padding:9px;border-radius:0;background:#fff;border:0;border-right:1px solid #777;border-bottom:1px solid #999;font-size:11.5px}.qr-meta div:nth-child(4n){border-right:0}.qr-meta b{display:block;color:#111;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #222;border-radius:0}.qr-table{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}.qr-table th{background:#263746;color:#fff;padding:8px;border:1px solid #111}.qr-table td{padding:8px;border:1px solid #666;text-align:center}.qr-table tbody tr:nth-child(even){background:#f0f2f3}.qr-table tfoot td{background:#e5e8ea;font-weight:900}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:14px;padding:14px;border:1.5px solid #222;border-radius:0;background:#f3f5f6}.qr-summary .copy{flex:1;font-size:11.5px;color:#243746}.qr-summary .amount{font-size:22px;font-weight:900;color:#000;margin-top:6px}.qr-code{width:116px;height:116px;border:6px solid #fff;outline:1px solid #555;box-shadow:none}.qr-signs{display:flex;gap:12px;margin-top:36px;font-size:11px}
+  @media(max-width:640px){.qr-page{padding:9px}.qr-actions{padding-top:5px}.qr-btn{flex:1;padding:12px 8px}.qr-sheet{padding:13px 11px;border-radius:6px}.qr-hero{padding:11px 8px}.qr-hero .brand{font-size:20px}.qr-hero .title{font-size:15px}.qr-meta{grid-template-columns:1fr 1fr}.qr-meta div{padding:8px;font-size:11px;border-right:1px solid #777}.qr-meta div:nth-child(2n){border-right:0}.qr-table-wrap{display:none}.qr-mobile-list{display:grid;gap:8px}.qr-debt-card{border:1px solid #8799a5;border-left:5px solid #163f59;border-radius:6px;overflow:hidden;background:#fff}.qr-debt-head{display:flex;justify-content:space-between;padding:9px 11px;background:#e5ebef;color:#17384e}.qr-debt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;font-size:11.5px}.qr-debt-grid span{color:#596b78}.qr-debt-grid b{display:block;color:#18384d;margin-top:2px}.qr-debt-total{display:flex;justify-content:space-between;padding:9px 11px;background:#edf1f3;color:#475e6e}.qr-debt-total b{font-size:16px;color:#111}.qr-summary{align-items:flex-start;padding:11px;gap:9px}.qr-summary .amount{font-size:19px}.qr-code{width:90px;height:90px}.qr-signs{display:none}}
+  @media print{body{background:#fff!important}.no-print{display:none!important}.qr-page{max-width:none;padding:0}.qr-sheet{padding:0;border:0;box-shadow:none}.qr-mobile-list{display:none!important}.qr-table-wrap{display:block!important}.qr-signs{display:flex!important}@page{size:A4;margin:14mm 12mm}}
+  </style>
+  <div class="qr-page">
+    <div class="qr-sheet">
+      <div class="qr-hero">
+        <div class="brand">${esc(biz.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์')}</div>
+        <div class="contact">${esc(biz.address||'')} ${biz.phone?'· โทร. '+esc(biz.phone):''}</div>
+        <div class="title">ทะเบียนติดตามลูกหนี้ค้างชำระ</div>
       </div>
-      <table style="width:100%;font-size:13px;margin-bottom:12px;border-collapse:collapse">
-        <tr><td style="padding:4px;width:25%"><b>เลขที่เอกสาร:</b> ${docNo}</td><td style="padding:4px;width:25%"><b>วันที่สแกน:</b> ${thDateTimeSec(new Date().toISOString())}</td><td style="padding:4px;width:25%"><b>รหัสลูกหนี้:</b> ${esc(c.code)}</td><td style="padding:4px;width:25%"><b>ชื่อลูกหนี้:</b> ${esc(c.name)}</td></tr>
-        <tr><td style="padding:4px"><b>พนักงานที่กรอก:</b> ${esc(emp.name||'-')}</td><td style="padding:4px"><b>ตำแหน่ง:</b> ${emp.role==='admin'?'แอดมิน':'พนักงาน'}</td><td style="padding:4px"><b>จำนวนค้าง:</b> ${debts.length} รายการ</td><td style="padding:4px"><b>เครดิต:</b> ${cs.txt}</td></tr>
-      </table>
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:#eef3f9"><th style="border:1px solid #cbd5e1;padding:6px">ลำดับ</th><th style="border:1px solid #cbd5e1;padding:6px">วันที่ค้าง</th><th style="border:1px solid #cbd5e1;padding:6px">ค้างมา (วัน)</th><th style="border:1px solid #cbd5e1;padding:6px">เครดิต</th><th style="border:1px solid #cbd5e1;padding:6px">ถัง</th><th style="border:1px solid #cbd5e1;padding:6px">เงินน้ำถัง</th><th style="border:1px solid #cbd5e1;padding:6px">แพ็ค</th><th style="border:1px solid #cbd5e1;padding:6px">เงินน้ำแพ็ค</th><th style="border:1px solid #cbd5e1;padding:6px">รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;padding:12px;border:1px solid #cbd5e1">ไม่มีรายการค้าง</td></tr>'}</tbody>
-      <tfoot><tr style="background:#fbf3df;font-weight:700"><td colspan="8" style="text-align:right;padding:8px;border:1px solid #cbd5e1">ยอดค้างรวมทั้งหมด</td><td style="padding:8px;border:1px solid #cbd5e1;text-align:right">${fmtN(total)} บาท</td></tr></tfoot></table>
-      <div style="display:flex;gap:16px;align-items:flex-end;margin-top:20px">
-        <div style="flex:1;font-size:11px;color:#6b7684">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้ โรงน้ำดื่ม เฟรชชี่ วอเตอร์<br>เลขที่เอกสาร: <b>${docNo}</b></div>
-        <img src="${qrImg}" style="width:110px;height:110px;border:1px solid #ddd;padding:4px;background:#fff">
+      <div class="qr-meta"><div><b>เลขที่เอกสาร</b>${docNo}</div><div><b>วันที่เปิดรายงาน</b>${thDateTimeSec(new Date().toISOString())}</div><div><b>รหัสลูกหนี้</b>${esc(c.code)}</div><div><b>ชื่อลูกหนี้</b>${esc(c.name)}</div><div><b>ผู้บันทึก</b>${esc(emp.name||'-')}</div><div><b>ตำแหน่ง</b>${emp.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน'}</div><div><b>จำนวนค้าง</b>${debts.length} รายการ</div><div><b>เครดิต</b>${cs.txt}</div></div>
+      <div class="qr-table-wrap"><table class="qr-table"><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ค้างมา (วัน)</th><th>เครดิต</th><th>ถัง</th><th>เงินน้ำถัง</th><th>แพ็ค</th><th>เงินน้ำแพ็ค</th><th>รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9">ไม่มีรายการค้าง</td></tr>'}</tbody><tfoot><tr><td colspan="8" style="text-align:right">ยอดค้างรวมทั้งหมด</td><td>${fmtN(total)} บาท</td></tr></tfoot></table></div>
+      <div class="qr-mobile-list">${mobileRows||'<div style="text-align:center;padding:20px">ไม่มีรายการค้าง</div>'}</div>
+      <div class="qr-summary">
+        <div class="copy">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้<br>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · เลขที่เอกสาร <b>${docNo}</b><div class="amount">ยอดค้างรวม ${fmtN(total)} บาท</div></div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:24px;font-size:12px">
+      <div class="qr-signs">
         ${sign('ผู้จัดการข้อมูล')}${sign('ผู้กรอกข้อมูล')}${sign('ผู้ออก QR Code')}${sign('ผู้ตรวจสอบ')}${sign('หัวหน้า / ผู้บริหาร')}
       </div>
     </div>
@@ -1708,7 +2232,7 @@ function renderSettings(){
       <button class="btn btn-navy" id="backupBtn"><i data-lucide="download"></i> สำรองข้อมูลที่เลือก (JSON)</button>
       <button class="btn btn-ghost" id="restoreBtn"><i data-lucide="upload"></i> กู้คืนจากไฟล์สำรอง</button>
       <input type="file" id="restoreFile" accept="application/json" style="display:none">
-      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> รีเซ็ตข้อมูลทั้งหมด</button>
+      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> รีเซ็ตข้อมูลใช้งานจริงทั้งระบบ</button>
     </div>
     <div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.length} รายการ)</h4>
     ${DB.sentEmails.slice(0,5).map(e=>'<div class="audit-item"><span class="ts">'+thDateTime(e.ts)+'</span><span><b>'+esc(e.subject)+'</b> — '+esc(e.status)+'</span></div>').join('')||'<span style="color:var(--muted);font-size:12.5px">ยังไม่มี</span>'}</div>
@@ -1726,10 +2250,13 @@ function renderSettings(){
     if(mode==='supabase'&&(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key)){toast('กรอก Project URL และ Publishable/Anon Key ให้ครบ','error');return;}
     if(key.startsWith('sb_secret_')){toast('ห้ามใช้ Secret Key ในหน้าเว็บ','error');return;}
     try{const part=key.split('.')[1];if(part&&JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'){toast('ห้ามใช้ Service Role Key','error');return;}}catch(e){}
+    const current=supaCfg();
+    const sameConnection=mode==='supabase'&&current&&current.url===url&&current.key===key;
+    if(sameConnection&&authIdentity){Object.assign(DB.settings.db,{mode,supabaseUrl:url,supabaseKey:key});safeCache();configureLogin();toast('ยืนยันการเชื่อมต่อฐานข้อมูลจริงแล้ว · ยังอยู่ในระบบ','success');return;}
     if(authIdentity){if(FreshySync.diff(remoteBase,FreshySync.shared(DB)).length&&!(await flushOnline())){toast('จัดการข้อมูลรอส่งก่อนเปลี่ยนการเชื่อมต่อ','error');return;}await authFor(supaCfg()).auth.signOut();}
     authIdentity=null;remoteBase=null;syncBlocked=false;session=null;localStorage.removeItem(SESSKEY);
     Object.assign(DB.settings.db,{mode,supabaseUrl:url,supabaseKey:key});safeCache();configureLogin();
-    $('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');toast('บันทึกแล้ว กรุณาเข้าสู่ระบบอีกครั้ง','success');
+    $('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');toast('เปลี่ยนโครงการฐานข้อมูลแล้ว กรุณายืนยันบัญชีอีกครั้ง','success');
   });
   bind('#testDbBtn',()=>{
     const st=$('#testDbStatus');if(!st)return;
@@ -1775,7 +2302,7 @@ function renderSettings(){
       }catch(err){toast('ไฟล์สำรองไม่ถูกต้อง: '+err.message,'error');}
     };rd.readAsText(f);
   });
-  bind('#resetBtn',()=>{if(DB.settings.db.mode==='supabase'){toast('ปุ่มนี้ใช้รีเซ็ตโหมดสาธิตเท่านั้น ข้อมูลออนไลน์จะไม่ถูกลบ','info');return;}if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
+  bind('#resetBtn',()=>{if(DB.settings.db.mode==='supabase'){openRealReset();return;}if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดในโหมดสาธิตจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
   if(window.lucide)lucide.createIcons();
 }
 function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=u.name;$('#userRole').textContent=u.role==='admin'?'แอดมินระบบ':'พนักงาน';$('#userAvatar').textContent=u.name.charAt(0);}
@@ -1795,24 +2322,26 @@ function docHeader(reportTitle,docNo){
     <div class="doc-logo">${logo}</div>
     <div class="doc-title">
       ${s.header.showName?`<div class="factory">${esc(s.business.name)}</div>`:''}
-      <div class="factory-sub">${esc(s.business.address)} · โทร ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
+      <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
       <div class="report-name">${esc(reportTitle)}</div>
     </div>
+    <div class="doc-control"><div class="control-label">เอกสารควบคุมของหน่วยงาน</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>ชั้นความลับ: ใช้ภายใน</span></div>
   </div>
   <div class="doc-meta">
-    <div>วันที่ออกเอกสาร: ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} เวลา ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
-    <div class="doc-no">เลขที่เอกสาร: ${docNo}</div>
+    <div><b>ส่วนงาน</b> งานทะเบียนและติดตามลูกหนี้</div>
+    <div><b>วันที่ออกเอกสาร</b> ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} · ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
+    <div class="doc-no">เลขอ้างอิง ${esc(docNo)}</div>
   </div>`;
 }
 function docFooter(docNo){
   const u=me();
   return `<div class="sign-row">
-    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้จัดการข้อมูล</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ส่งน้ำ</div></div>
-    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้ออกเอกสาร</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ / หัวหน้าหรือผู้บริหาร</div></div>
+    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้จัดทำข้อมูล</div><div class="sign-date">วันที่ ____/____/______</div></div>
+    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">พนักงานส่งน้ำ</div><div class="sign-date">วันที่ ____/____/______</div></div>
+    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ</div><div class="sign-date">วันที่ ____/____/______</div></div>
+    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้อนุมัติ</div><div class="sign-date">วันที่ ____/____/______</div></div>
   </div>
-  <div class="doc-foot">เลขที่เอกสาร ${docNo} ออกเอกสารโดยระบบจัดการลูกหนี้โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>`;
+  <div class="doc-foot"><span><strong>เลขที่เอกสาร ${esc(docNo)}</strong> · เอกสารภายใน ห้ามแก้ไขโดยไม่ได้รับอนุญาต</span><span>ระบบสารสนเทศจัดการลูกหนี้ · เฟรชชี่ วอเตอร์</span></div>`;
 }
 function buildDebtorReportHtml(area,filter,mode){
   let rows=DB.debtors.filter(d=>d.area===area&&d.status==='unpaid');
@@ -1896,8 +2425,8 @@ const overlay=$('#privacyOverlay');
 function showPrivacy(){if(!session)return;overlay.classList.remove('hidden');}
 function hidePrivacy(){overlay.classList.add('hidden');}
 window.addEventListener('blur',showPrivacy);
-window.addEventListener('focus',hidePrivacy);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)showPrivacy();else hidePrivacy();});
+window.addEventListener('focus',()=>{hidePrivacy();if(authIdentity){clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(()=>supabaseFetch(),500);}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)showPrivacy();else{hidePrivacy();if(authIdentity){clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(()=>supabaseFetch(),500);}}});
 document.addEventListener('keydown',e=>{
   if(e.key==='PrintScreen'||(e.ctrlKey&&(e.key==='p'||e.key==='P'||e.key==='s'||e.key==='S'))||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))){
     e.preventDefault();showPrivacy();toast('สงวนสิทธิ์ ไม่สามารถแคปหน้าจอหรือเปิดซ้อนหน้าจอได้','error');
@@ -1931,10 +2460,13 @@ async function doLogin(){
   enterApp();
 }
 function enterApp(){
+  const qrCustomer=new URLSearchParams(location.search).get('qr');
+  if(qrCustomer){renderPublicQrReport(qrCustomer);return;}
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
+  if(authIdentity)startRealtime();
   refreshUserChip();
-  const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else{setStatus(_m==='supabase'?'กำลังตรวจสอบฐานข้อมูล':'โหมดสาธิต','info');if(_m==='supabase')supabaseFetch();}
+  const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else setStatus(_m==='supabase'?'พร้อมใช้งาน · ซิงก์เบื้องหลัง':'โหมดสาธิต','info');
   navigate(new URLSearchParams(location.search).has('approval')&&isAdmin()?'approvals':'dashboard');
 }
 $('#logoutBtn').addEventListener('click',()=>{
@@ -1945,27 +2477,31 @@ $('#logoutBtn').addEventListener('click',()=>{
     if(authIdentity){const pending=FreshySync.diff(remoteBase||{},FreshySync.shared(DB));if(pending.length&&!(await flushOnline())){toast('ยังมีข้อมูลรอส่ง กรุณาจัดการก่อนออกจากระบบ','error');return;}}
     const u=me();
     if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')await sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
-    if(authIdentity){await flushOnline();await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
+    if(authIdentity){await flushOnline();if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch(e){}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
     session=null;localStorage.removeItem(SESSKEY);
     closeModal();$('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#loginCode').value='';
     toast('ออกจากระบบแล้ว','success');
   });
 });
 $('#menuToggle').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
+const mobileNavScrim=$('#mobileNavScrim');
+if(mobileNavScrim)mobileNavScrim.addEventListener('click',()=>$('#sidebar').classList.remove('open'));
 
 /* ============================================================
    REAL TIME SYNC (polling ทุก 5 วินาที)
    ============================================================ */
 let lastDataHash='';
-function dataHash(){return JSON.stringify(DB).length+'_'+DB.debtors.length+'_'+DB.cashsales.length+'_'+DB.audit.length;}
+function dataHash(){return [DB.debtors.length,DB.cashsales.length,DB.audit.length,DB.customers.length].join('_');}
 setInterval(()=>{
   if(!session)return;
-  if(DB.settings.db.mode!=='supabase')dbLoad();
+  if(DB.settings.db.mode==='supabase')return;
+  dbLoad();
   const h=dataHash();
   if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
-},5000);
-setInterval(()=>{if(DB&&DB.settings.db.mode==='supabase'&&session)supabaseFetch();},10000);
+},15000);
+// Broadcast refreshes immediately; a visible-tab poll recovers missed events.
+setInterval(()=>{if(authIdentity&&document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},15000);
 
 /* ============================================================
    INIT
@@ -1988,11 +2524,12 @@ window.addEventListener('offline',()=>setStatus('ไม่มีการเช�
 if(!navigator.onLine)setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต','err');
 if(DB.settings.db.mode==='supabase')setStatus('ออนไลน์ · กรุณาเข้าสู่ระบบ','info');
 const tbtn=$('#themeToggle');if(tbtn)tbtn.addEventListener('click',cycleTheme);
+const syncBadge=$('#modeTag');if(syncBadge){syncBadge.title='แตะเพื่อซิงก์ฐานข้อมูล';syncBadge.style.cursor='pointer';syncBadge.addEventListener('click',()=>{if(!authIdentity){toast('กรุณาเข้าสู่ระบบออนไลน์ก่อน','error');return;}setStatus('กำลังซิงก์ฐานข้อมูล','warn');supabaseFetch().then(ok=>toast(ok?'อัปเดตข้อมูลจากฐานจริงแล้ว':'ฐานข้อมูลยังไม่ตอบสนอง',ok?'success':'error'));});}
 /* กด Enter บนหน้าลูกหนี้ = เปิดฟอร์มเพิ่มรายการลูกหนี้ทันที (หลังบันทึกเสร็จ กด Enter อีกครั้ง = เพิ่มรายต่อไป) */
 document.addEventListener('keydown',e=>{
   if(e.key!=='Enter')return;
   if(currentPage!=='debtorsNai'&&currentPage!=='debtorsOther')return;
-  if(document.querySelector('#modalBox:not(.hidden)'))return;
+  if(modalIsOpen())return;
   const t=e.target;
   if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'||t.tagName==='BUTTON'))return;
   e.preventDefault();
@@ -2001,7 +2538,7 @@ document.addEventListener('keydown',e=>{
 });
 // Approval links identify the request; only an authenticated admin can decide in the approvals page.
 const _qr=new URLSearchParams(location.search).get('qr');
-if(_qr&&DB.settings.db.mode!=='supabase'){renderPublicQrReport(_qr);return;}
+if(_qr){openPublicQrReport(_qr);return;}
 try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
 if(DB.settings.db.mode==='supabase'){session=null;configureLogin();resumeOnline();}else{configureLogin();if(session&&DB.employees.find(e=>e.id===session.empId))enterApp();}
 if(window.lucide)lucide.createIcons();
@@ -2014,7 +2551,7 @@ $('#connectSave').onclick=()=>{
  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key){toast('กรอก Project URL และ Publishable/Anon Key ให้ครบ','error');return;}
  if(key.startsWith('sb_secret_')){toast('ห้ามใส่ Secret หรือ Service Role Key ในหน้าเว็บ','error');return;}
  try{const part=key.split('.')[1];if(part&&JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'){toast('ห้ามใช้ Service Role Key','error');return;}}catch(e){}
- Object.assign(DB.settings.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key,adminEmail});safeCache();configureLogin();toast('บันทึกการเชื่อมต่อแล้ว เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน','success');
+ Object.assign(DB.settings.db,{mode:'supabase',supabaseUrl:url,supabaseKey:key,adminEmail});safeCache();configureLogin();toast('บันทึกการเชื่อมต่อฐานข้อมูลจริงแล้ว','success');
 };
 $('#downloadSql').onclick=()=>{
  const email=$('#connectAdmin').value.trim();if(!/^[^\s@']+@[^\s@']+\.[^\s@']+$/.test(email)){toast('กรอกอีเมลแอดมินจริงก่อน','error');return;}
