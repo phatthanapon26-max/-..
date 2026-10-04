@@ -530,7 +530,7 @@ table.tbl tr:hover td{background:#fafbfd}
   <div class="login-deco"><span></span><span></span><span></span><span></span><span></span></div>
   <div class="login-card">
     <div class="login-logo"><i data-lucide="droplets"></i></div>
-    <h1 class="display-font">ระบบสารสนเทศ<br>การจัดการลูกหนี้และรายงานการส่งน้ำ</h1>
+    <h1 class="display-font">ระบบจัดการลูกหนี้<br><span class="login-brand-name">เฟรชชี่ วอเตอร์</span></h1>
     <p class="sub">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</p>
     <div class="field" id="demoLoginField">
       <label>รหัสสาธิต</label>
@@ -540,7 +540,7 @@ table.tbl tr:hover td{background:#fafbfd}
       </div>
       <div id="loginNamePreview" class="login-preview hidden"></div>
     </div>
-    <div id="onlineLogin" class="hidden"><div class="field"><label>รหัสพนักงาน</label><input id="loginEmployeeCode" autocomplete="username" placeholder="เช่น 7716"></div><p id="loginEmailHint" class="login-email-hint">กรอกรหัสพนักงาน ระบบจะเลือกบัญชีให้</p><div class="field"><label>อีเมล (เว้นว่างได้เมื่อใช้รหัสพนักงาน)</label><input id="loginEmail" type="email" autocomplete="username"></div><div class="field"><label>รหัสผ่าน</label><input id="loginPassword" type="password" autocomplete="current-password"></div></div>
+    <div id="onlineLogin" class="hidden"><div class="field"><label>รหัสพนักงาน</label><input id="loginEmployeeCode" autocomplete="username" placeholder="เช่น 7716"></div><p id="loginEmailHint" class="login-email-hint">กรอกรหัสพนักงาน ระบบจะเลือกบัญชีให้</p><details class="login-email-alternative"><summary>ใช้อีเมลแทนรหัสพนักงาน</summary><div class="field"><label>อีเมลบัญชี</label><input id="loginEmail" type="email" autocomplete="username"></div></details><div class="field"><label>รหัสผ่าน</label><input id="loginPassword" type="password" autocomplete="current-password"></div></div>
     <p id="loginPreviewNote" style="font-size:14px;margin-bottom:14px;color:var(--muted)"></p>
     <button class="btn btn-primary btn-block" id="loginBtn"><i data-lucide="log-in"></i> เข้าสู่ระบบ</button>
     <details class="connection-setup" id="connectionSetup"><summary>ตั้งค่าฐานข้อมูลครั้งแรก</summary><div class="field"><label>Supabase Project URL</label><input id="connectUrl" placeholder="https://xxx.supabase.co"></div><div class="field"><label>Publishable / Anon Key</label><input id="connectKey" autocomplete="off"></div><div class="field"><label>อีเมลผู้ดูแลระบบจริง</label><input id="connectAdmin" type="email"></div><p style="font-size:14px;margin-bottom:12px">สร้างบัญชีแอดมินใน Supabase Authentication → Users ก่อน แล้วดาวน์โหลด SQL ไปรันใน SQL Editor ครั้งเดียว</p><button id="downloadSql" class="btn btn-ghost">ดาวน์โหลด SQL</button><button id="connectSave" class="btn btn-primary">บันทึกการเชื่อมต่อ</button><button id="useDemo" class="btn btn-ghost">ทดลองโหมดสาธิต</button></details>
@@ -553,7 +553,7 @@ table.tbl tr:hover td{background:#fafbfd}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo"><i data-lucide="droplets"></i></div>
-      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v2.0</small></div>
+      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.0</small></div>
     </div>
     <nav class="nav" id="navMenu"></nav>
     <div class="sidebar-foot">

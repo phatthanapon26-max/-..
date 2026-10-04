@@ -23,7 +23,7 @@ async function preparePrint(html,docNo,showQr){
  const button=$('#confirmDocumentPrint')||$('#doPrint');if(button){button.disabled=true;button.textContent='กำลังเตรียมเอกสาร…';}
  try{let qrUrl;if(showQr)qrUrl=await persistDocument(html,docNo);$('#printArea').innerHTML='<div class="doc-page">'+html+'</div>';
  if(qrUrl){const control=$('#printArea .doc-control');const img=document.createElement('img');img.src=localQr(qrUrl);img.className='document-qr';img.alt='QR เอกสาร '+docNo;control.prepend(img);}
- closeModal();if(document.fonts)await document.fonts.ready;await Promise.all([...$('#printArea').querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));window.print();
+ closeModal();const previousTitle=document.title;document.title=docNo+' '+DB.settings.business.name;window.addEventListener('afterprint',()=>{document.title=previousTitle;},{once:true});if(document.fonts)await document.fonts.ready;await Promise.all([...$('#printArea').querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));window.print();
  }catch(e){if(button&&button.isConnected){button.disabled=false;button.textContent='ลองเตรียมเอกสารอีกครั้ง';}toast(e.message,'error');}
 }
 function askContinueDebtor(area){
@@ -32,7 +32,7 @@ function askContinueDebtor(area){
  box.tabIndex=-1;box.focus();box.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();openAddDebtor(area);}else if(['Backspace','Delete','Escape'].includes(e.key)){e.preventDefault();e.stopPropagation();finish();}};
 }
 async function ensureVillage(name){
- const found=DB.villages.find(v=>v.name.trim()===name);if(found)return {...found,code:FreshyFeatures.villageCode(DB.villages,name)};
+ const found=DB.villages.find(v=>v.name.trim()===name);if(found){const code=FreshyFeatures.villageCode(DB.villages,name);if(!found.code&&isAdmin()){dbUpdate('villages',found.id,{code});if(authIdentity&&!(await flushOnline()))throw Error('รหัสหมู่บ้านยังรอส่ง กรุณาตรวจสถานะฐานข้อมูล');}return {...found,code};}
  if(isAdmin()||!authIdentity){const row=dbAdd('villages',{name,code:FreshyFeatures.villageCode(DB.villages,name),createdBy:me().id});if(authIdentity&&!(await flushOnline()))throw Error('รหัสหมู่บ้านยังรอส่ง กรุณาตรวจฐานข้อมูลก่อนบันทึกลูกหนี้');return row;}
  const result=await apiRequest('/api/village',{method:'POST',body:JSON.stringify({name})});await supabaseFetch();return result.village;
 }
@@ -48,7 +48,7 @@ function attachCsv(){
 async function loginByCode(){
  const code=$('#loginEmployeeCode').value.trim(),password=$('#loginPassword').value,email=$('#loginEmail').value.trim();if(!password)throw Error('กรุณากรอกรหัสผ่าน');
  if(email){await startOnline(email,password);return;}if(!code)throw Error('กรุณากรอกรหัสพนักงาน');
- const known=code==='7716'?DB.settings.db.adminEmail:verifiedLoginDirectory()[code];if(known){try{await startOnline(known,password);$('#loginEmail').value=known;return;}catch(e){if(!/Invalid login credentials/i.test(e.message))throw e;}}
+ if(code.includes('@')){await startOnline(code,password);return;}const known=code==='7716'?DB.settings.db.adminEmail:verifiedLoginDirectory()[code];if(known){try{await startOnline(known,password);$('#loginEmail').value=known;return;}catch(e){if(!/Invalid login credentials/i.test(e.message))throw e;}}
  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,password}),signal:AbortSignal.timeout(25000)}),j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'เข้าสู่ระบบไม่สำเร็จ');
  const {error}=await authFor(supaCfg()).auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});if(error)throw error;$('#loginEmail').value=j.email||'';await resumeOnline();
 }
@@ -394,7 +394,7 @@ function configureLogin(){
  $('#demoLoginField').classList.toggle('hidden',online);
  $('#useDemo').classList.toggle('hidden',deploymentLocked);
  $('#connectionSetup').classList.toggle('hidden',configured||deploymentLocked);
- $('#loginPreviewNote').textContent=online?'โหมดออนไลน์ · ยืนยันบัญชีจริงผ่าน Supabase':'โหมดสาธิต · ข้อมูลตัวอย่างในเครื่องนี้';
+ $('#loginPreviewNote').textContent=online?'สำหรับผู้ดูแลและพนักงานที่ได้รับสิทธิ์':'โหมดสาธิต · ข้อมูลตัวอย่างในเครื่องนี้';
  $('#connectUrl').value=DB.settings.db.supabaseUrl||'';$('#connectKey').value=DB.settings.db.supabaseKey||'';
  $('#connectAdmin').value=DB.settings.db.adminEmail||'';
 }
@@ -1173,10 +1173,10 @@ function renderSettings(){
     <div class="panel-body" style="border-top:1px solid var(--border)"><button class="btn btn-primary" id="saveProd"><i data-lucide="save"></i> บันทึกรายการสินค้า</button></div></div>`;
   }
   else if(settingTab==='villages'){
-    const vhtml=DB.villages.map(v=>`<span class="pill orange" style="margin:3px">${esc(FreshyFeatures.villageCode(DB.villages,v.name))} · ${esc(v.name)} <button class="delV" data-id="${v.id}" style="color:var(--red);margin-left:6px;font-weight:700">×</button></span>`).join('');
+    const vhtml=DB.villages.map(v=>`<div class="village-setting-row"><span>${esc(v.name)}</span><input class="v_code" data-id="${v.id}" aria-label="รหัสหมู่บ้าน ${esc(v.name)}" value="${esc(FreshyFeatures.villageCode(DB.villages,v.name))}" maxlength="30"><button class="btn btn-ghost btn-sm delV" data-id="${v.id}">ลบ</button></div>`).join('');
     body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="map-pinned"></i> รายชื่อหมู่บ้าน (ลูกหนี้บ้านอื่น ๆ)</h3></div><div class="panel-body">
       <div style="margin-bottom:12px">${vhtml||'<span style="color:var(--muted);font-size:13px">ยังไม่มีหมู่บ้านเพิ่มเติม</span>'}</div>
-      <div style="display:flex;gap:8px"><input id="v_name" placeholder="ชื่อหมู่บ้าน เช่น บ้านโนนสูง" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px"><button class="btn btn-gold" id="addVillage"><i data-lucide="plus"></i> เพิ่ม</button></div></div></div>`;
+      <button class="btn btn-primary" id="saveVillageCodes">บันทึกรหัสหมู่บ้าน</button><div class="field" style="margin-top:18px"><label>รหัสสำหรับหมู่บ้านใหม่ (เว้นว่างให้รันอัตโนมัติ)</label><input id="v_code_new" maxlength="30"></div><div style="display:flex;gap:8px"><input id="v_name" placeholder="ชื่อหมู่บ้าน เช่น บ้านโนนสูง" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px"><button class="btn btn-gold" id="addVillage"><i data-lucide="plus"></i> เพิ่ม</button></div></div></div>`;
   }
   else if(settingTab==='email')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="mail"></i> การตั้งค่าอีเมลแจ้งเตือน</h3></div><div class="panel-body"><div class="form-grid">
     <label class="perm-item full"><input type="checkbox" id="em_en" ${s.email.enabled?'checked':''}> เปิดใช้งานการส่งอีเมลแจ้งเตือน</label>
@@ -1257,7 +1257,8 @@ function renderSettings(){
       DB.products[idx].returnable=$('#prodList').querySelector('.p_ret[data-i="'+idx+'"]').checked;
     });dbSave();toast('บันทึกรายการสินค้าแล้ว','success');
   });
-  bind('#addVillage',()=>{const name=$('#v_name').value.trim();if(!name)return;if(DB.villages.some(v=>v.name===name)){toast('ชื่อหมู่บ้านนี้มีอยู่แล้ว','error');return;}dbAdd('villages',{name,code:FreshyFeatures.villageCode(DB.villages,name)});toast('เพิ่มหมู่บ้านแล้ว','success');renderSettings();});
+  bind('#addVillage',()=>{const name=$('#v_name').value.trim();if(!name)return;if(DB.villages.some(v=>v.name===name)){toast('ชื่อหมู่บ้านนี้มีอยู่แล้ว','error');return;}const code=$('#v_code_new').value.trim()||FreshyFeatures.villageCode(DB.villages,name);if(DB.villages.some(v=>FreshyFeatures.villageCode(DB.villages,v.name).toLowerCase()===code.toLowerCase())){toast('รหัสหมู่บ้านซ้ำ','error');return;}dbAdd('villages',{name,code});toast('เพิ่มหมู่บ้านแล้ว','success');renderSettings();});
+  bind('#saveVillageCodes',async()=>{const fields=[...document.querySelectorAll('.v_code')],codes=fields.map(f=>f.value.trim());if(codes.some(x=>!x)||new Set(codes.map(x=>x.toLowerCase())).size!==codes.length){toast('รหัสหมู่บ้านต้องไม่ว่างและไม่ซ้ำ','error');return;}fields.forEach((f,i)=>dbUpdate('villages',f.dataset.id,{code:codes[i]}));toast(authIdentity?(await flushOnline()?'บันทึกรหัสหมู่บ้านออนไลน์แล้ว':'รหัสหมู่บ้านยังรอส่ง'):'บันทึกรหัสหมู่บ้านสาธิตแล้ว','info');});
   $('#pageContent').querySelectorAll('.delV').forEach(b=>b.addEventListener('click',()=>{dbRemove('villages',b.dataset.id);renderSettings();}));
   bind('#saveEmail',async()=>{try{const provider=$('#em_prov').value;const reportTimes=FreshyFeatures.scheduleTimes($('#em_times').value);Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value.trim(),provider,fromEmail:$('#em_from').value.trim(),smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value.trim(),reportTimes,reportsEnabled:$('#em_reports').checked,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked,newcustomer:$('#al_new').checked,profile:$('#al_profile').checked,payment:$('#al_payment').checked,cash:$('#al_cash').checked}});s.email[provider==='gmail'?'smtpPass':'apiKey']=$('#em_key').value.trim().replace(provider==='gmail'?/\s/g:/$^/g,'');dbSave();toast(authIdentity?(await flushOnline()?'บันทึกการตั้งค่าลงฐานข้อมูลแล้ว':'ค่าตั้งค่ายังรอส่ง โปรดตรวจสถานะฐานข้อมูล'):'บันทึกในโหมดสาธิตแล้ว',authIdentity&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length?'info':'success');}catch(e){toast(e.message,'error');}});
   bind('#backupBtn',()=>{
@@ -1301,10 +1302,10 @@ function docHeader(reportTitle,docNo){
       <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
       <div class="report-name">${esc(reportTitle)}</div>
     </div>
-    <div class="doc-control"><div class="control-label">เอกสารควบคุมขององค์กร</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>เอกสารรายงาน</span></div>
+    <div class="doc-control"><div class="control-label">เอกสารควบคุมขององค์กร</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1</span><span>เอกสารรายงาน</span></div>
   </div>
   <div class="doc-meta">
-    <div><b>ส่วนงาน</b> งานทะเบียนและติดตามลูกหนี้</div>
+    <div><b>ประเภทเอกสาร</b> ทะเบียนและติดตามลูกหนี้</div>
     <div><b>วันที่ออกเอกสาร</b> ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} · ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
     <div class="doc-no">เลขอ้างอิง ${esc(docNo)}</div>
   </div>`;
