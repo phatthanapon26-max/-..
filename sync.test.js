@@ -28,6 +28,8 @@ assert.equal(context.remoteSettings.db.old,true,'Expected settings must match th
 assert.equal(context.remoteBase.settings.db,undefined,'Device connection settings must stay out of the shared baseline');
 assert.match(fs.readFileSync(__dirname+'/database.sql','utf8'),/errcode='PT409'/);
 assert.doesNotMatch(fs.readFileSync(__dirname+'/database.sql','utf8'),/errcode='40001'/);
+const setup={window:{}};vm.createContext(setup);vm.runInContext(fs.readFileSync(__dirname+'/database-config.js','utf8'),setup);
+assert.equal(setup.window.FRESHY_SQL,fs.readFileSync(__dirname+'/database.sql','utf8'),'The setup SQL copied from the app must match the tested database source');
 async function verifyFlush(){
  let database=blank(),applies=0,loseResponse=true;
  database.settings.db={legacy:true};
