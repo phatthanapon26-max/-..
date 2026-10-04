@@ -2,6 +2,10 @@
   "name": "freshy-water-secure",
   "version": "2.0.0",
   "private": true,
+  "scripts": {
+    "build": "node build-assets.js",
+    "test": "node sync.test.js"
+  },
   "dependencies": {
     "nodemailer": "10.0.12",
     "pdfkit": "0.17.2"
