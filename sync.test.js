@@ -28,4 +28,29 @@ assert.equal(context.remoteSettings.db.old,true,'Expected settings must match th
 assert.equal(context.remoteBase.settings.db,undefined,'Device connection settings must stay out of the shared baseline');
 assert.match(fs.readFileSync(__dirname+'/database.sql','utf8'),/errcode='PT409'/);
 assert.doesNotMatch(fs.readFileSync(__dirname+'/database.sql','utf8'),/errcode='40001'/);
-console.log('Passed: 10 queued writes, replay after timeout, cross-device conflicts, settings merge, raw settings baseline, PT409.');
+async function verifyFlush(){
+ let database=blank(),applies=0,loseResponse=true;
+ database.settings.db={legacy:true};
+ const client={rpc:async(name,body)=>{
+  if(name==='freshy_read')return {data:{actor:{id:'admin'},data:S.clone(database)}};
+  applies++;
+  for(const c of body.changes){const existing=c.collection==='settings'?database.settings:(database[c.collection]||[]).find(x=>x.id===c.id)||null;if(!S.equal(existing,c.expected))return {error:{code:'PT409',message:'CONFLICT:'+c.collection+':'+c.id}};}
+  database=S.overlay(database,body.changes);delete database.settings.db;
+  if(loseResponse){loseResponse=false;return {error:{message:'TimeoutError: signal timed out'}};}
+  return {data:{actor:{id:'admin'},data:S.clone(database)}};
+ }};
+ const env={...context,DB:{settings:{db:{mode:'supabase'}}},remoteBase:null,remoteSettings:null,authIdentity:{id:'user'},syncPromise:null,syncBusy:false,syncBlocked:false,syncRetryCount:0,syncRetryTimer:null,supaCfg:()=>({url:'test'}),authFor:()=>client,setStatus:()=>{},toast:()=>{},broadcastOnlineChange:()=>{},clearTimeout:()=>{},setTimeout:()=>0};
+ vm.createContext(env);vm.runInContext(install,env);
+ vm.runInContext(app.slice(app.indexOf('async function rpc('),app.indexOf('async function supabaseFetch(')),env);
+ vm.runInContext(app.slice(app.indexOf('async function flushOnline('),app.indexOf('function supabasePush(')),env);
+ env.installRemote({actor:{id:'admin'},data:S.clone(database)},[]);
+ env.DB.customers=queued.map(c=>S.clone(c.value));env.DB.settings.business.name='Updated';
+ assert.equal(await env.flushOnline(),false,'Lost response must leave the draft pending');
+ assert.equal(await env.flushOnline(),true,'Retry must recognize the first committed batch and send the remaining row');
+ assert.equal(database.customers.length,10);
+ assert.equal(database.settings.business.name,'Updated');
+ assert.equal(S.diff(env.remoteBase,S.shared(env.DB)).length,0);
+ assert.equal(applies,3);
+ console.log('Passed: real flush loop, 10 queued records, committed response lost, retry without duplicates, exact legacy settings, and PT409.');
+}
+verifyFlush().catch(e=>{console.error(e);process.exitCode=1;});
