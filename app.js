@@ -16,10 +16,10 @@ async function apiRequest(path,options={}){
 async function persistDocument(html,docNo){
  if(authIdentity&&!(await flushOnline()))throw Error('ยังมีข้อมูลรอส่ง กรุณาซิงก์ให้สำเร็จก่อนออก QR');
  const snapshot=FreshyFeatures.documentSnapshot(html,docNo,DB.settings.business,me(),document);const result=await apiRequest('/api/document',{method:'POST',body:JSON.stringify({snapshot})});
- return location.origin+'/document?id='+result.id;
+ return location.origin+'/document?id='+result.id+(result.access==='private'?'&access=private':'');
 }
 async function preparePrint(html,docNo,showQr){
- if(showQr===undefined){openModal('<div class="modal-head"><h3>ตัวเลือกเอกสาร A4</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>เอกสารพื้นขาว ตัวอักษรดำ พร้อมเลขอ้างอิงและช่องลงนาม</p><label class="perm-item"><input id="printDocumentQr" type="checkbox"> แสดง QR เอกสารตรงมุมบนขวา</label><p class="help-text">ผู้ที่สแกน QR จะเห็นเฉพาะข้อมูลในเอกสารฉบับนี้ โดยไม่ต้องล็อกอิน</p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button id="confirmDocumentPrint" class="btn btn-primary">พิมพ์ / บันทึก PDF</button></div>');$('#confirmDocumentPrint').onclick=()=>preparePrint(html,docNo,$('#printDocumentQr').checked);return;}
+ if(showQr===undefined){openModal('<div class="modal-head"><h3>ตัวเลือกเอกสาร A4</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>เอกสารพื้นขาว ตัวอักษรดำ พร้อมเลขอ้างอิงและช่องลงนาม</p><label class="perm-item"><input id="printDocumentQr" type="checkbox" checked> แสดง QR เอกสารตรงมุมบนขวา</label><p class="help-text">QR เปิดเอกสารฉบับนี้ตามสิทธิ์บัญชี ผู้สแกนต้องเข้าสู่ระบบ</p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button id="confirmDocumentPrint" class="btn btn-primary">พิมพ์ / บันทึก PDF</button></div>');$('#confirmDocumentPrint').onclick=()=>preparePrint(html,docNo,$('#printDocumentQr').checked);return;}
  const button=$('#confirmDocumentPrint')||$('#doPrint');if(button){button.disabled=true;button.textContent='กำลังเตรียมเอกสาร…';}
  try{let qrUrl;if(showQr)qrUrl=await persistDocument(html,docNo);$('#printArea').innerHTML='<div class="doc-page">'+html+'</div>';
  if(qrUrl){const control=$('#printArea .doc-control');const img=document.createElement('img');img.src=localQr(qrUrl);img.className='document-qr';img.alt='QR เอกสาร '+docNo;control.prepend(img);}
@@ -56,7 +56,7 @@ function verifiedLoginDirectory(){try{return JSON.parse(localStorage.getItem('fr
 function bindCodeLogin(){const input=$('#loginEmployeeCode');if(!input)return;input.addEventListener('input',()=>{const code=input.value.trim(),known=code==='7716'?DB.settings.db.adminEmail:verifiedLoginDirectory()[code];$('#loginEmail').value=known||'';$('#loginEmailHint').textContent=known?'บัญชี '+known:'ระบบจะเลือกบัญชีหลังยืนยันรหัสผ่าน';});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginPassword').focus();}});}
 function rememberVerifiedLogin(){const u=me();if(!authIdentity||!u)return;const directory=verifiedLoginDirectory();directory[u.code]=u.email;localStorage.setItem('freshy_login_codes_v1',JSON.stringify(directory));}
 function attachSettingsFeatures(){
- if(isAdmin()&&authIdentity&&['email','system'].includes(settingTab)){const note=document.createElement('p');note.className='help-text';note.id='serverFeaturesStatus';$('#pageContent .panel-body')?.append(note);note.textContent='กำลังตรวจความพร้อมของเซิร์ฟเวอร์…';apiRequest('/api/config-status').then(s=>{if(!note.isConnected)return;note.textContent=s.documentStorage&&s.backgroundSchedule?'เซิร์ฟเวอร์พร้อมสำหรับ QR สำรองครบชุด และรายงานเบื้องหลัง':'เซิร์ฟเวอร์ยังต้องตั้งค่า '+(!s.documentStorage?'SUPABASE_SERVICE_ROLE_KEY ':'')+(!s.backgroundSchedule?'และ CRON_SECRET สำหรับงานอัตโนมัติ':'');}).catch(e=>{if(note.isConnected)note.textContent=e.message;});}
+ if(isAdmin()&&authIdentity&&['email','system'].includes(settingTab)){const note=document.createElement('p');note.className='help-text';note.id='serverFeaturesStatus';$('#pageContent .panel-body')?.append(note);note.textContent='กำลังตรวจความพร้อมของเซิร์ฟเวอร์…';apiRequest('/api/config-status').then(s=>{if(!note.isConnected)return;note.textContent=(s.documentStorage?'QR เอกสารพร้อมใช้งานผ่านฐานข้อมูลเดิม':'กำลังรออัปเดตส่วนเก็บเอกสาร QR')+' · '+(s.backgroundSchedule?'รายงานเบื้องหลังพร้อมใช้งาน':'รายงานขณะปิดเว็บยังรอการเชื่อมต่อฝั่งเซิร์ฟเวอร์');}).catch(e=>{if(note.isConnected)note.textContent=e.message;});}
  const file=$('#profileFile');if(file)file.onchange=async()=>{const selected=file.files[0];if(!selected)return;if(!['image/jpeg','image/png','image/webp'].includes(selected.type)||selected.size>5*1024*1024){toast('เลือกรูป JPG / PNG / WebP ไม่เกิน 5 MB','error');file.value='';return;}const save=$('#saveProfile');save.disabled=true;try{const image=await createImageBitmap(selected);const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,256,256);const size=Math.min(image.width,image.height);ctx.drawImage(image,(image.width-size)/2,(image.height-size)/2,size,size,0,0,256,256);image.close();$('#s_avatar').value=canvas.toDataURL('image/jpeg',.85);$('#profilePreview').src=$('#s_avatar').value;$('#profilePreview').hidden=false;}catch{toast('อ่านรูปไม่ได้ กรุณาเลือกรูปใหม่','error');}finally{save.disabled=false;}};
  if(settingTab==='system'){
   const panel=$('#pageContent .panel-body'),section=document.createElement('div');section.className='backup-settings';section.innerHTML='<h3>สำรองข้อมูลวันที่ 1 / 15 / 31</h3><p class="help-text">ทำงานบนเครื่องแอดมินเมื่อเปิดระบบ โดยใช้เวลาประเทศไทย หากพลาดรอบ ระบบจะทำรอบล่าสุดเมื่อเปิดใช้งานอีกครั้ง เดือนที่ไม่มีวันที่ 31 จะข้ามวันนั้น</p><label class="perm-item"><input id="autoBackupEnabled" type="checkbox" '+(DB.settings.backup?.enabled!==false?'checked':'')+'> เปิดการสำรองตามรอบ</label><div class="actions"><button id="chooseBackupFolder" class="btn btn-ghost">เลือกโฟลเดอร์สำรองในเครื่อง</button><button id="fullBackupNow" class="btn btn-primary">สำรองทั้งหมดตอนนี้</button></div><p id="backupStatus" class="help-text"></p>';panel.prepend(section);
@@ -473,12 +473,13 @@ function scopeRows(rows){if(isAdmin())return rows;const id=me().id;return rows.f
 /* ---------- email alerts (ส่งผ่าน /api/email ถ้าตั้งค่าไว้ มิฉะนั้นบันทึก log) ---------- */
 async function sendAlert(type,subject,bodyHtml,toOverride){
  const em=DB.settings.email;const alertKey={undo:'undoRequest'}[type]||type;if(type!=='report'&&em.alerts?.[alertKey]===false)return false;
- if(!em.enabled)return false;
+ if(!em.enabled){if(type==='report')toast('ยังไม่เปิดการส่งอีเมล กรุณาเปิดใช้งานในหน้าตั้งค่าอีเมลครั้งแรก','error');return false;}
  const entry={id:uid(),createdBy:(me()||{}).id||'demo',ts:new Date().toISOString(),type,to:toOverride||em.adminEmail||'',subject,body:bodyHtml,status:em.enabled&&em.adminEmail?'กำลังส่ง':'ร่าง (ยังไม่เปิดอีเมล)'};
  DB.sentEmails.unshift(entry);dbSave();
- if(!em.enabled||!entry.to)return false;
- if(!authIdentity){entry.status='ไม่ได้ส่ง — ต้องเข้าสู่ระบบออนไลน์';dbSave();return false;}
+ if(!em.enabled||!entry.to){if(type==='report')toast('กรุณาระบุอีเมลผู้รับรายงาน','error');return false;}
+ if(!authIdentity){entry.status='ไม่ได้ส่ง — ต้องเข้าสู่ระบบออนไลน์';dbSave();if(type==='report')toast('กรุณาเข้าสู่ระบบออนไลน์ก่อนส่งรายงาน','error');return false;}
  try{
+  if(!(await flushOnline()))throw Error('ค่าตั้งค่าหรือข้อมูลรายงานยังบันทึกออนไลน์ไม่สำเร็จ กรุณาซิงก์แล้วลองส่งอีกครั้ง');
   const {data,error}=await authFor(supaCfg()).auth.getSession();if(error||!data.session)throw Error('เซสชันหมดอายุ');
   const r=await fetch('/api/email',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({type,to:entry.to,subject,html:bodyHtml,project:supaCfg()}),signal:AbortSignal.timeout(25000)});
   const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'HTTP '+r.status);
@@ -1182,8 +1183,8 @@ function renderSettings(){
     <label class="perm-item full"><input type="checkbox" id="em_en" ${s.email.enabled?'checked':''}> เปิดใช้งานการส่งอีเมลแจ้งเตือน</label>
     <div class="field full"><label>อีเมลแอดมินสำหรับรับการแจ้งเตือน</label><input id="em_to" value="${esc(s.email.adminEmail)}"></div>
     <div class="field"><label>ผู้ให้บริการ</label><select id="em_prov" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="gmail" ${s.email.provider==='gmail'?'selected':''}>Google Gmail (App Password)</option><option value="resend" ${s.email.provider==='resend'?'selected':''}>Resend API</option><option value="smtp" ${s.email.provider==='smtp'?'selected':''}>SMTP</option></select></div>
-    <div class="field"><label>Gmail App Password / API Key</label><input type="password" id="em_key" value="${esc(s.email.provider==='gmail'?(s.email.smtpPass||''):s.email.apiKey||'')}"></div>
-    <div class="field full"><label>อีเมลผู้ส่ง (Gmail ที่ออก App Password)</label><input id="em_from" value="${esc(s.email.fromEmail||'')}"></div><div class="field"><label>SMTP Host (ตั้งค่าที่เซิร์ฟเวอร์)</label><input id="em_host" value="${esc(s.email.smtpHost)}"></div>
+    <div class="field"><label>รหัสส่งอีเมล (Gmail App Password / SMTP Password / API Key)</label><input type="password" id="em_key" value="${esc(['gmail','smtp'].includes(s.email.provider)?(s.email.smtpPass||s.email.apiKey||''):s.email.apiKey||'')}"></div>
+    <div class="field full"><label>อีเมลผู้ส่ง (Gmail ที่ออก App Password)</label><input id="em_from" value="${esc(s.email.fromEmail||'')}"></div><div class="field"><label>SMTP Host (ใช้เมื่อเลือก SMTP)</label><input id="em_host" value="${esc(s.email.smtpHost)}"></div>
     <div class="field"><label>SMTP Port</label><input id="em_port" value="${esc(s.email.smtpPort)}"></div>
     <div class="field"><label>SMTP User</label><input id="em_user" value="${esc(s.email.smtpUser)}"></div>
     <div class="field full"><label>เวลาส่งรายงาน (เวลาประเทศไทย คั่นด้วยจุลภาค)</label><input id="em_times" value="${esc((s.email.reportTimes||['08:00','18:00']).join(','))}" placeholder="08:00,18:00"><label class="perm-item"><input type="checkbox" id="em_reports" ${s.email.reportsEnabled?'checked':''}> เปิดรายงานตามเวลา</label><p class="help-text">Gmail ใช้ App Password ของบัญชีที่เปิดการยืนยัน 2 ขั้นตอน ไม่ต้องใช้ API Key · การส่งขณะปิดระบบต้องตั้งค่าเซิร์ฟเวอร์งานอัตโนมัติ</p></div><div class="field full" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1213,8 +1214,8 @@ function renderSettings(){
       <input type="file" id="restoreFile" accept="application/json" style="display:none">
       <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> ล้างเฉพาะข้อมูลจำลอง</button>
     </div>
-    <div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.length} รายการ)</h4>
-    ${DB.sentEmails.slice(0,5).map(e=>'<div class="audit-item"><span class="ts">'+thDateTime(e.ts)+'</span><span><b>'+esc(e.subject)+'</b> — '+esc(e.status)+'</span></div>').join('')||'<span style="color:var(--muted);font-size:12.5px">ยังไม่มี</span>'}</div>
+    <div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.filter(e=>e.type!=='document').length} รายการ)</h4>
+    ${DB.sentEmails.filter(e=>e.type!=='document').slice(0,5).map(e=>'<div class="audit-item"><span class="ts">'+thDateTime(e.ts)+'</span><span><b>'+esc(e.subject)+'</b> — '+esc(e.status)+'</span></div>').join('')||'<span style="color:var(--muted);font-size:12.5px">ยังไม่มี</span>'}</div>
   </div></div>`;
   $('#pageContent').innerHTML='<div class="page-head"><h2>การตั้งค่าระบบ</h2><span class="desc">แยกเป็นหมวดหมู่ชัดเจน ไม่ต้องแก้ไขโค้ด</span></div><div class="tabs">'+tabsHtml+'</div>'+body;
   $('#pageContent').querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{settingTab=t.dataset.t;renderSettings();}));
@@ -1260,7 +1261,7 @@ function renderSettings(){
   bind('#addVillage',()=>{const name=$('#v_name').value.trim();if(!name)return;if(DB.villages.some(v=>v.name===name)){toast('ชื่อหมู่บ้านนี้มีอยู่แล้ว','error');return;}const code=$('#v_code_new').value.trim()||FreshyFeatures.villageCode(DB.villages,name);if(DB.villages.some(v=>FreshyFeatures.villageCode(DB.villages,v.name).toLowerCase()===code.toLowerCase())){toast('รหัสหมู่บ้านซ้ำ','error');return;}dbAdd('villages',{name,code});toast('เพิ่มหมู่บ้านแล้ว','success');renderSettings();});
   bind('#saveVillageCodes',async()=>{const fields=[...document.querySelectorAll('.v_code')],codes=fields.map(f=>f.value.trim());if(codes.some(x=>!x)||new Set(codes.map(x=>x.toLowerCase())).size!==codes.length){toast('รหัสหมู่บ้านต้องไม่ว่างและไม่ซ้ำ','error');return;}fields.forEach((f,i)=>dbUpdate('villages',f.dataset.id,{code:codes[i]}));toast(authIdentity?(await flushOnline()?'บันทึกรหัสหมู่บ้านออนไลน์แล้ว':'รหัสหมู่บ้านยังรอส่ง'):'บันทึกรหัสหมู่บ้านสาธิตแล้ว','info');});
   $('#pageContent').querySelectorAll('.delV').forEach(b=>b.addEventListener('click',()=>{dbRemove('villages',b.dataset.id);renderSettings();}));
-  bind('#saveEmail',async()=>{try{const provider=$('#em_prov').value;const reportTimes=FreshyFeatures.scheduleTimes($('#em_times').value);Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value.trim(),provider,fromEmail:$('#em_from').value.trim(),smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value.trim(),reportTimes,reportsEnabled:$('#em_reports').checked,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked,newcustomer:$('#al_new').checked,profile:$('#al_profile').checked,payment:$('#al_payment').checked,cash:$('#al_cash').checked}});s.email[provider==='gmail'?'smtpPass':'apiKey']=$('#em_key').value.trim().replace(provider==='gmail'?/\s/g:/$^/g,'');dbSave();toast(authIdentity?(await flushOnline()?'บันทึกการตั้งค่าลงฐานข้อมูลแล้ว':'ค่าตั้งค่ายังรอส่ง โปรดตรวจสถานะฐานข้อมูล'):'บันทึกในโหมดสาธิตแล้ว',authIdentity&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length?'info':'success');}catch(e){toast(e.message,'error');}});
+  bind('#saveEmail',async()=>{try{const provider=$('#em_prov').value;const reportTimes=FreshyFeatures.scheduleTimes($('#em_times').value);Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value.trim(),provider,fromEmail:$('#em_from').value.trim(),smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value.trim(),reportTimes,reportsEnabled:$('#em_reports').checked,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked,newcustomer:$('#al_new').checked,profile:$('#al_profile').checked,payment:$('#al_payment').checked,cash:$('#al_cash').checked}});s.email[['gmail','smtp'].includes(provider)?'smtpPass':'apiKey']=$('#em_key').value.trim().replace(provider==='gmail'?/\s/g:/$^/g,'');dbSave();toast(authIdentity?(await flushOnline()?'บันทึกการตั้งค่าลงฐานข้อมูลแล้ว':'ค่าตั้งค่ายังรอส่ง โปรดตรวจสถานะฐานข้อมูล'):'บันทึกในโหมดสาธิตแล้ว',authIdentity&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length?'info':'success');}catch(e){toast(e.message,'error');}});
   bind('#backupBtn',()=>{
     const all=[...document.querySelectorAll('.bk')].find(c=>c.dataset.col==='all').checked;
     const data={};
@@ -1327,17 +1328,17 @@ function buildDebtorReportHtml(area,filter,mode,customerId){
   const groups={};rows.forEach(d=>{(groups[d.customerId]=groups[d.customerId]||[]).push(d);});
   const docNo=nextDocNo(DB.settings.docPrefix.debtor);
   let body=docHeader('รายงานลูกหนี้ค้างชำระ '+(area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ')+(filter&&filter!=='all'?' ('+(area==='nai'?'หมู่ที่ '+filter:filter)+')':''),docNo);
-  let reportIndex=0;
   const renderGroup=(list,title)=>{
     const customerIds=Object.keys(list);if(!customerIds.length)return '';
     let h=title?'<div class="doc-section-title">'+esc(title)+'</div>':'';
-    h+='<table class="doc-table debtor-report-table"><colgroup><col style="width:5%"><col style="width:22%"><col style="width:12%"><col style="width:12%"><col style="width:5%"><col style="width:5%"><col style="width:13%"><col style="width:13%"><col style="width:13%"></colgroup><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th>'+(area==='nai'?'หมู่ที่':'หมู่บ้าน')+'</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม</th></tr></thead><tbody>';
     for(const cid of customerIds){
       const dl=[...list[cid]].sort((a,b)=>a.debtDate.localeCompare(b.debtDate));
-      for(const d of dl){h+=`<tr><td>${++reportIndex}</td><td class="l">${esc(d.customerName)}</td><td class="l">${esc(area==='nai'?d.moo:d.village||'-')}</td><td>${thDate(d.debtDate)}</td><td>${d.jugs||0}</td><td>${d.packs||0}</td><td class="r">${fmtN(d.jugAmount)}</td><td class="r">${fmtN(d.packAmount)}</td><td class="r">${fmtN(d.total)}</td></tr>`;}
-      if(dl.length>1){const sum=key=>dl.reduce((n,d)=>n+Number(d[key]||0),0);h+=`<tr class="doc-customer-total"><td></td><td colspan="3" class="l">รวม ${esc(dl[0].customerName)}</td><td>${sum('jugs')}</td><td>${sum('packs')}</td><td class="r">${fmtN(sum('jugAmount'))}</td><td class="r">${fmtN(sum('packAmount'))}</td><td class="r">${fmtN(sum('total'))}</td></tr>`;}
+      const customer=DB.customers.find(c=>c.id===cid)||{},first=dl[0],village=area==='nai'?'บ้านนาไฮ · หมู่ที่ '+first.moo:(first.village||'-');
+      h+=`<section class="doc-customer-block"><table class="doc-table debtor-report-table"><caption>ลูกหนี้: ${esc(first.customerName)}${customer.code?' · รหัส '+esc(customer.code):''} · ${esc(village)}</caption><colgroup><col style="width:7%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:20%"></colgroup><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>`;
+      dl.forEach((d,i)=>{h+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td>${d.jugs||0}</td><td>${d.packs||0}</td><td class="r">${fmtN(d.jugAmount)}</td><td class="r">${fmtN(d.packAmount)}</td><td class="r">${fmtN(d.total)}</td></tr>`;});
+      const sum=key=>dl.reduce((n,d)=>n+Number(d[key]||0),0);h+=`<tr class="doc-customer-total"><td colspan="2" class="l">รวม ${esc(first.customerName)}</td><td>${sum('jugs')}</td><td>${sum('packs')}</td><td class="r">${fmtN(sum('jugAmount'))}</td><td class="r">${fmtN(sum('packAmount'))}</td><td class="r">${fmtN(sum('total'))}</td></tr></tbody></table></section>`;
     }
-    return h+'</tbody></table>';
+    return h;
   };
   if(mode==='split'&&area==='nai'){
     const g7={},g16={};Object.keys(groups).forEach(cid=>{const m=groups[cid][0].moo==='7'?g7:g16;m[cid]=groups[cid];});
@@ -1355,13 +1356,13 @@ function openPrintOptions(area){
   <div class="modal-body">
     <div class="field"><label>รูปแบบการปริ้น</label><select id="po_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="combined">ปริ้นรวม (ทุกหมู่ในรายงานเดียว)</option><option value="split">ปริ้นแยก (แยกตามหมู่/หมู่บ้าน)</option></select></div>
     <div class="field"><label>กรองข้อมูล</label><select id="po_filter" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="all">ทั้งหมด</option>${area==='nai'?'<option value="7">เฉพาะหมู่ที่ 7</option><option value="16">เฉพาะหมู่ที่ 16</option>':DB.villages.map(v=>'<option value="'+esc(v.name)+'">'+esc(v.name)+'</option>').join('')}</select></div>
-    <label class="perm-item"><input type="checkbox" id="po_qr"> แสดง QR เอกสารตรงมุมบนขวา</label><p style="font-size:12px;color:var(--muted)">ระบบจะเปิดหน้าพิมพ์ A4 ให้เลือกบันทึกเป็น PDF หรือส่งไปเครื่องพิมพ์ เลขที่เอกสารไม่ซ้ำกันอัตโนมัติ</p>
+    <label class="perm-item"><input type="checkbox" id="po_qr" checked> แสดง QR เอกสารตรงมุมบนขวา</label><p style="font-size:12px;color:var(--muted)">ระบบจะเปิดหน้าพิมพ์ A4 ให้เลือกบันทึกเป็น PDF หรือส่งไปเครื่องพิมพ์ เลขที่เอกสารไม่ซ้ำกันอัตโนมัติ</p>
   </div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="doPrint"><i data-lucide="printer"></i> ปริ้น / ส่งออก PDF</button></div>`);
   $('#doPrint').addEventListener('click',()=>{const r=buildDebtorReportHtml(area,$('#po_filter').value,$('#po_mode').value),showQr=$('#po_qr').checked;preparePrint(r.html,r.docNo,showQr);});
 }
-function printCashReport(date){
-  const rows=DB.cashsales.filter(r=>r.deliveryDate===date);
+function buildCashReportHtml(date){
+  const rows=scopeRows(DB.cashsales).filter(r=>!date||r.deliveryDate===date);
   const docNo=nextDocNo(DB.settings.docPrefix.cash);
   let body=docHeader('รายงานการส่งน้ำยอดเงินลูกค้าจ่ายสด วันที่ '+thDate(date),docNo);
   body+='<table class="doc-table"><thead><tr><th>ลำดับ</th><th>รหัส</th><th>ชื่อลูกค้า</th><th>หมู่บ้าน</th><th>หมู่ที่</th><th>ถัง</th><th>แพ็ค</th><th>เงินถัง</th><th>เงินแพ็ค</th><th>รวม</th></tr></thead><tbody>';
@@ -1375,24 +1376,28 @@ function printCashReport(date){
     <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ส่งน้ำ</div></div>
     <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ / หัวหน้า</div></div>
   </div><div class="doc-foot">เลขที่เอกสาร ${docNo} ออกเอกสารโดยระบบจัดการลูกหนี้โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>`;
-  preparePrint(body,docNo);
+  return {html:body,docNo};
 }
+function printCashReport(date){const r=buildCashReportHtml(date);preparePrint(r.html,r.docNo);}
 function openEmailReport(kind){
   openModal(`<div class="modal-head"><h3><i data-lucide="mail"></i> ส่งรายงานทางอีเมล</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
   <div class="modal-body"><div class="form-grid">
-    <div class="field full"><label>อีเมลผู้รับ (คั่นด้วยเครื่องหมายจุลภาค)</label><input id="er_to" value="${esc(DB.settings.email.adminEmail||'')}"></div>
+    <div class="field full"><label>อีเมลผู้รับ / กลุ่มผู้รับ (คั่นด้วยจุลภาค อัฒภาค หรือขึ้นบรรทัดใหม่)</label><textarea id="er_to" rows="3">${esc(DB.settings.email.adminEmail||'')}</textarea></div>
     <div class="field full"><label>รูปแบบอีเมล</label><select id="er_fmt" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="simple">แบบเรียบง่าย</option><option value="formal">แบบเป็นทางการ</option></select></div>
-    <p style="font-size:12px;color:var(--muted);grid-column:1/-1">ระบบจะแนบรายงานเป็น HTML ในอีเมล ต้องตั้งค่าผู้ให้บริการอีเมลในหน้าการตั้งค่าก่อน</p>
+    <p style="font-size:12px;color:var(--muted);grid-column:1/-1">ส่งรายละเอียดรายงานในเนื้อหาอีเมลโดยใช้บัญชีผู้ส่งที่บันทึกไว้ รองรับผู้รับสูงสุด 10 อีเมล</p>${!DB.settings.email.enabled?'<div class="field full"><p>ยังไม่ได้เปิดใช้งานบัญชีผู้ส่ง กรุณาตั้งค่าครั้งแรกก่อนส่งรายงาน</p>'+(isAdmin()?'<button class="btn btn-ghost" id="setupReportEmail">ตั้งค่าบัญชีผู้ส่ง</button>':'<p>ให้ผู้ดูแลระบบบันทึกบัญชีผู้ส่งครั้งแรก</p>')+'</div>':''}<p id="emailReportStatus" role="status" class="help-text full"></p>
   </div></div>
-  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-gold" id="doSendEmail"><i data-lucide="send"></i> ส่งรายงาน</button></div>`);
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-gold" id="doSendEmail" ${!DB.settings.email.enabled?'disabled':''}><i data-lucide="send"></i> ส่งรายงาน</button></div>`);
+  if($('#setupReportEmail'))$('#setupReportEmail').onclick=()=>{closeModal();settingTab='email';navigate('settings');};
   $('#doSendEmail').addEventListener('click',async()=>{
     const to=$('#er_to').value.trim();if(!to){toast('กรุณากรอกอีเมลผู้รับ','error');return;}
+    const button=$('#doSendEmail'),status=$('#emailReportStatus');button.disabled=true;button.textContent='กำลังส่งรายงาน…';status.textContent='กำลังบันทึกข้อมูลและส่งรายงานไปยังผู้รับ';try{
     let r;
-    if(kind==='cash')r={html:'(รายงานลูกค้าจ่ายสด)',docNo:nextDocNo(DB.settings.docPrefix.cash)};
+    if(kind==='cash')r=buildCashReportHtml(cashDateFilter);
     else if(kind&&kind.startsWith('customers-'))r=buildCustomerReportHtml(kind.split('-')[1]);
     else r=buildDebtorReportHtml(kind==='nai'?'nai':'other','all','combined');
     const sent=await sendAlert('report','[รายงาน] '+ (kind==='cash'?'รายงานลูกค้าจ่ายสด':'รายงานลูกหนี้') +' เลขที่ '+r.docNo, ( $('#er_fmt').value==='formal'?'<p>เรียน ผู้เกี่ยวข้อง</p><p>ทางโรงน้ำดื่ม เฟรชชี่ วอเตอร์ ขอส่งรายงานฉบับนี้ให้เพื่อทราบ</p><hr>':'<p>ส่งรายงานให้ครับ</p>') + r.html,to);
-    if(sent){closeModal();toast('ผู้ให้บริการรับรายงานแล้ว','success');}
+    if(sent){closeModal();toast('ผู้ให้บริการรับรายงานแล้ว','success');}else if(status.isConnected){status.textContent=DB.sentEmails[0]?.status||'ยังไม่ส่งรายงาน กรุณาตรวจบัญชีผู้ส่งในหน้าตั้งค่าอีเมล';}
+    }catch(e){if(status.isConnected)status.textContent=e.message;toast(e.message,'error');}finally{if(button.isConnected){button.disabled=false;button.innerHTML='<i data-lucide="send"></i> ส่งรายงาน';if(window.lucide)lucide.createIcons();}}
   });
 }
 
@@ -1425,6 +1430,7 @@ async function doLogin(){
 function enterApp(){
   const qrCustomer=new URLSearchParams(location.search).get('qr');
   if(qrCustomer){renderPublicQrReport(qrCustomer);return;}
+  const documentId=new URLSearchParams(location.search).get('document');if(/^[a-f0-9]{64}$/.test(documentId||'')){location.replace('/document?id='+documentId+'&access=private');return;}
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
   if(authIdentity)startRealtime();
