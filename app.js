@@ -6,13 +6,88 @@
 (function(){
 'use strict';
 
+/* New workflows deliberately keep the original database and pending queue. */
+let adminScheduleTimer=null,backupBusy=false,backupFolder=null,backupFolderLoaded=false,lastScheduledAttempt=0;
+function localQr(url){const qr=qrcode(0,'M');qr.addData(url);qr.make();return 'data:image/svg+xml;base64,'+btoa(qr.createSvgTag({cellSize:3,margin:12,scalable:true}));}
+async function apiRequest(path,options={}){
+ if(!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');const {data,error}=await authFor(supaCfg()).auth.getSession();if(error||!data.session)throw Error('เซสชันหมดอายุ');
+ const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token,...options.headers},signal:AbortSignal.timeout(28000)});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'ดำเนินการไม่สำเร็จ');return j;
+}
+async function persistDocument(html,docNo){
+ if(authIdentity&&!(await flushOnline()))throw Error('ยังมีข้อมูลรอส่ง กรุณาซิงก์ให้สำเร็จก่อนออก QR');
+ const snapshot=FreshyFeatures.documentSnapshot(html,docNo,DB.settings.business,me(),document);const result=await apiRequest('/api/document',{method:'POST',body:JSON.stringify({snapshot})});
+ return location.origin+'/document?id='+result.id;
+}
+async function preparePrint(html,docNo,showQr){
+ if(showQr===undefined){openModal('<div class="modal-head"><h3>ตัวเลือกเอกสาร A4</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>เอกสารพื้นขาว ตัวอักษรดำ พร้อมเลขอ้างอิงและช่องลงนาม</p><label class="perm-item"><input id="printDocumentQr" type="checkbox"> แสดง QR เอกสารตรงมุมบนขวา</label><p class="help-text">ผู้ที่สแกน QR จะเห็นเฉพาะข้อมูลในเอกสารฉบับนี้ โดยไม่ต้องล็อกอิน</p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button id="confirmDocumentPrint" class="btn btn-primary">พิมพ์ / บันทึก PDF</button></div>');$('#confirmDocumentPrint').onclick=()=>preparePrint(html,docNo,$('#printDocumentQr').checked);return;}
+ const button=$('#confirmDocumentPrint')||$('#doPrint');if(button){button.disabled=true;button.textContent='กำลังเตรียมเอกสาร…';}
+ try{let qrUrl;if(showQr)qrUrl=await persistDocument(html,docNo);$('#printArea').innerHTML='<div class="doc-page">'+html+'</div>';
+ if(qrUrl){const control=$('#printArea .doc-control');const img=document.createElement('img');img.src=localQr(qrUrl);img.className='document-qr';img.alt='QR เอกสาร '+docNo;control.prepend(img);}
+ closeModal();if(document.fonts)await document.fonts.ready;await Promise.all([...$('#printArea').querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));window.print();
+ }catch(e){if(button&&button.isConnected){button.disabled=false;button.textContent='ลองเตรียมเอกสารอีกครั้ง';}toast(e.message,'error');}
+}
+function askContinueDebtor(area){
+ openModal('<div class="modal-head"><h3>บันทึกเรียบร้อยแล้ว</h3></div><div class="modal-body"><p>ต้องการเพิ่มรายการลูกหนี้ต่ออีกหรือไม่?</p><p class="help-text">Enter = เพิ่มต่อ · Backspace / Delete = เสร็จสิ้น</p></div><div class="modal-foot"><button class="btn btn-ghost" id="finishDebtorEntry">ยกเลิก / เสร็จสิ้น</button><button class="btn btn-primary" id="continueDebtorEntry">ยืนยันเพิ่มต่อ</button></div>');
+ const box=$('#modalBox');const finish=()=>{closeModal();$('#addDebtorBtn')?.focus();};$('#finishDebtorEntry').onclick=finish;$('#continueDebtorEntry').onclick=()=>openAddDebtor(area);
+ box.tabIndex=-1;box.focus();box.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();openAddDebtor(area);}else if(['Backspace','Delete','Escape'].includes(e.key)){e.preventDefault();e.stopPropagation();finish();}};
+}
+async function ensureVillage(name){
+ const found=DB.villages.find(v=>v.name.trim()===name);if(found)return {...found,code:FreshyFeatures.villageCode(DB.villages,name)};
+ if(isAdmin()||!authIdentity){const row=dbAdd('villages',{name,code:FreshyFeatures.villageCode(DB.villages,name),createdBy:me().id});if(authIdentity&&!(await flushOnline()))throw Error('รหัสหมู่บ้านยังรอส่ง กรุณาตรวจฐานข้อมูลก่อนบันทึกลูกหนี้');return row;}
+ const result=await apiRequest('/api/village',{method:'POST',body:JSON.stringify({name})});await supabaseFetch();return result.village;
+}
+function attachCsv(){
+ const pages=['debtorsNai','debtorsOther','customersNai','customersOther','paymentsNai','paymentsOther','cashsales'];if(!pages.includes(currentPage)||$('#exportCsv'))return;
+ const target=$('#pageContent .actions')||$('#pageContent .page-head');if(!target)return;const button=document.createElement('button');button.id='exportCsv';button.className='btn btn-ghost btn-sm csv-btn';button.textContent='ส่งออก CSV';target.append(button);
+ button.onclick=()=>{const area=currentPage.endsWith('Nai')?'nai':'other';let headers,rows;
+ if(currentPage.startsWith('customers')){let data=DB.customers.filter(x=>x.area===area);const query=custSearch[area]||'';if(query)data=data.filter(x=>x.name.includes(query)||String(x.code||'').toLowerCase().includes(query.toLowerCase()));if(custCredit[area]!=='all')data=data.filter(x=>creditStatus(x.id).txt===custCredit[area]);headers=['รหัสลูกค้า','ชื่อลูกค้า','หมู่ที่','หมู่บ้าน','รหัสหมู่บ้าน','ที่อยู่','วันที่บันทึก'];rows=data.map(x=>[x.code,x.name,x.moo,x.village,x.villageCode,x.address,x.createdAt]);}
+ else if(currentPage==='cashsales'){const data=scopeRows(DB.cashsales).filter(x=>x.deliveryDate===cashDateFilter);headers=['รหัสลูกค้า','ชื่อลูกค้า','วันที่ส่ง','หมู่ที่','หมู่บ้าน','ถัง','แพ็ค','เงินถัง','เงินแพ็ค','ยอดรวม'];rows=data.map(x=>[x.customerCode,x.customerName,x.deliveryDate,x.moo,x.village,x.jugs,x.packs,x.jugAmount,x.packAmount,Number(x.jugAmount||0)+Number(x.packAmount||0)]);}
+ else{const paid=currentPage.startsWith('payments');let data=scopeRows(DB.debtors).filter(x=>x.area===area&&x.status===(paid?'paid':'unpaid'));const query=paid?paySearch:debtorSearch;if(query)data=data.filter(x=>x.customerName.includes(query));if(!paid&&debtorFilter[area]!=='all')data=data.filter(x=>String(area==='nai'?x.moo:x.village)===debtorFilter[area]);const customers=new Map(DB.customers.map(x=>[x.id,x]));headers=['รหัสลูกค้า','ชื่อลูกหนี้','วันที่ค้าง','หมู่ที่','หมู่บ้าน','รหัสหมู่บ้าน','ถัง','แพ็ค','เงินถัง','เงินแพ็ค','ยอดรวม','สถานะ','วันที่รับชำระ'];rows=data.map(x=>[customers.get(x.customerId)?.code||'',x.customerName,x.debtDate,x.moo,x.village,x.villageCode,x.jugs,x.packs,x.jugAmount,x.packAmount,x.total,paid?'รับชำระแล้ว':'ค้างชำระ',x.paidAt||'']);}
+ const blob=new Blob([FreshyFeatures.csv(headers,rows)],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='freshy-'+currentPage+'-'+todayStr()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('เริ่มดาวน์โหลด CSV '+rows.length+' รายการ','info');};
+}
+async function loginByCode(){
+ const code=$('#loginEmployeeCode').value.trim(),password=$('#loginPassword').value,email=$('#loginEmail').value.trim();if(!password)throw Error('กรุณากรอกรหัสผ่าน');
+ if(email){await startOnline(email,password);return;}if(!code)throw Error('กรุณากรอกรหัสพนักงาน');
+ const known=code==='7716'?DB.settings.db.adminEmail:verifiedLoginDirectory()[code];if(known){try{await startOnline(known,password);$('#loginEmail').value=known;return;}catch(e){if(!/Invalid login credentials/i.test(e.message))throw e;}}
+ const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,password}),signal:AbortSignal.timeout(25000)}),j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'เข้าสู่ระบบไม่สำเร็จ');
+ const {error}=await authFor(supaCfg()).auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});if(error)throw error;$('#loginEmail').value=j.email||'';await resumeOnline();
+}
+function verifiedLoginDirectory(){try{return JSON.parse(localStorage.getItem('freshy_login_codes_v1')||'{}');}catch{return {};}}
+function bindCodeLogin(){const input=$('#loginEmployeeCode');if(!input)return;input.addEventListener('input',()=>{const code=input.value.trim(),known=code==='7716'?DB.settings.db.adminEmail:verifiedLoginDirectory()[code];$('#loginEmail').value=known||'';$('#loginEmailHint').textContent=known?'บัญชี '+known:'ระบบจะเลือกบัญชีหลังยืนยันรหัสผ่าน';});input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginPassword').focus();}});}
+function rememberVerifiedLogin(){const u=me();if(!authIdentity||!u)return;const directory=verifiedLoginDirectory();directory[u.code]=u.email;localStorage.setItem('freshy_login_codes_v1',JSON.stringify(directory));}
+function attachSettingsFeatures(){
+ if(isAdmin()&&authIdentity&&['email','system'].includes(settingTab)){const note=document.createElement('p');note.className='help-text';note.id='serverFeaturesStatus';$('#pageContent .panel-body')?.append(note);note.textContent='กำลังตรวจความพร้อมของเซิร์ฟเวอร์…';apiRequest('/api/config-status').then(s=>{if(!note.isConnected)return;note.textContent=s.documentStorage&&s.backgroundSchedule?'เซิร์ฟเวอร์พร้อมสำหรับ QR สำรองครบชุด และรายงานเบื้องหลัง':'เซิร์ฟเวอร์ยังต้องตั้งค่า '+(!s.documentStorage?'SUPABASE_SERVICE_ROLE_KEY ':'')+(!s.backgroundSchedule?'และ CRON_SECRET สำหรับงานอัตโนมัติ':'');}).catch(e=>{if(note.isConnected)note.textContent=e.message;});}
+ const file=$('#profileFile');if(file)file.onchange=async()=>{const selected=file.files[0];if(!selected)return;if(!['image/jpeg','image/png','image/webp'].includes(selected.type)||selected.size>5*1024*1024){toast('เลือกรูป JPG / PNG / WebP ไม่เกิน 5 MB','error');file.value='';return;}const save=$('#saveProfile');save.disabled=true;try{const image=await createImageBitmap(selected);const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,256,256);const size=Math.min(image.width,image.height);ctx.drawImage(image,(image.width-size)/2,(image.height-size)/2,size,size,0,0,256,256);image.close();$('#s_avatar').value=canvas.toDataURL('image/jpeg',.85);$('#profilePreview').src=$('#s_avatar').value;$('#profilePreview').hidden=false;}catch{toast('อ่านรูปไม่ได้ กรุณาเลือกรูปใหม่','error');}finally{save.disabled=false;}};
+ if(settingTab==='system'){
+  const panel=$('#pageContent .panel-body'),section=document.createElement('div');section.className='backup-settings';section.innerHTML='<h3>สำรองข้อมูลวันที่ 1 / 15 / 31</h3><p class="help-text">ทำงานบนเครื่องแอดมินเมื่อเปิดระบบ โดยใช้เวลาประเทศไทย หากพลาดรอบ ระบบจะทำรอบล่าสุดเมื่อเปิดใช้งานอีกครั้ง เดือนที่ไม่มีวันที่ 31 จะข้ามวันนั้น</p><label class="perm-item"><input id="autoBackupEnabled" type="checkbox" '+(DB.settings.backup?.enabled!==false?'checked':'')+'> เปิดการสำรองตามรอบ</label><div class="actions"><button id="chooseBackupFolder" class="btn btn-ghost">เลือกโฟลเดอร์สำรองในเครื่อง</button><button id="fullBackupNow" class="btn btn-primary">สำรองทั้งหมดตอนนี้</button></div><p id="backupStatus" class="help-text"></p>';panel.prepend(section);
+  $('#autoBackupEnabled').onchange=()=>{DB.settings.backup={...(DB.settings.backup||{}),enabled:$('#autoBackupEnabled').checked,days:[1,15,31]};dbSave();};$('#chooseBackupFolder').onclick=async()=>{if(!window.showDirectoryPicker){toast('เบราว์เซอร์นี้ใช้โฟลเดอร์ดาวน์โหลดตามปกติ','info');return;}try{backupFolder=await window.showDirectoryPicker({id:'freshy-backups',mode:'readwrite'});await folderStore('write',backupFolder);$('#backupStatus').textContent='เลือกโฟลเดอร์แล้ว: '+backupFolder.name;toast('เลือกโฟลเดอร์สำรองแล้ว','success');}catch(e){if(e.name!=='AbortError')toast('เลือกโฟลเดอร์ไม่สำเร็จ','error');}};$('#fullBackupNow').onclick=()=>performBackup(true);
+ }
+}
+function folderStore(action,value){return new Promise((resolve,reject)=>{const request=indexedDB.open('freshy-backup-preferences',1);request.onupgradeneeded=()=>request.result.createObjectStore('preferences');request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('preferences',action==='write'?'readwrite':'readonly'),store=tx.objectStore('preferences'),result=action==='write'?store.put(value,'folder'):store.get('folder');result.onsuccess=()=>resolve(result.result);result.onerror=()=>reject(result.error);tx.oncomplete=()=>db.close();};});}
+async function performBackup(manual=false){
+ if(backupBusy||!isAdmin()||!authIdentity)return;const due=FreshyFeatures.latestBackupDate(),key='freshy_backup_'+authIdentity.id+'_'+supaCfg().url+'_'+due;
+ if(!manual&&localStorage.getItem(key))return;backupBusy=true;
+ try{if(!(await flushOnline())||!(await supabaseFetch()))throw Error('ยังมีข้อมูลรอส่ง ไม่สามารถยืนยันสำรองฐานข้อมูลล่าสุดได้');
+ let snapshot={schema:2,exportedAt:new Date().toISOString(),data:FreshySync.clone(FreshySync.shared(DB)),rows:[]};try{let cursor=0;do{const page=await apiRequest('/api/backup?cursor='+cursor);snapshot.rows.push(...page.rows);cursor=page.nextCursor;}while(cursor!==null);}catch(e){snapshot.scope='ข้อมูลหลัก และเอกสาร QR ที่อ่านได้ก่อนเกิดข้อผิดพลาด';snapshot.warning=e.message;toast('สำรองข้อมูลหลักได้ แต่เอกสาร QR ยังอ่านไม่ครบ โปรดตรวจการตั้งค่าเซิร์ฟเวอร์','info');}
+ snapshot.backupPeriod=due;snapshot.pending=FreshySync.diff(remoteBase,FreshySync.shared(DB));const text=JSON.stringify(snapshot,null,2),filename='freshy-full-backup-'+due+'-'+Date.now()+'.json';
+ if(!backupFolderLoaded){backupFolderLoaded=true;try{backupFolder=await folderStore('read');}catch{}}
+ let verified=false;if(backupFolder){let permission=await backupFolder.queryPermission({mode:'readwrite'});if(permission!=='granted'&&manual)permission=await backupFolder.requestPermission({mode:'readwrite'});if(permission==='granted'){const handle=await backupFolder.getFileHandle(filename,{create:true}),stream=await handle.createWritable();await stream.write(text);await stream.close();const file=await handle.getFile();if(await file.text()!==text)throw Error('ตรวจสอบไฟล์สำรองไม่สำเร็จ');verified=true;}}
+ if(!verified){const blob=new Blob([text],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1500);}
+ localStorage.setItem(key,JSON.stringify({time:new Date().toISOString(),verified,complete:!snapshot.warning}));const message=verified?'บันทึกไฟล์สำรองและตรวจอ่านไฟล์แล้ว':'เริ่มดาวน์โหลดสำรองแล้ว โปรดตรวจไฟล์ในโฟลเดอร์ดาวน์โหลด';if($('#backupStatus'))$('#backupStatus').textContent=message;toast(message,'info');
+ }catch(e){if(manual)toast(e.message,'error');}finally{backupBusy=false;}
+}
+function startAdminSchedule(){
+ rememberVerifiedLogin();if(adminScheduleTimer)clearInterval(adminScheduleTimer);if(!isAdmin()||!authIdentity)return;
+ const tick=async()=>{if(!session||!authIdentity||!isAdmin()||document.hidden||modalIsOpen())return;if(DB.settings.backup?.enabled!==false)await performBackup();if(DB.settings.email.enabled&&DB.settings.email.reportsEnabled&&Date.now()-lastScheduledAttempt>60000){lastScheduledAttempt=Date.now();try{await apiRequest('/api/daily-report',{method:'POST',body:'{}'});}catch(e){console.warn('งานรายงานยังไม่พร้อม:',e.message);}}};adminScheduleTimer=setInterval(tick,60000);setTimeout(tick,1500);
+}
+
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const fmtN = n => Number(n||0).toLocaleString('th-TH');
 const uid = () => Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 const pad2 = n => String(n).padStart(2,'0');
-function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
+function todayStr(){return FreshyFeatures.bangkokParts().date;}
 function fmtDate(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return fmtDate(d);}
 function thDate(iso){if(!iso)return'-';const p=String(iso).split(' ')[0].split('-');if(p.length<3)return iso;return p[2]+'/'+p[1]+'/'+p[0];}
@@ -61,18 +136,18 @@ function toast(msg, type){
 
 /* ---------- modal ---------- */
 function openModal(html){
-  $('#modalBox').className='modal';$('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
+  $('#modalBox').className='modal';$('#modalBox').onkeydown=null;$('#modalBox').removeAttribute('tabindex');$('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
   if(window.lucide)lucide.createIcons();
 }
-function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').className='modal';$('#modalBox').innerHTML='';}
+function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').className='modal';$('#modalBox').onkeydown=null;$('#modalBox').removeAttribute('tabindex');$('#modalBox').innerHTML='';}
 function modalIsOpen(){return !$('#modalBackdrop').classList.contains('hidden');}
 $('#modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal();});
 
 /* ============================================================
    ฐานข้อมูล (DB) — สาธิตในเครื่อง; ออนไลน์ใช้ Supabase Auth และ RPC
    ============================================================ */
-const DBKEY='freshywater_db_v1';
-const SESSKEY='freshywater_session_v1';
+const DBKEY=window.FRESHY_PREVIEW?'freshywater_demo_v8':'freshywater_db_v1';
+const SESSKEY=window.FRESHY_PREVIEW?'freshywater_demo_session_v8':'freshywater_session_v1';
 let DB=null; let session=null;
 
 function defaultSettings(){
@@ -80,9 +155,9 @@ function defaultSettings(){
     business:{name:'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',address:'บ้านนาไฮ ตำบลบ้านนาไฮ อำเภอเมือง จังหวัดนครราชสีมา',taxId:'',commercialId:'',phone:'08x-xxx-xxxx',email:'freshywater@example.com',menuName:'ระบบจัดการลูกหนี้'},
     header:{showLogo:true,showName:true,logoDataUrl:''},
     db:Object.assign({mode:'demo',sheetUrl:'',sheetId:'',apiKey:'',serviceEmail:'',serviceKey:'',supabaseUrl:'',supabaseKey:'',adminEmail:''},window.FRESHY_CONFIG||{}),
-    email:{enabled:false,adminEmail:'',provider:'resend',apiKey:'',smtpHost:'',smtpPort:'587',smtpUser:'',smtpPass:'',alerts:{login:true,logout:true,addDebtor:true,undoRequest:true}},
+    email:{enabled:false,adminEmail:'',provider:'gmail',apiKey:'',smtpHost:'',smtpPort:'587',smtpUser:'',smtpPass:'',reportTimes:['08:00','18:00'],reportsEnabled:false,alerts:{login:true,logout:true,addDebtor:true,undoRequest:true,newcustomer:true,profile:true,payment:true,cash:true}},
     docPrefix:{debtor:'FWD',cash:'CSH',customer:'CUS'},
-    doccounters:{}
+    doccounters:{},backup:{enabled:true,days:[1,15,31]}
   };
 }
 function seed(){
@@ -123,24 +198,25 @@ function seed(){
   debt('c007','other','','บ้านโนนเสลา',6,3,2,'emp_s2','paid');
   function cash(ccode,name,vill,moo,ago,jugs,packs,by){
     const ja=jugs*20,pa=packs*30;
-    s.cashsales.push({id:uid(),customerCode:ccode,customerName:name,village:vill,moo:moo,deliveryDate:daysAgo(ago),createdBy:by,createdByName:(s.employees.find(e=>e.id===by)||{}).name||'ระบบ',dbSource:'สาธิต',responsibleBy:by,jugs,packs,jugAmount:ja,packAmount:pa,createdAt:new Date(Date.now()-ago*86400000).toISOString(),editHistory:[]});
+    s.cashsales.push({id:uid(),customerCode:ccode,customerName:name,village:vill,moo:moo,deliveryDate:daysAgo(ago),createdBy:by,createdByName:(s.employees.find(e=>e.id===by)||{}).name||'ระบบ',dbSource:'สาธิต',isDemo:true,responsibleBy:by,jugs,packs,jugAmount:ja,packAmount:pa,createdAt:new Date(Date.now()-ago*86400000).toISOString(),editHistory:[]});
   }
   cash('C001','นายสมศรี ใจดี','บ้านนาไฮ','7',0,5,2,'emp_s1');
   cash('C005','นายกิตติ ทองสุข','บ้านดอนนกเอี้ยงเก่า','',0,3,1,'emp_s2');
   cash('C003','นายวิชาญ แก้วกุหลาบ','บ้านนาไฮ','16',0,4,0,'emp_admin');
   cash('C002','นางสาวพิมพ์ใจ รักน้ำ','บ้านนาไฮ','7',1,2,3,'emp_s1');
   cash('C006','นางมะลิ ไพลิน','บ้านตลาด','',1,6,1,'emp_s2');
+  for(const key of ['customers','debtors','cashsales','approvals'])for(const row of s[key])row.isDemo=true;
   return s;
 }
 function dbLoad(){
   let backup=null;
   try{backup=JSON.parse(localStorage.getItem('freshywater_dbconfig_v1'));}catch(e){}
   try{DB=JSON.parse(localStorage.getItem(DBKEY));}catch(e){DB=null;}
-  if(!DB||!DB.settings)DB=seed();
+  if(!DB||!DB.settings)DB=seed();if(window.FRESHY_PREVIEW)backup=null;
   // Deployment config is applied last so stale browser data cannot switch production back to demo.
   DB.settings.db=Object.assign({},seed().settings.db,DB.settings.db||{},backup||{},window.FRESHY_CONFIG||{});
   if(!DB.audit)DB.audit=[]; if(!DB.approvals)DB.approvals=[]; if(!DB.sentEmails)DB.sentEmails=[];
-  if(!DB.settings.doccounters)DB.settings.doccounters={};
+  if(!DB.settings.doccounters)DB.settings.doccounters={};for(const key of ['business','header','email','docPrefix','backup'])DB.settings[key]=Object.assign({},defaultSettings()[key],DB.settings[key]||{});DB.settings.email.alerts=Object.assign({},defaultSettings().email.alerts,DB.settings.email.alerts||{});
   if(DB.settings.db.mode!=='supabase')localStorage.setItem(DBKEY,JSON.stringify(DB));
 }
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
@@ -162,7 +238,7 @@ function authFor(cfg){
 }
 function safeCache(){
  const config=DB.settings.db;
- localStorage.setItem('freshywater_dbconfig_v1',JSON.stringify(config));
+ localStorage.setItem(window.FRESHY_PREVIEW?'freshywater_demo_config_v8':'freshywater_dbconfig_v1',JSON.stringify(config));
  if(config.mode!=='supabase'){localStorage.setItem(DBKEY,JSON.stringify(DB));return;}
  if(authIdentity&&remoteBase)localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,data:FreshySync.shared(DB)}));
 }
@@ -173,7 +249,7 @@ function installRemote(payload,preserve){
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
  remoteSettings=FreshySync.clone(data.settings||{});
- data.settings=Object.assign(defaults,remoteSettings);delete data.settings.db;
+ data.settings=Object.assign(defaults,remoteSettings);for(const key of ['business','header','email','docPrefix','backup'])data.settings[key]=Object.assign({},defaultSettings()[key],remoteSettings[key]||{});data.settings.email.alerts=Object.assign({},defaultSettings().email.alerts,remoteSettings.email?.alerts||{});delete data.settings.db;
  remoteBase=FreshySync.clone(data);
  const merged=FreshySync.overlay(data,preserve||[]);
  for(const k of SUPA_COLS){if(k==='settings')DB.settings=FreshySync.clone(merged[k]);else DB[k]=merged[k];}
@@ -304,29 +380,11 @@ function downloadSystemSnapshot(data,label){
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download=(label||'freshywater-backup')+'-'+todayStr()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);
 }
-function openRealReset(){
- if(!isAdmin()){toast('เฉพาะผู้ดูแลระบบเท่านั้น','error');return;}
- openModal(`<div class="modal-head"><h3><i data-lucide="shield-alert"></i> รีเซ็ตข้อมูลใช้งานจริงทั้งระบบ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
- <div class="modal-body"><div class="reset-warning"><b>ข้อมูลที่จะถูกล้างจาก Supabase จริง</b><ul><li>ลูกค้าและทะเบียนลูกหนี้ทั้งหมด</li><li>รายการค้าง รับชำระ และยอดขายเงินสดทั้งหมด</li><li>คำขออนุมัติ ประวัติอีเมล หมู่บ้าน และสินค้า</li><li>บัญชีพนักงานอื่น เหลือเฉพาะแอดมินที่กำลังใช้งาน</li></ul><p>ระบบจะดาวน์โหลดไฟล์สำรองก่อนล้างอัตโนมัติ ส่วน Audit Log จะเก็บไว้เพื่อการตรวจสอบย้อนหลัง</p></div><div class="field"><label>พิมพ์คำว่า RESET เพื่อยืนยัน</label><input id="resetConfirmText" autocomplete="off" placeholder="RESET"></div></div>
- <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmRealReset"><i data-lucide="trash-2"></i> ล้างข้อมูลจริงทั้งระบบ</button></div>`);
- $('#confirmRealReset').addEventListener('click',resetRealSystemData);
-}
-async function resetRealSystemData(){
- if($('#resetConfirmText').value.trim()!=='RESET'){toast('กรุณาพิมพ์ RESET ให้ถูกต้อง','error');return;}
- if(!authIdentity||!remoteBase){toast('ฐานข้อมูลจริงยังไม่เชื่อมต่อ กรุณารอให้สถานะออนไลน์ก่อน','error');return;}
- const btn=$('#confirmRealReset');btn.disabled=true;btn.textContent='กำลังสำรองและล้างข้อมูล...';
- const snapshot=FreshySync.clone(FreshySync.shared(DB)),config=DB.settings.db,actor=FreshySync.clone(me()),defaults=seed();
- downloadSystemSnapshot({exportedAt:new Date().toISOString(),source:'Supabase ก่อนรีเซ็ต',data:snapshot},'freshywater-before-reset');
- try{
-  DB.settings=defaultSettings();DB.settings.db=config;DB.employees=[actor];DB.products=defaults.products;DB.villages=defaults.villages;
-  DB.customers=[];DB.debtors=[];DB.cashsales=[];DB.approvals=[];DB.sentEmails=[];
-  syncBlocked=false;safeCache();
-  if(!(await flushOnline()))throw Error('ฐานข้อมูลปฏิเสธหรือยังไม่ตอบสนอง');
-  closeModal();toast('รีเซ็ตข้อมูลจริงสำเร็จแล้ว','success');currentPage='dashboard';renderNav();renderPage();
- }catch(e){
-  for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),snapshot.settings||{});else DB[k]=snapshot[k]||[];}
-  DB.settings.db=config;safeCache();btn.disabled=false;btn.innerHTML='<i data-lucide="trash-2"></i> ลองล้างข้อมูลอีกครั้ง';if(window.lucide)lucide.createIcons();toast('รีเซ็ตไม่สำเร็จ: '+e.message,'error');
- }
+function openRealReset(){clearDemoData();}
+async function clearDemoData(){
+ if(!isAdmin())return;const keys=['customers','debtors','cashsales','approvals'];const count=keys.reduce((s,k)=>s+DB[k].filter(x=>x.isDemo===true).length,0);if(!count){toast('ไม่มีรายการที่ระบุว่าเป็นข้อมูลจำลอง ข้อมูลจริงยังคงอยู่','info');return;}
+ if(!confirm('ล้างเฉพาะข้อมูลจำลอง '+count+' รายการ? ข้อมูลจริง ผู้ใช้ และค่าตั้งค่าจะคงอยู่'))return;
+ downloadSystemSnapshot({exportedAt:new Date().toISOString(),data:FreshySync.shared(DB)},'freshy-before-demo-reset');for(const key of keys)DB[key]=DB[key].filter(x=>x.isDemo!==true);audit('ล้างข้อมูลจำลอง',count+' รายการ');dbSave();const online=authIdentity?await flushOnline():true;toast(online?'ล้างข้อมูลจำลองแล้ว ค่าตั้งค่าและข้อมูลจริงยังอยู่':'รายการล้างยังรอส่ง กรุณาตรวจสถานะฐานข้อมูล',online?'success':'info');renderPage();
 }
 function configureLogin(){
  const online=DB.settings.db.mode==='supabase';
@@ -399,7 +457,7 @@ async function resumeOnline(){
   session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('ยืนยันบัญชีแล้ว แต่ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง','error');
  }
 }
-function dbAdd(col,doc){doc.id=doc.id||uid();DB[col].push(doc);dbSave();return doc;}
+function dbAdd(col,doc){if(DB.settings.db.mode==='demo'&&['customers','debtors','cashsales','approvals'].includes(col))doc.isDemo=true;doc.id=doc.id||uid();DB[col].push(doc);dbSave();return doc;}
 function dbUpdate(col,id,patch){const i=DB[col].findIndex(x=>x.id===id);if(i>=0){Object.assign(DB[col][i],patch);dbSave();return DB[col][i];}return null;}
 function dbRemove(col,id){DB[col]=DB[col].filter(x=>x.id!==id);dbSave();}
 function audit(action,detail){dbAdd('audit',{ts:new Date().toISOString(),userId:(me()||{}).id||'system',userName:(me()||{}).name||'ระบบ',action,detail});}
@@ -414,7 +472,8 @@ function scopeRows(rows){if(isAdmin())return rows;const id=me().id;return rows.f
 
 /* ---------- email alerts (ส่งผ่าน /api/email ถ้าตั้งค่าไว้ มิฉะนั้นบันทึก log) ---------- */
 async function sendAlert(type,subject,bodyHtml,toOverride){
- const em=DB.settings.email;
+ const em=DB.settings.email;const alertKey={undo:'undoRequest'}[type]||type;if(type!=='report'&&em.alerts?.[alertKey]===false)return false;
+ if(!em.enabled)return false;
  const entry={id:uid(),createdBy:(me()||{}).id||'demo',ts:new Date().toISOString(),type,to:toOverride||em.adminEmail||'',subject,body:bodyHtml,status:em.enabled&&em.adminEmail?'กำลังส่ง':'ร่าง (ยังไม่เปิดอีเมล)'};
  DB.sentEmails.unshift(entry);dbSave();
  if(!em.enabled||!entry.to)return false;
@@ -480,6 +539,7 @@ function renderPage(){
     customersNai:()=>renderCustomers('nai'),customersOther:()=>renderCustomers('other'),
     cashsales:renderCashsales,approvals:renderApprovals,employees:renderEmployees,audit:renderAudit,settings:renderSettings};
   (fn[currentPage]||renderDashboard)();
+  attachCsv();
   if(window.lucide)lucide.createIcons();
 }
 
@@ -517,7 +577,7 @@ function renderDashboard(){
   <div class="stats-grid">
     <div class="stat-card green"><div class="label"><i data-lucide="banknote"></i> ยอดขายเงินสดวันนี้</div><div class="value">${fmtN(cashTotal)} <span style="font-size:14px">บาท</span></div><div class="sub">จาก ${cash.length} รายการ</div></div>
     <div class="stat-card red"><div class="label"><i data-lucide="alert-triangle"></i> ลูกหนี้ค้างจ่ายวันนี้</div><div class="value">${fmtN(debtToday)} <span style="font-size:14px">บาท</span></div><div class="sub">ยอดค้างใหม่วันนี้</div></div>
-    <div class="stat-card blue"><div class="label"><i data-lucide="package"></i> จำนวนถังที่ขายได้วันนี้</div><div class="value">${fmtN(jugsToday)} <span style="font-size:14px">ถัง</span></div><div class="sub">รวมทั้งเงินสดและลูกหนี้</div></div>
+    <div class="stat-card orange"><div class="label"><i data-lucide="package"></i> จำนวนถังที่ขายได้วันนี้</div><div class="value">${fmtN(jugsToday)} <span style="font-size:14px">ถัง</span></div><div class="sub">รวมทั้งเงินสดและลูกหนี้</div></div>
   </div>
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px" class="dash-grid">
     <div class="panel"><div class="panel-head"><h3><i data-lucide="users"></i> ทะเบียนรายได้และผลงานพนักงานวันนี้</h3><span class="sync-tag">real time</span></div><div class="panel-body">${empHtml}</div></div>
@@ -528,13 +588,13 @@ function renderDashboard(){
   </div>
   <div class="panel" style="margin-top:18px"><div class="panel-head"><h3><i data-lucide="database"></i> ข้อมูลสะสมของระบบตั้งแต่เริ่มใช้งาน</h3></div><div class="panel-body">
     <div class="stats-grid" style="margin-bottom:0">
-      <div class="stat-card purple"><div class="label"><i data-lucide="user-x"></i> ลูกหนี้ค้างชำระ</div><div class="value">${fmtN(unpaidCust)} <span style="font-size:14px">คน</span></div></div>
+      <div class="stat-card gold"><div class="label"><i data-lucide="user-x"></i> ลูกหนี้ค้างชำระ</div><div class="value">${fmtN(unpaidCust)} <span style="font-size:14px">คน</span></div></div>
       <div class="stat-card red"><div class="label"><i data-lucide="wallet"></i> ยอดค้างรวมทั้งหมด</div><div class="value">${fmtN(unpaidTotal)} <span style="font-size:14px">บาท</span></div></div>
       <div class="stat-card green"><div class="label"><i data-lucide="circle-check-big"></i> ยอดชำระแล้ว</div><div class="value">${fmtN(paidTotal)} <span style="font-size:14px">บาท</span></div></div>
-      <div class="stat-card blue"><div class="label"><i data-lucide="package"></i> จำนวนถังคงค้าง</div><div class="value">${fmtN(unpaidJugs)} <span style="font-size:14px">ถัง</span></div></div>
+      <div class="stat-card orange"><div class="label"><i data-lucide="package"></i> จำนวนถังคงค้าง</div><div class="value">${fmtN(unpaidJugs)} <span style="font-size:14px">ถัง</span></div></div>
     </div>
   </div></div>
-  <div class="report-schedule"><div class="report-clock"><i data-lucide="clock-3"></i></div><div><b>รายงานอัตโนมัติสำหรับผู้บริหาร</b><p>รอบเช้า 08:00 น. และรอบเย็น 18:00 น. · อ่านสรุปในอีเมลได้ทันที พร้อมแนบรายงาน PDF</p></div><span class="status-tag ok">ตั้งเวลาพร้อมใช้งาน</span></div>
+  <div class="report-schedule"><div class="report-clock"><i data-lucide="clock-3"></i></div><div><b>รายงานอัตโนมัติสำหรับผู้บริหาร</b><p>เวลารายงาน ${(DB.settings.email.reportTimes||['08:00','18:00']).join(' / ')} น. · ${DB.settings.email.enabled&&DB.settings.email.reportsEnabled?'เปิดการส่งตามเวลา':'ยังไม่เปิดการส่งตามเวลา'}</p></div><span class="status-tag ok">ตรวจการตั้งค่าอีเมล</span></div>
   <style>@media(max-width:900px){.dash-grid{grid-template-columns:1fr !important}}</style>`;
   $('#quickDebt').onclick=()=>navigate('debtorsNai');
   $('#quickCash').onclick=()=>navigate('cashsales');
@@ -544,6 +604,7 @@ function renderDashboard(){
 /* ---------- DEBTORS (nai / other) ---------- */
 let debtorFilter={nai:'all',other:'all'}, debtorSearch='';
 let custSearch={nai:'',other:''}, custCredit={nai:'all',other:'all'};
+let debtorPage={nai:0,other:0};
 function renderDebtors(area){
   const tone=area==='nai'?'tone-blue':'tone-orange';
   let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='unpaid');
@@ -562,14 +623,14 @@ function renderDebtors(area){
   const emailBtn=canEmail()?'<button class="btn btn-ghost btn-sm" id="emailReportBtn"><i data-lucide="mail"></i> ส่งรายงานทางอีเมล</button>':'';
   const printBtn=canPrint()?'<button class="btn btn-ghost btn-sm" id="printReportBtn"><i data-lucide="printer"></i> ปริ้น A4 / PDF</button>':'';
   let cardsHtml=''; let idx=0;
-  Object.keys(groups).forEach(cid=>{
+  const ids=Object.keys(groups),pages=Math.max(1,Math.ceil(ids.length/30));debtorPage[area]=Math.min(debtorPage[area],pages-1);const customerMap=new Map(DB.customers.map(c=>[c.id,c]));
+  ids.slice(debtorPage[area]*30,(debtorPage[area]+1)*30).forEach(cid=>{
     idx++; const list=groups[cid].sort((a,b)=>a.debtDate<b.debtDate?-1:1);
-    const c=DB.customers.find(x=>x.id===cid)||{};
+    const c=customerMap.get(cid)||{};
     const tj=list.reduce((s,d)=>s+(d.jugs||0),0), tp=list.reduce((s,d)=>s+(d.packs||0),0), tt=list.reduce((s,d)=>s+d.total,0);
     const latest=list.reduce((a,b)=>String(a.createdAt)>String(b.createdAt)?a:b);
     const creator=(DB.employees.find(e=>e.id===latest.createdBy)||{}).name||'-';
-    const qrUrl=location.href.split('?')[0]+'?qr='+cid;
-    const qrImg='https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=4&data='+encodeURIComponent(qrUrl);
+
     let rowsHtml='';
     list.forEach(d=>{
       rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce"><button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button></td></tr>`;
@@ -578,7 +639,7 @@ function renderDebtors(area){
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
       <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
-      <a class="qr-wrap" href="${qrUrl}" aria-label="เปิดรายงานลูกหนี้ ${esc(list[0].customerName)}"><img class="qr-mini" src="${qrImg}" alt="QR รายงานลูกหนี้" title="แตะเพื่อเปิดรายงานลูกหนี้"><small><b>เปิดเอกสารลูกหนี้</b><br>แสดงในหน้าปัจจุบัน</small></a></div>
+      <button class="btn btn-ghost btn-sm debtorDocument" data-cid="${cid}" aria-label="เปิดเอกสารลูกหนี้ ${esc(list[0].customerName)}"><i data-lucide="file-text"></i> เอกสารลูกหนี้</button></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
@@ -592,18 +653,14 @@ function renderDebtors(area){
       <div class="search-box"><i data-lucide="search"></i><input id="debtorSearch" placeholder="พิมพ์ชื่อลูกหนี้เพื่อค้นหา..." value="${esc(debtorSearch)}"><div class="search-suggest hidden" id="searchSuggest"></div></div>
       <div class="filter-chips">${chipsHtml}</div>
     </div>
-    <div class="debtor-cards">${cardsHtml}</div>
+    <div class="debtor-cards">${cardsHtml}</div><div class="pager"><button class="btn btn-ghost btn-sm" id="debtPrev" ${debtorPage[area]===0?'disabled':''}>ก่อนหน้า</button><span>หน้า ${debtorPage[area]+1} / ${pages} · ${ids.length} ลูกหนี้</span><button class="btn btn-ghost btn-sm" id="debtNext" ${debtorPage[area]>=pages-1?'disabled':''}>ถัดไป</button></div>
   </div>`;
   // events
-  $('#pageContent').querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{debtorFilter[area]=b.dataset.f;renderDebtors(area);}));
+  $('#pageContent').querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{debtorFilter[area]=b.dataset.f;debtorPage[area]=0;renderDebtors(area);}));
   const si=$('#debtorSearch'); const sug=$('#searchSuggest');
-  si.addEventListener('input',()=>{
-    debtorSearch=si.value.trim();
-    const names=[...new Set(DB.debtors.filter(d=>d.area===area&&d.status==='unpaid').map(d=>d.customerName))].filter(n=>n.includes(debtorSearch)).slice(0,6);
-    if(debtorSearch&&names.length){sug.innerHTML=names.map(n=>'<div data-n="'+esc(n)+'">'+esc(n)+'</div>').join('');sug.classList.remove('hidden');sug.querySelectorAll('div').forEach(d=>d.addEventListener('click',()=>{si.value=d.dataset.n;debtorSearch=d.dataset.n;sug.classList.add('hidden');renderDebtors(area);}));}
-    else sug.classList.add('hidden');
-    document.querySelectorAll('.debtor-card').forEach(c=>{c.style.display = debtorSearch && !(c.dataset.name||'').includes(debtorSearch) ? 'none' : '';});
-  });
+  let searchTimer;si.addEventListener('input',()=>{debtorSearch=si.value.trim();debtorPage[area]=0;clearTimeout(searchTimer);searchTimer=setTimeout(()=>{renderDebtors(area);const input=$('#debtorSearch');input.focus();input.setSelectionRange(input.value.length,input.value.length);attachCsv();},200);});
+  $('#pageContent').querySelectorAll('.debtorDocument').forEach(button=>button.onclick=async()=>{button.disabled=true;try{const report=buildDebtorReportHtml(area,'all','combined',button.dataset.cid);if(!authIdentity){preparePrint(report.html,report.docNo,false);return;}const url=await persistDocument(report.html,report.docNo);location.assign(url);}catch(e){toast(e.message,'error');}finally{button.disabled=false;}});
+  $('#debtPrev').onclick=()=>{debtorPage[area]--;renderDebtors(area);attachCsv();};$('#debtNext').onclick=()=>{debtorPage[area]++;renderDebtors(area);attachCsv();};
   $('#addDebtorBtn').addEventListener('click',()=>openAddDebtor(area));
   $('#pageContent').querySelectorAll('.payOne').forEach(b=>b.addEventListener('click',()=>markPaid(b.dataset.id)));
   $('#pageContent').querySelectorAll('.payAll').forEach(b=>b.addEventListener('click',()=>{
@@ -612,11 +669,13 @@ function renderDebtors(area){
   }));
   if(printBtn)$('#printReportBtn').addEventListener('click',()=>openPrintOptions(area));
   if(emailBtn)$('#emailReportBtn').addEventListener('click',()=>openEmailReport(area));
+  attachCsv();
   if(window.lucide)lucide.createIcons();
 }
 function markPaid(id,silent){
   const d=dbUpdate('debtors',id,{status:'paid',paidAt:new Date().toISOString(),paidBy:me().id,paidByName:me().name});
   audit('รับชำระเงิน','ลูกหนี้ '+d.customerName+' จ่าย '+fmtN(d.total)+' บาท');
+  sendAlert('payment','[แจ้งเตือน] รับชำระลูกหนี้','<p>'+esc(d.customerName)+' · '+fmtN(d.total)+' บาท</p>');
   if(!silent){toast('บันทึกรับชำระเงินแล้ว ย้ายไปประวัติรับชำระ','success');renderPage();}
 }
 function openAddDebtor(area){
@@ -631,7 +690,7 @@ function openAddDebtor(area){
           <div class="search-suggest hidden" id="f_nameSug" style="position:absolute;top:auto;left:0;right:0;z-index:40"></div>
         </div>
         <div class="field"><label>รหัสลูกหนี้ (ระบบรันอัตโนมัติ)</label><input id="f_code" readonly style="background:#f1f3f6;font-weight:700;color:var(--navy2)" value="รอพิมพ์ชื่อ"></div>
-        <div class="field"><label>${area==='nai'?'หมู่ที่ (พิมพ์ 7 หรือ 16 ได้)':'ชื่อบ้าน / หมู่บ้าน'}</label><input id="f_area" class="f-step" autocomplete="off" placeholder="${area==='nai'?'เช่น 7 หรือ 16':'เลือก/พิมพ์หมู่บ้าน'}"></div>
+        <div class="field"><label>${area==='nai'?'หมู่ที่ (พิมพ์ 7 หรือ 16 ได้)':'ชื่อบ้าน / หมู่บ้าน'}</label><input id="f_area" class="f-step" autocomplete="off" list="villageSuggestions" placeholder="${area==='nai'?'เช่น 7 หรือ 16':'เลือก/พิมพ์หมู่บ้าน'}"></div><datalist id="villageSuggestions">${(area==='nai'?['7','16']:villageList).map(v=>'<option value="'+esc(v)+'"></option>').join('')}</datalist><div class="field full"><label>รหัสหมู่บ้าน (อัตโนมัติ)</label><input id="f_villageCode" readonly></div>
         <div class="debt-product-group jug-group full"><div class="field"><label>จำนวนถังที่ค้าง</label><input type="number" inputmode="numeric" id="f_jugs" class="f-step" value="0" min="0"></div><div class="field"><label>เงินค้างน้ำถัง (บาท)</label><input type="number" inputmode="decimal" id="f_ja" class="f-step debt-money" value="0" min="0"></div></div>
         <div class="debt-product-group pack-group full"><div class="field"><label>จำนวนแพ็คที่ค้าง</label><input type="number" inputmode="numeric" id="f_packs" class="f-step" value="0" min="0"></div><div class="field"><label>เงินค้างน้ำแพ็ค (บาท)</label><input type="number" inputmode="decimal" id="f_pa" class="f-step debt-money" value="0" min="0"></div></div>
         <div class="field full"><label>วันที่ค้างชำระ</label><input type="date" id="f_date" class="f-step" value="${todayStr()}"></div>
@@ -642,9 +701,12 @@ function openAddDebtor(area){
   $('#modalBox').classList.add('debt-entry-modal');
   let selectedCustId=null;
   const nameI=$('#f_name'), sug=$('#f_nameSug'), codeI=$('#f_code'), areaI=$('#f_area');
+  const villageName=()=>area==='nai'?'บ้านนาไฮ หมู่ '+areaI.value.trim():areaI.value.trim();
+  const updateVillageCode=()=>{$('#f_villageCode').value=areaI.value.trim()?FreshyFeatures.villageCode(DB.villages,villageName()):'รอเลือกหมู่บ้าน';};areaI.addEventListener('input',updateVillageCode);
   function applyCustomer(c){
     if(c){selectedCustId=c.id;codeI.value=c.code;areaI.value=area==='nai'?(c.moo||''):(c.village||'');}
     else{selectedCustId=null;codeI.value=nextCustomerCode();}
+    updateVillageCode();
   }
   nameI.addEventListener('input',()=>{
     const v=nameI.value.trim();
@@ -680,24 +742,27 @@ function openAddDebtor(area){
   const refreshDebtTotal=()=>{$('#debtTotalPreview').textContent=fmtN((+$('#f_ja').value||0)+(+$('#f_pa').value||0))+' บาท';};
   ['#f_ja','#f_pa'].forEach(sel=>$(sel).addEventListener('input',refreshDebtTotal));
   $('#modalBox').querySelectorAll('input[type="number"]').forEach(el=>el.addEventListener('focus',()=>el.select()));
-  $('#saveDebtor').addEventListener('click',()=>{
+  $('#saveDebtor').addEventListener('click',async()=>{
     const name=nameI.value.trim(); if(!name){toast('กรุณาพิมพ์ชื่อลูกหนี้','error');nameI.focus();return;}
     const jugs=+$('#f_jugs').value||0, packs=+$('#f_packs').value||0, ja=+$('#f_ja').value||0, pa=+$('#f_pa').value||0;
+    if(![jugs,packs,ja,pa].every(x=>Number.isFinite(x)&&x>=0)||!Number.isInteger(jugs)||!Number.isInteger(packs)){toast('จำนวนต้องเป็นจำนวนเต็ม และยอดเงินต้องไม่ติดลบ','error');return;}
     if(jugs+packs===0){toast('กรุณาระบุจำนวนถังหรือแพ็ค','error');return;}
+    if(!areaI.value.trim()||!/^\d{4}-\d{2}-\d{2}$/.test($('#f_date').value)){toast('กรุณาระบุหมู่บ้านและวันที่ค้าง','error');return;}
+    const saveBtn=$('#saveDebtor');saveBtn.disabled=true;let villageRecord;try{villageRecord=await ensureVillage(villageName());}catch(e){saveBtn.disabled=false;toast(e.message,'error');return;}
     let c=selectedCustId?DB.customers.find(x=>x.id===selectedCustId):null;
     if(!c){
       const code=nextCustomerCode();
-      c=dbAdd('customers',{code,name,area,moo:area==='nai'?areaI.value.trim():'',village:area==='other'?areaI.value.trim():'',address:'',createdAt:todayStr(),createdBy:me().id,managedBy:me().id,responsibleBy:me().id});
+      c=dbAdd('customers',{code,name,area,villageId:villageRecord.id,villageCode:villageRecord.code,moo:area==='nai'?areaI.value.trim():'',village:area==='other'?areaI.value.trim():'',address:'',createdAt:todayStr(),createdBy:me().id,managedBy:me().id,responsibleBy:me().id});
       audit('เพิ่มลูกค้าใหม่',name+' ('+code+')');
       sendAlert('newcustomer','[แจ้งเตือน] พนักงานเพิ่มลูกหนี้ใหม่ รหัสใหม่ '+code,'<p>พนักงาน <b>'+esc(me().name)+'</b> ได้เพิ่มลูกหนี้ใหม่ในระบบ</p><ul><li>ชื่อ: '+esc(name)+'</li><li>รหัสลูกหนี้ใหม่: <b>'+code+'</b> (ระบบรันอัตโนมัติ ไม่ซ้ำกับคนอื่น)</li><li>หมวด: '+(area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ')+'</li></ul>');
     }
     const moo=area==='nai'?(areaI.value.trim()||c.moo||''):(c.moo||'');
     const village=area==='other'?(areaI.value.trim()||c.village||''):(c.village||'');
-    const d=dbAdd('debtors',{customerId:c.id,customerName:c.name,area,moo,village,debtDate:$('#f_date').value,jugs,packs,jugAmount:ja,packAmount:pa,total:ja+pa,status:'unpaid',createdAt:new Date().toISOString(),createdBy:me().id});
+    const d=dbAdd('debtors',{customerId:c.id,customerName:c.name,area,moo,village,villageId:villageRecord.id,villageCode:villageRecord.code,debtDate:$('#f_date').value,jugs,packs,jugAmount:ja,packAmount:pa,total:ja+pa,status:'unpaid',createdAt:new Date().toISOString(),createdBy:me().id});
     audit('เพิ่มลูกหนี้',c.name+' ค้าง '+fmtN(d.total)+' บาท');
     if(DB.settings.email.alerts.addDebtor)sendAlert('addDebtor','[แจ้งเตือน] พนักงานเพิ่มรายการลูกหนี้',
       `<p>พนักงาน <b>${esc(me().name)}</b> เพิ่มรายการลูกหนี้</p><ul><li>ชื่อลูกหนี้: ${esc(c.name)} (${esc(c.code)})</li><li>หมู่บ้าน/หมู่ที่: ${esc(area==='nai'?'บ้านนาไฮ หมู่ที่ '+moo:village)}</li><li>วันที่ค้าง: ${thDate(d.debtDate)}</li><li>จำนวนถังค้าง: ${jugs} ถัง</li><li>จำนวนแพ็คค้าง: ${packs} แพ็ค</li><li>เงินค้างน้ำแพ็ค: ${fmtN(pa)} บาท</li><li>ยอดค้างรวม: ${fmtN(d.total)} บาท</li></ul>`);
-    closeModal();toast('เพิ่มรายการลูกหนี้แล้ว (รหัส '+c.code+') · ตรวจสถานะอีเมลในประวัติ','success');renderPage();
+    const ok=authIdentity?await flushOnline():true;closeModal();renderPage();if(!ok){toast('รายการยังอยู่ในเครื่องและรอส่ง ห้ามปิดระบบจนกว่าสถานะจะยืนยันบันทึกออนไลน์','error');return;}toast(authIdentity?'บันทึกลงฐานข้อมูลแล้ว (รหัส '+c.code+')':'บันทึกข้อมูลสาธิตแล้ว','success');askContinueDebtor(area);
   });
 }
 
@@ -722,6 +787,7 @@ function renderPayments(area){
   <div class="panel"><div class="panel-body">${html}</div></div>`;
   $('#paySearch').addEventListener('input',e=>{paySearch=e.target.value.trim();renderPayments(area);const i=$('#paySearch');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}});
   $('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.addEventListener('click',()=>requestUndo(b.dataset.id,area)));
+  attachCsv();
   if(window.lucide)lucide.createIcons();
 }
 function requestUndo(id,area){
@@ -793,13 +859,14 @@ function creditStatus(customerId){
   return{cls:'red',txt:'เครดิตไม่ดี'};
 }
 function renderCustomers(area){
+  const oldestByCustomer=new Map();for(const d of DB.debtors){if(d.status==='unpaid')oldestByCustomer.set(d.customerId,Math.max(oldestByCustomer.get(d.customerId)||0,dayDiff(d.debtDate)));}const creditFor=id=>{const days=oldestByCustomer.get(id);return days===undefined||days<=10?{cls:'green',txt:'เครดิตดีเยี่ยม'}:days<=30?{cls:'orange',txt:'เครดิตดี'}:days<=100?{cls:'gray',txt:'เครดิตสีเทา'}:{cls:'red',txt:'เครดิตไม่ดี'};};
   let rows=DB.customers.filter(c=>c.area===area);
   const q=custSearch[area];
   if(q)rows=rows.filter(c=>c.name.includes(q)||String(c.code||'').toLowerCase().includes(q.toLowerCase()));
-  if(custCredit[area]!=='all')rows=rows.filter(c=>creditStatus(c.id).txt===custCredit[area]);
+  if(custCredit[area]!=='all')rows=rows.filter(c=>creditFor(c.id).txt===custCredit[area]);
   let html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ลำดับ</th><th>รหัสลูกค้า</th><th>ชื่อลูกค้า</th>'+(area==='nai'?'<th>หมู่ที่</th>':'<th>หมู่บ้านที่อยู่</th>')+'<th>ที่อยู่</th><th>วันที่นำลงระบบ</th><th>ผู้นำลงระบบ</th><th>ผู้จัดการข้อมูล</th><th>ผู้รับผิดชอบ</th><th>ประวัติลูกหนี้</th></tr></thead><tbody>';
   rows.forEach((c,i)=>{
-    const cs=creditStatus(c.id);
+    const cs=creditFor(c.id);
     const byName=id=>(DB.employees.find(e=>e.id===id)||{}).name||'-';
     html+=`<tr><td>${i+1}</td><td>${esc(c.code)}</td><td><b>${esc(c.name)}</b></td><td>${esc(area==='nai'?('หมู่ที่ '+c.moo):c.village)}</td><td>${esc(c.address||'-')}</td><td>${thDate(c.createdAt)}</td><td>${esc(byName(c.createdBy))}</td><td>${esc(byName(c.managedBy))}</td><td>${esc(byName(c.responsibleBy))}</td><td><span class="pill ${cs.cls}">${cs.txt}</span></td></tr>`;
   });
@@ -819,6 +886,7 @@ function renderCustomers(area){
   $('#custSearch').addEventListener('input',e=>{custSearch[area]=e.target.value.trim();renderCustomers(area);const i=$('#custSearch');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}});
   $('#pageContent').querySelectorAll('[data-cr]').forEach(b=>b.addEventListener('click',()=>{custCredit[area]=b.dataset.cr;renderCustomers(area);}));
   $('#addCustBtn').addEventListener('click',()=>openAddCustomer(area));
+  attachCsv();
   if(printBtn)$('#custPrintBtn').addEventListener('click',()=>printCustomers(area));
   if(emailBtn)$('#custEmailBtn').addEventListener('click',()=>openEmailReport('customers-'+area));
   if(window.lucide)lucide.createIcons();
@@ -831,8 +899,7 @@ function printCustomers(area){
   rows.forEach((c,i)=>{const cs=creditStatus(c.id);const by=(DB.employees.find(e=>e.id===c.responsibleBy)||{}).name||'-';
     body+=`<tr><td>${i+1}</td><td>${esc(c.code)}</td><td class="l">${esc(c.name)}</td><td>${esc(area==='nai'?('หมู่ที่ '+c.moo):c.village)}</td><td class="l">${esc(c.address||'-')}</td><td>${thDate(c.createdAt)}</td><td>${esc(by)}</td><td>${esc(cs.txt)}</td></tr>`;});
   body+='</tbody></table>'+docFooter(docNo);
-  $('#printArea').innerHTML='<div class="doc-page">'+body+'</div>';
-  setTimeout(()=>window.print(),200);
+  preparePrint(body,docNo);
 }
 function buildCustomerReportHtml(area){
   const rows=DB.customers.filter(c=>c.area===area);
@@ -890,6 +957,7 @@ function renderCashsales(){
   $('#pageContent').querySelectorAll('.editCash').forEach(b=>b.addEventListener('click',()=>openEditCash(b.dataset.id)));
   if(printBtn)$('#cashPrintBtn').addEventListener('click',()=>printCashReport(cashDateFilter));
   if(emailBtn)$('#cashEmailBtn').addEventListener('click',()=>openEmailReport('cash'));
+  attachCsv();
   if(window.lucide)lucide.createIcons();
 }
 function openAddCash(){
@@ -908,7 +976,7 @@ function openAddCash(){
     const cid=$('#cs_cust').value;if(!cid){toast('กรุณาเลือกลูกค้า','error');return;}
     const c=DB.customers.find(x=>x.id===cid);
     dbAdd('cashsales',{customerCode:c.code,customerName:c.name,village:c.village||'บ้านนาไฮ',moo:c.moo||'',deliveryDate:$('#cs_date').value,createdBy:me().id,createdByName:me().name,dbSource:DB.settings.db.mode==='supabase'?'Supabase':'สาธิต',responsibleBy:me().id,jugs:+$('#cs_jugs').value||0,packs:+$('#cs_packs').value||0,jugAmount:+$('#cs_ja').value||0,packAmount:+$('#cs_pa').value||0,createdAt:new Date().toISOString(),editHistory:[]});
-    audit('เพิ่มลูกค้าจ่ายสด',c.name);closeModal();toast('บันทึกรายการจ่ายสดแล้ว','success');renderPage();
+    audit('เพิ่มลูกค้าจ่ายสด',c.name);sendAlert('cash','[แจ้งเตือน] บันทึกรายการเงินสด','<p>'+esc(c.name)+' · '+esc($('#cs_date').value)+'</p>');closeModal();toast('บันทึกรายการจ่ายสดแล้ว','success');renderPage();
   });
 }
 function openEditCash(id){
@@ -962,14 +1030,15 @@ function openEditEmp(id){
     <div class="field"><label>บทบาท</label><select id="e_role" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="staff" ${e.role==='staff'?'selected':''}>พนักงาน</option><option value="admin" ${e.role==='admin'?'selected':''}>แอดมิน</option></select></div>
     <div class="field full"><label>สิทธิ์การเข้าถึงแต่ละหน้า</label><div class="perm-grid">${pagePerms}</div></div>
     <label class="perm-item"><input type="checkbox" id="e_print" ${e.permissions.canPrint?'checked':''}> อนุญาตให้ปริ้นรายงาน</label>
-    <label class="perm-item"><input type="checkbox" id="e_email" ${e.permissions.canEmail?'checked':''}> อนุญาตให้ส่งรายงานทางอีเมล</label>
+    <label class="perm-item"><input type="checkbox" id="e_canEmail" ${e.permissions.canEmail?'checked':''}> อนุญาตให้ส่งรายงานทางอีเมล</label>
   </div></div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="saveEmp"><i data-lucide="save"></i> บันทึก</button></div>`);
   $('#saveEmp').addEventListener('click',()=>{
     const name=$('#e_name').value.trim(),code=$('#e_code').value.trim();
     if(!name||!code){toast('กรุณากรอกชื่อและรหัสพนักงาน','error');return;}
+    if(DB.employees.some(x=>x.id!==id&&(x.code===code||String(x.email||'').toLowerCase()===$('#e_email').value.trim().toLowerCase()))){toast('รหัสหรืออีเมลพนักงานซ้ำ','error');return;}
     const pages={};$('#modalBox').querySelectorAll('[data-page]').forEach(c=>pages[c.dataset.page]=c.checked);
-    const patch={name,code,email:$('#e_email').value.trim(),role:$('#e_role').value,permissions:{pages,canPrint:$('#e_print').checked,canEmail:$('#e_email').checked}};
+    const patch={name,code,email:$('#e_email').value.trim(),role:$('#e_role').value,permissions:{pages,canPrint:$('#e_print').checked,canEmail:$('#e_canEmail').checked}};
     if(id){dbUpdate('employees',id,patch);audit('แก้ไขพนักงาน',name);}
     else{dbAdd('employees',Object.assign({id:uid()},patch));audit('เพิ่มพนักงาน',name);}
     closeModal();toast('บันทึกข้อมูลพนักงานแล้ว','success');renderPage();
@@ -991,8 +1060,7 @@ function printEmployeeReport(empId){
   body+='<table class="doc-table"><thead><tr><th>ลำดับ</th><th>วัน-เวลา (ยันวินาที)</th><th>ประเภทกิจกรรม</th><th>รายละเอียด</th></tr></thead><tbody>';
   acts.slice(0,500).forEach((a,i)=>{body+=`<tr><td>${i+1}</td><td>${thDateTimeSec(a.ts)}</td><td class="l">${esc(a.type)}</td><td class="l">${esc(a.detail)}</td></tr>`;});
   body+='</tbody></table>'+docFooter(docNo);
-  $('#printArea').innerHTML='<div class="doc-page">'+body+'</div>';
-  setTimeout(()=>window.print(),200);
+  preparePrint(body,docNo);
 }
 async function openPublicQrReport(cid){
   document.body.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;padding:24px;font:700 17px Sarabun,sans-serif;color:#17384e;background:#f3f7fa">กำลังเปิดข้อมูลเอกสาร…</div>';
@@ -1023,7 +1091,7 @@ function renderPublicQrReport(cid,payload){
   const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
   document.body.innerHTML=`
   <style>
-  *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#dfe7ed,#f6f8f9);color:#102739;font-family:'Sarabun',sans-serif}.qr-page{max-width:940px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#e6ecef 70%,transparent)}.qr-btn{padding:11px 17px;border:1px solid #254a62;border-radius:7px;font:800 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:#0a3b5b;color:#fff}.qr-btn.back{background:#fff;color:#153a52}.qr-sheet{background:#fff;padding:30px;color:#111;border:1px solid #8fa2af;border-radius:8px;box-shadow:0 20px 55px rgba(4,32,51,.18)}.qr-hero{text-align:center;border:1.5px solid #111;border-bottom:4px double #111;padding:14px;margin-bottom:0}.qr-hero:before{content:'เอกสารควบคุมของหน่วยงาน';display:block;font-size:10px;font-weight:800;letter-spacing:.12em;text-align:right}.qr-hero .brand{font-size:23px;font-weight:900;color:#000}.qr-hero .contact{font-size:12px;color:#222}.qr-hero .title{font-size:17px;font-weight:900;margin-top:9px;color:#000;text-decoration:underline;text-underline-offset:4px}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:15px;border:1px solid #333;border-top:0}.qr-meta div{padding:9px;border-radius:0;background:#fff;border:0;border-right:1px solid #777;border-bottom:1px solid #999;font-size:11.5px}.qr-meta div:nth-child(4n){border-right:0}.qr-meta b{display:block;color:#111;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #222;border-radius:0}.qr-table{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}.qr-table th{background:#263746;color:#fff;padding:8px;border:1px solid #111}.qr-table td{padding:8px;border:1px solid #666;text-align:center}.qr-table tbody tr:nth-child(even){background:#f0f2f3}.qr-table tfoot td{background:#e5e8ea;font-weight:900}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:14px;padding:14px;border:1.5px solid #222;border-radius:0;background:#f3f5f6}.qr-summary .copy{flex:1;font-size:11.5px;color:#243746}.qr-summary .amount{font-size:22px;font-weight:900;color:#000;margin-top:6px}.qr-code{width:116px;height:116px;border:6px solid #fff;outline:1px solid #555;box-shadow:none}.qr-signs{display:flex;gap:12px;margin-top:36px;font-size:11px}
+  *{box-sizing:border-box}body{margin:0;background:#fff;color:#111;font-family:'Sarabun',sans-serif}.qr-page{max-width:940px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#e6ecef 70%,transparent)}.qr-btn{padding:11px 17px;border:1px solid #254a62;border-radius:7px;font:800 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:#0a3b5b;color:#fff}.qr-btn.back{background:#fff;color:#153a52}.qr-sheet{background:#fff;padding:30px;color:#111;border:1px solid #8fa2af;border-radius:8px;box-shadow:0 20px 55px rgba(4,32,51,.18)}.qr-hero{text-align:center;border:1.5px solid #111;border-bottom:4px double #111;padding:14px;margin-bottom:0}.qr-hero:before{content:'เอกสารรายงาน';display:block;font-size:10px;font-weight:800;letter-spacing:.12em;text-align:right}.qr-hero .brand{font-size:23px;font-weight:900;color:#000}.qr-hero .contact{font-size:12px;color:#222}.qr-hero .title{font-size:17px;font-weight:900;margin-top:9px;color:#000;text-decoration:underline;text-underline-offset:4px}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:15px;border:1px solid #333;border-top:0}.qr-meta div{padding:9px;border-radius:0;background:#fff;border:0;border-right:1px solid #777;border-bottom:1px solid #999;font-size:11.5px}.qr-meta div:nth-child(4n){border-right:0}.qr-meta b{display:block;color:#111;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #222;border-radius:0}.qr-table{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}.qr-table th{background:#fff;color:#111;padding:8px;border:1px solid #111}.qr-table td{padding:8px;border:1px solid #666;text-align:center}.qr-table tbody tr:nth-child(even){background:#fff}.qr-table tfoot td{background:#fff;font-weight:900}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:14px;padding:14px;border:1.5px solid #222;border-radius:0;background:#fff}.qr-summary .copy{flex:1;font-size:11.5px;color:#243746}.qr-summary .amount{font-size:22px;font-weight:900;color:#000;margin-top:6px}.qr-code{width:116px;height:116px;border:6px solid #fff;outline:1px solid #555;box-shadow:none}.qr-signs{display:flex;gap:12px;margin-top:36px;font-size:11px}
   @media(max-width:640px){.qr-page{padding:9px}.qr-actions{padding-top:5px}.qr-btn{flex:1;padding:12px 8px}.qr-sheet{padding:13px 11px;border-radius:6px}.qr-hero{padding:11px 8px}.qr-hero .brand{font-size:20px}.qr-hero .title{font-size:15px}.qr-meta{grid-template-columns:1fr 1fr}.qr-meta div{padding:8px;font-size:11px;border-right:1px solid #777}.qr-meta div:nth-child(2n){border-right:0}.qr-table-wrap{display:none}.qr-mobile-list{display:grid;gap:8px}.qr-debt-card{border:1px solid #8799a5;border-left:5px solid #163f59;border-radius:6px;overflow:hidden;background:#fff}.qr-debt-head{display:flex;justify-content:space-between;padding:9px 11px;background:#e5ebef;color:#17384e}.qr-debt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;font-size:11.5px}.qr-debt-grid span{color:#596b78}.qr-debt-grid b{display:block;color:#18384d;margin-top:2px}.qr-debt-total{display:flex;justify-content:space-between;padding:9px 11px;background:#edf1f3;color:#475e6e}.qr-debt-total b{font-size:16px;color:#111}.qr-summary{align-items:flex-start;padding:11px;gap:9px}.qr-summary .amount{font-size:19px}.qr-code{width:90px;height:90px}.qr-signs{display:none}}
   @media print{body{background:#fff!important}.no-print{display:none!important}.qr-page{max-width:none;padding:0}.qr-sheet{padding:0;border:0;box-shadow:none}.qr-mobile-list{display:none!important}.qr-table-wrap{display:block!important}.qr-signs{display:flex!important}@page{size:A4;margin:14mm 12mm}}
   </style>
@@ -1064,7 +1132,7 @@ function renderSettings(){
     <div class="field"><label>ชื่อผู้ใช้ (ชื่อจริง แสดงในรายงาน)</label><input id="s_name" value="${esc(u.name)}"></div>
     <div class="field"><label>รหัสพนักงาน</label><input id="s_code" value="${esc(u.code)}"></div>
     <div class="field"><label>อีเมล</label><input id="s_email" ${!isAdmin()&&authIdentity?'readonly':''} value="${esc(u.email||'')}"></div>
-    <div class="field"><label>รูปโปรไฟล์ URL (เว้นว่างใช้ตัวอักษร)</label><input id="s_avatar" value="${esc(u.avatarUrl||'')}"></div>
+    <div class="field full"><label>เลือกรูปโปรไฟล์จากเครื่อง (JPG / PNG / WebP ไม่เกิน 5 MB)</label><input id="profileFile" type="file" accept="image/jpeg,image/png,image/webp"><img id="profilePreview" class="profile-preview" alt="ตัวอย่างรูป" ${u.avatarUrl?'src="'+esc(u.avatarUrl)+'"':'hidden'}></div><div class="field full"><label>URL รูปโปรไฟล์ (ไม่จำเป็น)</label><input id="s_avatar" value="${esc(u.avatarUrl||'')}"></div>
   </div><button class="btn btn-primary" id="saveProfile"><i data-lucide="save"></i> บันทึกโปรไฟล์</button></div></div>`;
   else if(settingTab==='business')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="building-2"></i> ข้อมูลสถานประกอบการ</h3></div><div class="panel-body"><div class="form-grid">
     <div class="field full"><label>ชื่อสถานประกอบการ</label><input id="b_name" value="${esc(s.business.name)}"></div>
@@ -1105,7 +1173,7 @@ function renderSettings(){
     <div class="panel-body" style="border-top:1px solid var(--border)"><button class="btn btn-primary" id="saveProd"><i data-lucide="save"></i> บันทึกรายการสินค้า</button></div></div>`;
   }
   else if(settingTab==='villages'){
-    const vhtml=DB.villages.map(v=>`<span class="pill orange" style="margin:3px">${esc(v.name)} <button class="delV" data-id="${v.id}" style="color:var(--red);margin-left:6px;font-weight:700">×</button></span>`).join('');
+    const vhtml=DB.villages.map(v=>`<span class="pill orange" style="margin:3px">${esc(FreshyFeatures.villageCode(DB.villages,v.name))} · ${esc(v.name)} <button class="delV" data-id="${v.id}" style="color:var(--red);margin-left:6px;font-weight:700">×</button></span>`).join('');
     body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="map-pinned"></i> รายชื่อหมู่บ้าน (ลูกหนี้บ้านอื่น ๆ)</h3></div><div class="panel-body">
       <div style="margin-bottom:12px">${vhtml||'<span style="color:var(--muted);font-size:13px">ยังไม่มีหมู่บ้านเพิ่มเติม</span>'}</div>
       <div style="display:flex;gap:8px"><input id="v_name" placeholder="ชื่อหมู่บ้าน เช่น บ้านโนนสูง" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px"><button class="btn btn-gold" id="addVillage"><i data-lucide="plus"></i> เพิ่ม</button></div></div></div>`;
@@ -1113,17 +1181,17 @@ function renderSettings(){
   else if(settingTab==='email')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="mail"></i> การตั้งค่าอีเมลแจ้งเตือน</h3></div><div class="panel-body"><div class="form-grid">
     <label class="perm-item full"><input type="checkbox" id="em_en" ${s.email.enabled?'checked':''}> เปิดใช้งานการส่งอีเมลแจ้งเตือน</label>
     <div class="field full"><label>อีเมลแอดมินสำหรับรับการแจ้งเตือน</label><input id="em_to" value="${esc(s.email.adminEmail)}"></div>
-    <div class="field"><label>ผู้ให้บริการ</label><select id="em_prov" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="resend" ${s.email.provider==='resend'?'selected':''}>Resend API</option><option value="smtp" ${s.email.provider==='smtp'?'selected':''}>SMTP</option></select></div>
-    <div class="field"><label>API Key / SMTP Password</label><input type="password" id="em_key" value="${esc(s.email.apiKey)}"></div>
-    <div class="field full"><label>อีเมลผู้ส่ง (โดเมนยืนยันกับ Resend)</label><input id="em_from" value="${esc(s.email.fromEmail||'')}"></div><div class="field"><label>SMTP Host (ตั้งค่าที่เซิร์ฟเวอร์)</label><input id="em_host" value="${esc(s.email.smtpHost)}"></div>
+    <div class="field"><label>ผู้ให้บริการ</label><select id="em_prov" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="gmail" ${s.email.provider==='gmail'?'selected':''}>Google Gmail (App Password)</option><option value="resend" ${s.email.provider==='resend'?'selected':''}>Resend API</option><option value="smtp" ${s.email.provider==='smtp'?'selected':''}>SMTP</option></select></div>
+    <div class="field"><label>Gmail App Password / API Key</label><input type="password" id="em_key" value="${esc(s.email.provider==='gmail'?(s.email.smtpPass||''):s.email.apiKey||'')}"></div>
+    <div class="field full"><label>อีเมลผู้ส่ง (Gmail ที่ออก App Password)</label><input id="em_from" value="${esc(s.email.fromEmail||'')}"></div><div class="field"><label>SMTP Host (ตั้งค่าที่เซิร์ฟเวอร์)</label><input id="em_host" value="${esc(s.email.smtpHost)}"></div>
     <div class="field"><label>SMTP Port</label><input id="em_port" value="${esc(s.email.smtpPort)}"></div>
     <div class="field"><label>SMTP User</label><input id="em_user" value="${esc(s.email.smtpUser)}"></div>
-    <div class="field full" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div class="field full"><label>เวลาส่งรายงาน (เวลาประเทศไทย คั่นด้วยจุลภาค)</label><input id="em_times" value="${esc((s.email.reportTimes||['08:00','18:00']).join(','))}" placeholder="08:00,18:00"><label class="perm-item"><input type="checkbox" id="em_reports" ${s.email.reportsEnabled?'checked':''}> เปิดรายงานตามเวลา</label><p class="help-text">Gmail ใช้ App Password ของบัญชีที่เปิดการยืนยัน 2 ขั้นตอน ไม่ต้องใช้ API Key · การส่งขณะปิดระบบต้องตั้งค่าเซิร์ฟเวอร์งานอัตโนมัติ</p></div><div class="field full" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <label class="perm-item"><input type="checkbox" id="al_login" ${s.email.alerts.login?'checked':''}> แจ้งพนักงานล็อกอิน</label>
       <label class="perm-item"><input type="checkbox" id="al_logout" ${s.email.alerts.logout?'checked':''}> แจ้งพนักงานออกระบบ</label>
       <label class="perm-item"><input type="checkbox" id="al_add" ${s.email.alerts.addDebtor?'checked':''}> แจ้งเพิ่มรายการลูกหนี้</label>
       <label class="perm-item"><input type="checkbox" id="al_undo" ${s.email.alerts.undoRequest?'checked':''}> แจ้งคำขอกลับไปค้าง</label>
-    </div>
+      <label class="perm-item"><input type="checkbox" id="al_new" ${s.email.alerts.newcustomer!==false?'checked':''}> แจ้งเพิ่มลูกค้าใหม่</label><label class="perm-item"><input type="checkbox" id="al_profile" ${s.email.alerts.profile!==false?'checked':''}> แจ้งแก้ไขโปรไฟล์</label><label class="perm-item"><input type="checkbox" id="al_payment" ${s.email.alerts.payment!==false?'checked':''}> แจ้งรับชำระ</label><label class="perm-item"><input type="checkbox" id="al_cash" ${s.email.alerts.cash!==false?'checked':''}> แจ้งรายการเงินสด</label></div>
   </div><button class="btn btn-primary" id="saveEmail" style="margin-top:6px"><i data-lucide="save"></i> บันทึก</button></div></div>`;
   else if(settingTab==='system')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="settings-2"></i> ระบบและข้อมูล</h3></div><div class="panel-body">
     <p style="font-size:13px;color:var(--muted);margin-bottom:10px">เลือกหมวดข้อมูลที่ต้องการสำรอง หรือเลือกทั้งหมด (แอดมินเท่านั้น)</p>
@@ -1143,7 +1211,7 @@ function renderSettings(){
       <button class="btn btn-navy" id="backupBtn"><i data-lucide="download"></i> สำรองข้อมูลที่เลือก (JSON)</button>
       <button class="btn btn-ghost" id="restoreBtn"><i data-lucide="upload"></i> กู้คืนจากไฟล์สำรอง</button>
       <input type="file" id="restoreFile" accept="application/json" style="display:none">
-      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> รีเซ็ตข้อมูลใช้งานจริงทั้งระบบ</button>
+      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> ล้างเฉพาะข้อมูลจำลอง</button>
     </div>
     <div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.length} รายการ)</h4>
     ${DB.sentEmails.slice(0,5).map(e=>'<div class="audit-item"><span class="ts">'+thDateTime(e.ts)+'</span><span><b>'+esc(e.subject)+'</b> — '+esc(e.status)+'</span></div>').join('')||'<span style="color:var(--muted);font-size:12.5px">ยังไม่มี</span>'}</div>
@@ -1152,7 +1220,7 @@ function renderSettings(){
   $('#pageContent').querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{settingTab=t.dataset.t;renderSettings();}));
   // save handlers
   const bind=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
-  bind('#saveProfile',()=>{const oldName=u.name;const newName=$('#s_name').value.trim();dbUpdate('employees',u.id,{name:newName,code:$('#s_code').value.trim(),email:$('#s_email').value.trim(),avatarUrl:$('#s_avatar').value.trim()});if(newName&&newName!==oldName)sendAlert('profile','[แจ้งเตือน] ผู้ใช้เปลี่ยนชื่อโปรไฟล์','<p>ผู้ใช้รหัส '+esc(u.code)+' ได้เปลี่ยนชื่อจาก <b>'+esc(oldName)+'</b> เป็น <b>'+esc(newName)+'</b></p>');toast('บันทึกโปรไฟล์แล้ว'+(newName!==oldName?' · ตรวจผลอีเมลในประวัติ':''),'success');refreshUserChip();});
+  bind('#saveProfile',()=>{const oldName=u.name;const newName=$('#s_name').value.trim();if(!newName||!$('#s_code').value.trim()){toast('กรุณากรอกชื่อและรหัส','error');return;}if(DB.employees.some(e=>e.id!==u.id&&e.code===$('#s_code').value.trim())){toast('รหัสพนักงานซ้ำ','error');return;}dbUpdate('employees',u.id,{name:newName,code:$('#s_code').value.trim(),email:$('#s_email').value.trim(),avatarUrl:$('#s_avatar').value.trim()});if(newName&&newName!==oldName)sendAlert('profile','[แจ้งเตือน] ผู้ใช้เปลี่ยนชื่อโปรไฟล์','<p>ผู้ใช้รหัส '+esc(u.code)+' ได้เปลี่ยนชื่อจาก <b>'+esc(oldName)+'</b> เป็น <b>'+esc(newName)+'</b></p>');toast('บันทึกโปรไฟล์แล้ว'+(newName!==oldName?' · ตรวจผลอีเมลในประวัติ':''),'success');refreshUserChip();});
   bind('#saveBiz',()=>{Object.assign(s.business,{name:$('#b_name').value,address:$('#b_addr').value,taxId:$('#b_tax').value,commercialId:$('#b_com').value,phone:$('#b_phone').value,email:$('#b_email').value,menuName:$('#b_menu').value});dbSave();toast('บันทึกข้อมูลสถานประกอบการแล้ว','success');});
   bind('#resetBiz',()=>{s.business=defaultSettings().business;dbSave();renderSettings();toast('รีเซ็ตแล้ว','success');});
   bind('#saveHeader',()=>{Object.assign(s.header,{showLogo:$('#h_logo').checked,showName:$('#h_name').checked,logoDataUrl:$('#h_logoUrl').value});dbSave();toast('บันทึกแล้ว','success');});
@@ -1189,9 +1257,9 @@ function renderSettings(){
       DB.products[idx].returnable=$('#prodList').querySelector('.p_ret[data-i="'+idx+'"]').checked;
     });dbSave();toast('บันทึกรายการสินค้าแล้ว','success');
   });
-  bind('#addVillage',()=>{const name=$('#v_name').value.trim();if(!name)return;if(DB.villages.some(v=>v.name===name)){toast('ชื่อหมู่บ้านนี้มีอยู่แล้ว','error');return;}dbAdd('villages',{name});toast('เพิ่มหมู่บ้านแล้ว','success');renderSettings();});
+  bind('#addVillage',()=>{const name=$('#v_name').value.trim();if(!name)return;if(DB.villages.some(v=>v.name===name)){toast('ชื่อหมู่บ้านนี้มีอยู่แล้ว','error');return;}dbAdd('villages',{name,code:FreshyFeatures.villageCode(DB.villages,name)});toast('เพิ่มหมู่บ้านแล้ว','success');renderSettings();});
   $('#pageContent').querySelectorAll('.delV').forEach(b=>b.addEventListener('click',()=>{dbRemove('villages',b.dataset.id);renderSettings();}));
-  bind('#saveEmail',()=>{Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value,provider:$('#em_prov').value,apiKey:$('#em_key').value,fromEmail:$('#em_from').value.trim(),smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked}});dbSave();toast('บันทึกการตั้งค่าอีเมลแล้ว','success');});
+  bind('#saveEmail',async()=>{try{const provider=$('#em_prov').value;const reportTimes=FreshyFeatures.scheduleTimes($('#em_times').value);Object.assign(s.email,{enabled:$('#em_en').checked,adminEmail:$('#em_to').value.trim(),provider,fromEmail:$('#em_from').value.trim(),smtpHost:$('#em_host').value,smtpPort:$('#em_port').value,smtpUser:$('#em_user').value.trim(),reportTimes,reportsEnabled:$('#em_reports').checked,alerts:{login:$('#al_login').checked,logout:$('#al_logout').checked,addDebtor:$('#al_add').checked,undoRequest:$('#al_undo').checked,newcustomer:$('#al_new').checked,profile:$('#al_profile').checked,payment:$('#al_payment').checked,cash:$('#al_cash').checked}});s.email[provider==='gmail'?'smtpPass':'apiKey']=$('#em_key').value.trim().replace(provider==='gmail'?/\s/g:/$^/g,'');dbSave();toast(authIdentity?(await flushOnline()?'บันทึกการตั้งค่าลงฐานข้อมูลแล้ว':'ค่าตั้งค่ายังรอส่ง โปรดตรวจสถานะฐานข้อมูล'):'บันทึกในโหมดสาธิตแล้ว',authIdentity&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length?'info':'success');}catch(e){toast(e.message,'error');}});
   bind('#backupBtn',()=>{
     const all=[...document.querySelectorAll('.bk')].find(c=>c.dataset.col==='all').checked;
     const data={};
@@ -1204,31 +1272,28 @@ function renderSettings(){
   const rf=$('#restoreFile');if(rf)rf.addEventListener('change',e=>{
     const f=e.target.files[0];if(!f)return;
     const rd=new FileReader();rd.onload=()=>{
-      try{const data=JSON.parse(rd.result);
+      try{const parsed=JSON.parse(rd.result),data=parsed.data||parsed;
         if(!data||typeof data!=='object')throw new Error('ไฟล์ไม่ถูกต้อง');
         if(!confirm('จะกู้คืนข้อมูลจากไฟล์นี้หรือ? ข้อมูลที่มีอยู่จะถูกผสานทับ (คีย์เดียวกันจะถูกแทนที่)'))return;
         Object.keys(data).forEach(k=>{if(SUPA_COLS.includes(k)&&Array.isArray(data[k])&&DB[k]!==undefined){if(authIdentity){const rows=new Map(DB[k].map(x=>[x.id,x]));data[k].forEach(x=>{if(x&&typeof x==='object'){x.id=x.id||uid();if(k!=='audit'||!rows.has(x.id))rows.set(x.id,x);}});DB[k]=Array.from(rows.values());}else DB[k]=data[k];}});
-        if(data.settings){const connection=DB.settings.db;Object.assign(DB.settings,defaultSettings(),data.settings);DB.settings.db=connection;}
+        if(data.settings){const connection=DB.settings.db;Object.assign(DB.settings,data.settings);DB.settings.db=connection;}
         dbSave();toast(authIdentity?'ผสานไฟล์ในเครื่องแล้ว · รอผลบันทึกออนไลน์':'กู้คืนในเครื่องแล้ว','success');renderPage();
       }catch(err){toast('ไฟล์สำรองไม่ถูกต้อง: '+err.message,'error');}
     };rd.readAsText(f);
   });
-  bind('#resetBtn',()=>{if(DB.settings.db.mode==='supabase'){openRealReset();return;}if(confirm('แน่ใจหรือ? ข้อมูลทั้งหมดในโหมดสาธิตจะถูกลบและเริ่มใหม่')){localStorage.removeItem(DBKEY);dbLoad();toast('รีเซ็ตข้อมูลแล้ว','success');renderPage();}});
+  bind('#resetBtn',clearDemoData);
+  attachSettingsFeatures();
   if(window.lucide)lucide.createIcons();
 }
-function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=u.name;$('#userRole').textContent=u.role==='admin'?'แอดมินระบบ':'พนักงาน';$('#userAvatar').textContent=u.name.charAt(0);}
+function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=u.name;$('#userRole').textContent=u.role==='admin'?'แอดมินระบบ':'พนักงาน';$('#userAvatar').replaceChildren();if(u.avatarUrl){const img=document.createElement('img');img.src=u.avatarUrl;img.alt='รูปโปรไฟล์';$('#userAvatar').append(img);}else $('#userAvatar').textContent=u.name.charAt(0);}
 
 /* ============================================================
    PRINT / PDF / EMAIL REPORT (A4, เลขที่เอกสารไม่ซ้ำ)
    ============================================================ */
-function nextDocNo(prefix){
-  const d=new Date();const key=prefix+pad2(d.getDate())+pad2(d.getMonth()+1)+String(d.getFullYear()).slice(2);
-  const n=(DB.settings.doccounters[key]||0)+1;DB.settings.doccounters[key]=n;dbSave();
-  return key+'-'+String(n).padStart(3,'0');
-}
+function nextDocNo(prefix){const p=FreshyFeatures.bangkokParts();return String(prefix||'DOC')+p.date.replace(/-/g,'')+'-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomUUID().slice(0,8).toUpperCase();}
 function docHeader(reportTitle,docNo){
   const s=DB.settings; const d=new Date();
-  const logo=s.header.showLogo&&s.header.logoDataUrl?('<img src="'+esc(s.header.logoDataUrl)+'" alt="logo">'):'<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#122c4d" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>';
+  const logo=s.header.showLogo&&s.header.logoDataUrl?('<img src="'+esc(s.header.logoDataUrl)+'" alt="logo">'):'<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>';
   return `<div class="doc-head">
     <div class="doc-logo">${logo}</div>
     <div class="doc-title">
@@ -1236,7 +1301,7 @@ function docHeader(reportTitle,docNo){
       <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
       <div class="report-name">${esc(reportTitle)}</div>
     </div>
-    <div class="doc-control"><div class="control-label">เอกสารควบคุมของหน่วยงาน</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>ชั้นความลับ: ใช้ภายใน</span></div>
+    <div class="doc-control"><div class="control-label">เอกสารควบคุมขององค์กร</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1 · หน้า 1</span><span>เอกสารรายงาน</span></div>
   </div>
   <div class="doc-meta">
     <div><b>ส่วนงาน</b> งานทะเบียนและติดตามลูกหนี้</div>
@@ -1254,8 +1319,8 @@ function docFooter(docNo){
   </div>
   <div class="doc-foot"><span><strong>เลขที่เอกสาร ${esc(docNo)}</strong> · เอกสารภายใน ห้ามแก้ไขโดยไม่ได้รับอนุญาต</span><span>ระบบสารสนเทศจัดการลูกหนี้ · เฟรชชี่ วอเตอร์</span></div>`;
 }
-function buildDebtorReportHtml(area,filter,mode){
-  let rows=DB.debtors.filter(d=>d.area===area&&d.status==='unpaid');
+function buildDebtorReportHtml(area,filter,mode,customerId){
+  let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='unpaid'&&(!customerId||d.customerId===customerId));
   if(area==='nai'&&filter&&filter!=='all')rows=rows.filter(d=>d.moo===filter);
   if(area==='other'&&filter&&filter!=='all')rows=rows.filter(d=>d.village===filter);
   const groups={};rows.forEach(d=>{(groups[d.customerId]=groups[d.customerId]||[]).push(d);});
@@ -1287,10 +1352,10 @@ function openPrintOptions(area){
   <div class="modal-body">
     <div class="field"><label>รูปแบบการปริ้น</label><select id="po_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="combined">ปริ้นรวม (ทุกหมู่ในรายงานเดียว)</option><option value="split">ปริ้นแยก (แยกตามหมู่/หมู่บ้าน)</option></select></div>
     <div class="field"><label>กรองข้อมูล</label><select id="po_filter" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="all">ทั้งหมด</option>${area==='nai'?'<option value="7">เฉพาะหมู่ที่ 7</option><option value="16">เฉพาะหมู่ที่ 16</option>':DB.villages.map(v=>'<option value="'+esc(v.name)+'">'+esc(v.name)+'</option>').join('')}</select></div>
-    <p style="font-size:12px;color:var(--muted)">ระบบจะเปิดหน้าพิมพ์ A4 ให้เลือกบันทึกเป็น PDF หรือส่งไปเครื่องพิมพ์ เลขที่เอกสารไม่ซ้ำกันอัตโนมัติ</p>
+    <label class="perm-item"><input type="checkbox" id="po_qr"> แสดง QR เอกสารตรงมุมบนขวา</label><p style="font-size:12px;color:var(--muted)">ระบบจะเปิดหน้าพิมพ์ A4 ให้เลือกบันทึกเป็น PDF หรือส่งไปเครื่องพิมพ์ เลขที่เอกสารไม่ซ้ำกันอัตโนมัติ</p>
   </div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="doPrint"><i data-lucide="printer"></i> ปริ้น / ส่งออก PDF</button></div>`);
-  $('#doPrint').addEventListener('click',()=>{const r=buildDebtorReportHtml(area,$('#po_filter').value,$('#po_mode').value);$('#printArea').innerHTML='<div class="doc-page">'+r.html+'</div>';closeModal();setTimeout(()=>window.print(),200);});
+  $('#doPrint').addEventListener('click',()=>{const r=buildDebtorReportHtml(area,$('#po_filter').value,$('#po_mode').value),showQr=$('#po_qr').checked;preparePrint(r.html,r.docNo,showQr);});
 }
 function printCashReport(date){
   const rows=DB.cashsales.filter(r=>r.deliveryDate===date);
@@ -1307,8 +1372,7 @@ function printCashReport(date){
     <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ส่งน้ำ</div></div>
     <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ / หัวหน้า</div></div>
   </div><div class="doc-foot">เลขที่เอกสาร ${docNo} ออกเอกสารโดยระบบจัดการลูกหนี้โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>`;
-  $('#printArea').innerHTML='<div class="doc-page">'+body+'</div>';
-  setTimeout(()=>window.print(),200);
+  preparePrint(body,docNo);
 }
 function openEmailReport(kind){
   openModal(`<div class="modal-head"><h3><i data-lucide="mail"></i> ส่งรายงานทางอีเมล</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
@@ -1332,21 +1396,6 @@ function openEmailReport(kind){
 /* ============================================================
    PRIVACY PROTECTION (ป้องกันแคปหน้าจอ / เปิดซ้อนหน้าจอ)
    ============================================================ */
-const overlay=$('#privacyOverlay');
-function showPrivacy(){if(!session)return;overlay.classList.remove('hidden');}
-function hidePrivacy(){overlay.classList.add('hidden');}
-window.addEventListener('blur',showPrivacy);
-window.addEventListener('focus',()=>{hidePrivacy();if(authIdentity){clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(()=>supabaseFetch(),500);}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)showPrivacy();else{hidePrivacy();if(authIdentity){clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(()=>supabaseFetch(),500);}}});
-document.addEventListener('keydown',e=>{
-  if(e.key==='PrintScreen'||(e.ctrlKey&&(e.key==='p'||e.key==='P'||e.key==='s'||e.key==='S'))||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))){
-    e.preventDefault();showPrivacy();toast('สงวนสิทธิ์ ไม่สามารถแคปหน้าจอหรือเปิดซ้อนหน้าจอได้','error');
-    setTimeout(hidePrivacy,1500);
-  }
-});
-document.addEventListener('contextmenu',e=>{if(session){e.preventDefault();toast('สงวนสิทธิ์ ข้อมูลส่วนบุคคล ห้ามคลิกขวา','error');}});
-document.addEventListener('dragstart',e=>e.preventDefault());
-
 /* ============================================================
    LOGIN / LOGOUT
    ============================================================ */
@@ -1361,7 +1410,7 @@ $('#loginCode').addEventListener('input',()=>{
   else{pv.classList.remove('hidden');pv.classList.add('err');pv.textContent='รหัสนี้ยังไม่ตรงกับผู้ใช้ใด ๆ';}
 });
 async function doLogin(){
-  if(DB.settings.db.mode==='supabase'){const btn=$('#loginBtn');btn.disabled=true;try{await startOnline($('#loginEmail').value.trim(),$('#loginPassword').value);$('#loginPassword').value='';}catch(e){toast('เข้าสู่ระบบไม่สำเร็จ: '+e.message,'error');}finally{btn.disabled=false;}return;}
+  if(DB.settings.db.mode==='supabase'){const btn=$('#loginBtn');btn.disabled=true;try{await loginByCode();$('#loginPassword').value='';}catch(e){toast('เข้าสู่ระบบไม่สำเร็จ: '+e.message,'error');}finally{btn.disabled=false;}return;}
   const code=$('#loginCode').value.trim();
   const u=DB.employees.find(e=>e.code===code);
   if(!u){toast('รหัสผู้ใช้งานไม่ถูกต้อง','error');return;}
@@ -1376,6 +1425,7 @@ function enterApp(){
   $('#loginScreen').classList.add('hidden');
   $('#appShell').classList.remove('hidden');
   if(authIdentity)startRealtime();
+  startAdminSchedule();
   refreshUserChip();
   const _m=DB.settings.db.mode;if(syncBlocked)setStatus('ข้อมูลรอส่ง · ต้องตรวจสอบก่อนบันทึก','err');else setStatus(_m==='supabase'?'พร้อมใช้งาน · ซิงก์เบื้องหลัง':'โหมดสาธิต','info');
   navigate(new URLSearchParams(location.search).has('approval')&&isAdmin()?'approvals':'dashboard');
@@ -1389,7 +1439,7 @@ $('#logoutBtn').addEventListener('click',()=>{
     const u=me();
     if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')await sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
     if(authIdentity){await flushOnline();if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch(e){}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
-    session=null;localStorage.removeItem(SESSKEY);
+    if(adminScheduleTimer)clearInterval(adminScheduleTimer);adminScheduleTimer=null;session=null;localStorage.removeItem(SESSKEY);
     closeModal();$('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#loginCode').value='';
     toast('ออกจากระบบแล้ว','success');
   });
@@ -1426,7 +1476,7 @@ function applyTheme(){
   document.documentElement.setAttribute('data-theme',t);
   const btn=$('#themeToggle');if(btn){btn.innerHTML='<i data-lucide="'+(t==='dark'?'sun':'moon')+'"></i><span id="themeLabel" style="font-size:11px;margin-left:2px">'+(pref==='auto'?'อัตโนมัติ':t==='dark'?'มืด':'สว่าง')+'</span>';if(window.lucide)lucide.createIcons();}
 }
-function cycleTheme(){const cur=localStorage.getItem(THEMEKEY)||'auto';const next=cur==='light'?'dark':cur==='dark'?'auto':'light';localStorage.setItem(THEMEKEY,next);applyTheme();}
+function cycleTheme(){localStorage.setItem(THEMEKEY,document.documentElement.dataset.theme==='dark'?'light':'dark');applyTheme();}
 applyTheme();
 if(window.matchMedia)window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
 function setStatus(text,cls){const el=$('#modeTag');if(!el)return;el.className='status-tag '+(cls||'info');const t=$('#modeTagText');if(t)t.textContent=text;}
@@ -1454,6 +1504,7 @@ try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
 if(DB.settings.db.mode==='supabase'){session=null;configureLogin();resumeOnline();}else{configureLogin();if(session&&DB.employees.find(e=>e.id===session.empId))enterApp();}
 if(window.lucide)lucide.createIcons();
 lastDataHash=dataHash();
+bindCodeLogin();
 
 
 $('#loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});

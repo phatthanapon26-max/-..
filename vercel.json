@@ -4,10 +4,107 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
-    "api/*.js": { "maxDuration": 30 }
+    "api/*.js": {
+      "maxDuration": 30,
+      "includeFiles": "{deploy-config.js,features.js,vendor/fonts/*.ttf}"
+    }
   },
   "crons": [
-    { "path": "/api/daily-report", "schedule": "0 1 * * *" },
-    { "path": "/api/daily-report", "schedule": "0 11 * * *" }
+    {
+      "path": "/api/daily-report?slot=00",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=01",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=02",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=03",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=04",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=05",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=06",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=07",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=08",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=09",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=10",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=11",
+      "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=12",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=13",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=14",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=15",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=16",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=17",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=18",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=19",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=20",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=21",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=22",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/daily-report?slot=23",
+      "schedule": "0 23 * * *"
+    }
   ]
 }

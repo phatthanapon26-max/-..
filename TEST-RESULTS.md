@@ -1,13 +1,11 @@
-# ผลตรวจสอบ Freshy Water v2
+# Freshy Water 8.0 validation
 
-ผ่านการตรวจ syntax ของ app.js, sync.js, database-config.js และ API ทั้งสองไฟล์
+Run `npm test` and `npm run build`.
 
-ผ่าน Chromium: ล็อกอินสาธิต เปิด 12 หน้า/8 แท็บตั้งค่า รีเฟรชกลับเข้าได้; ล็อกอินออนไลน์ด้วย SDK และคำตอบ Auth/RPC จำลอง; ไม่อัปโหลดข้อมูลสาธิต; บันทึกโปรไฟล์; ข้อมูลรอส่งหลัง CONFLICT ยังอยู่เมื่อรีเฟรช; หน้าจอมือถือไม่ล้นแนวนอน; HTML ไฟล์เดียวมีฟอนต์ไทยและไอคอนครบ ไม่มี JavaScript error
+- Existing real flush loop: 10 queued records, lost successful response, safe retry, no duplicate IDs, exact old settings baseline, PT409 conflict handling.
+- UI workflows in a simulated DOM: debtor validation and continuation, Enter/Backspace behavior, village codes, unique employee controls, profile file picker, CSV exports, theme switching, QR print choice, demo-only reset preserving settings and 1,000 unmarked real-style records.
+- Pagination: 1,000 customer groups produce 30 rendered cards per page; searching and export use the entire filtered dataset.
+- Server tests with mocked database and mail transport: opaque document tokens, immutable snapshot storage, anonymous exact-document read, admin-only paginated backups, fixed Gmail TLS endpoint, recipient permissions, action toggles, report deduplication, Thai dates, white-paper PDF generation.
+- Build produces updated standalone HTML and dist assets from the same sources; no production seed upload or database deletion is part of deployment.
 
-ผ่าน SQL บน PostgreSQL/PGlite: ปฏิเสธ anonymous/บัญชีนอกระบบ; จำกัดข้อมูลตามเจ้าของ; ห้ามเพิ่มสิทธิ์ตัวเอง; ห้ามแก้รายการคนอื่น; รับชำระตามบัญชีจริง; ห้ามพนักงานย้อนรายการจ่ายแล้ว; ล็อกการแก้เงินสดหลัง 2 นาที; ตรวจสำเนาเก่า; rollback ทั้ง batch เมื่อคำสั่งหนึ่งไม่ผ่าน
-
-ผ่าน API อีเมลด้วยคำตอบเครือข่ายจำลอง: ตรวจ POST/token/บัญชียืนยัน; ปฏิเสธ URL ที่ไม่ได้อนุญาต; ใช้ผู้รับที่กรอกจริง; รายงานสำเร็จเมื่อผู้ให้บริการตอบรับ; แสดงล้มเหลวเมื่อถูกปฏิเสธ; พนักงานส่งรายงานไปคนอื่นไม่ได้
-
-เชื่อมค่าโครงการ Supabase จริงในชุดเว็บแล้ว และติดตั้ง/ตรวจสิทธิ์ฐานข้อมูลจริงผ่าน SQL แล้ว รวมทั้งยืนยันว่า anonymous และการเข้าตารางโดยตรงถูกปฏิเสธ ยังไม่ได้ส่งอีเมลจริงและยังไม่ได้ deploy บนโดเมนสาธารณะ
-
-เพิ่ม API รายงานอัตโนมัติสองรอบตามเวลาไทย ตรวจสิทธิ์ด้วย CRON_SECRET อ่านฐานข้อมูลด้วย Service Role เฉพาะฝั่งเซิร์ฟเวอร์ สร้าง PDF ภาษาไทย และส่งเนื้อหาสรุปพร้อมไฟล์แนบผ่าน Resend การส่งจริงต้องทดสอบอีกครั้งหลังตั้ง Environment Variables บน Vercel
+These tests do not establish delivery to a real Gmail inbox or authenticated synchronization between two production devices. Those require the real account and server configuration. They are not a guarantee of zero defects.

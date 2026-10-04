@@ -6,3 +6,7 @@ https://github.com/supabase/supabase-js
 
 Lucide icons: ISC.
 https://github.com/lucide-icons/lucide
+
+QR Code Generator for JavaScript (qrcode-generator 2.0.4)
+Copyright (c) 2009 Kazuhiko Arase. MIT License.
+The complete source notice is retained in vendor/qrcode.js.

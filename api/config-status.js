@@ -1,0 +1,2 @@
+'use strict';const C=require('./_lib/core');
+module.exports=async(req,res)=>{C.noStore(res);try{if(req.method!=='GET')throw new C.HttpError(405,'ใช้ GET');await C.authenticate(req,true);return res.json({ok:true,documentStorage:!!process.env.SUPABASE_SERVICE_ROLE_KEY,fullBackup:!!process.env.SUPABASE_SERVICE_ROLE_KEY,backgroundSchedule:!!(process.env.CRON_SECRET&&process.env.SUPABASE_SERVICE_ROLE_KEY)});}catch(e){return C.fail(res,e);}};
