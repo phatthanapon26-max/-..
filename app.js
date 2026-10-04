@@ -1302,7 +1302,7 @@ function docHeader(reportTitle,docNo){
       <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
       <div class="report-name">${esc(reportTitle)}</div>
     </div>
-    <div class="doc-control"><div class="control-label">เอกสารควบคุมขององค์กร</div><strong>เลขที่ ${esc(docNo)}</strong><span>ฉบับที่ 1</span><span>เอกสารรายงาน</span></div>
+    <div class="doc-control"><div class="control-label">เอกสารควบคุมขององค์กร</div><span>เลขที่</span><strong>${esc(docNo)}</strong><span>ฉบับที่ 1</span><span>เอกสารรายงาน</span></div>
   </div>
   <div class="doc-meta">
     <div><b>ประเภทเอกสาร</b> ทะเบียนและติดตามลูกหนี้</div>
