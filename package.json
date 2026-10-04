@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node build-assets.js",
-    "test": "node sync.test.js && node features.test.js && node api.test.js"
+    "test": "node sync.test.js && node features.test.js && node api.test.js && node document-view.test.js"
   },
   "dependencies": {
     "nodemailer": "10.0.12",

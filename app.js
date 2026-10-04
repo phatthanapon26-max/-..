@@ -471,7 +471,7 @@ function canEmail(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.c
 function scopeRows(rows){if(isAdmin())return rows;const id=me().id;return rows.filter(r=>r.createdBy===id||r.responsibleBy===id||r.paidBy===id);}
 
 /* ---------- email alerts (ส่งผ่าน /api/email ถ้าตั้งค่าไว้ มิฉะนั้นบันทึก log) ---------- */
-async function sendAlert(type,subject,bodyHtml,toOverride){
+async function sendAlert(type,subject,bodyHtml,toOverride,reportOptions={}){
  const em=DB.settings.email;const alertKey={undo:'undoRequest'}[type]||type;if(type!=='report'&&em.alerts?.[alertKey]===false)return false;
  if(!em.enabled){if(type==='report')toast('ยังไม่เปิดการส่งอีเมล กรุณาเปิดใช้งานในหน้าตั้งค่าอีเมลครั้งแรก','error');return false;}
  const entry={id:uid(),createdBy:(me()||{}).id||'demo',ts:new Date().toISOString(),type,to:toOverride||em.adminEmail||'',subject,body:bodyHtml,status:em.enabled&&em.adminEmail?'กำลังส่ง':'ร่าง (ยังไม่เปิดอีเมล)'};
@@ -481,7 +481,7 @@ async function sendAlert(type,subject,bodyHtml,toOverride){
  try{
   if(!(await flushOnline()))throw Error('ค่าตั้งค่าหรือข้อมูลรายงานยังบันทึกออนไลน์ไม่สำเร็จ กรุณาซิงก์แล้วลองส่งอีกครั้ง');
   const {data,error}=await authFor(supaCfg()).auth.getSession();if(error||!data.session)throw Error('เซสชันหมดอายุ');
-  const r=await fetch('/api/email',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({type,to:entry.to,subject,html:bodyHtml,project:supaCfg()}),signal:AbortSignal.timeout(25000)});
+  const r=await fetch('/api/email',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({type,to:entry.to,subject,html:bodyHtml,format:reportOptions.format,snapshot:reportOptions.snapshot}),signal:AbortSignal.timeout(25000)});
   const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'HTTP '+r.status);
   Object.assign(DB.sentEmails.find(x=>x.id===entry.id)||entry,{status:'ผู้ให้บริการรับอีเมลแล้ว',providerId:j.id||''});dbSave();return true;
  }catch(e){(DB.sentEmails.find(x=>x.id===entry.id)||entry).status='ส่งไม่สำเร็จ: '+e.message;dbSave();toast('อีเมลส่งไม่สำเร็จ: '+e.message,'error');return false;}
@@ -1075,51 +1075,21 @@ async function openPublicQrReport(cid){
   }catch(e){document.body.innerHTML='<div style="min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center;font-family:Sarabun,sans-serif;background:#f3f7fa;color:#17384e"><div><h2>ไม่สามารถเปิดข้อมูลเอกสารได้</h2><p>กรุณาสแกน QR Code ใหม่อีกครั้ง</p></div></div>';}
 }
 function renderPublicQrReport(cid,payload){
-  const c=payload&&payload.customer?payload.customer:DB.customers.find(x=>x.id===cid);
-  if(!c){document.body.innerHTML='<div style="padding:40px;font-family:Sarabun,sans-serif"><h2>ไม่พบข้อมูลลูกหนี้</h2><p>รหัสลูกหนี้ไม่ถูกต้อง</p></div>';return;}
-  const debts=(payload&&payload.debtors?payload.debtors:DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid')).sort((a,b)=>a.debtDate<b.debtDate?-1:1);
-  const first=debts[0]||{};
-  const emp=payload&&payload.recorder?payload.recorder:(DB.employees.find(e=>e.id===first.createdBy)||{});
-  const biz=payload&&payload.business?payload.business:DB.settings.business;
-  const docNo=new URLSearchParams(location.search).get('doc')||'QR-'+String(c.code||cid).toUpperCase();
-  const oldest=debts.reduce((n,d)=>Math.max(n,Math.max(0,Math.floor((new Date()-new Date(d.debtDate))/86400000))),0);
-  const cs=oldest>100?{txt:'เครดิตไม่ดี'}:oldest>30?{txt:'เครดิตเฝ้าระวัง'}:oldest>10?{txt:'เครดิตดี'}:{txt:'เครดิตดีเยี่ยม'};
-  const total=debts.reduce((s,d)=>s+d.total,0);
-  const days=(iso)=>Math.max(0,Math.floor((new Date()-new Date(iso))/86400000));
-  let rows='';
-  debts.forEach((d,i)=>{rows+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td class="num">${days(d.debtDate)}</td><td>${cs.txt}</td><td class="num">${d.jugs||0}</td><td class="num">${fmtN(d.jugAmount||0)}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.packAmount||0)}</td><td class="num">${fmtN(d.total)}</td></tr>`;});
-  const mobileRows=debts.map((d,i)=>`<article class="qr-debt-card"><div class="qr-debt-head"><b>รายการที่ ${i+1}</b><span>${thDate(d.debtDate)}</span></div><div class="qr-debt-grid"><span>ค้างมา <b>${days(d.debtDate)} วัน</b></span><span>เครดิต <b>${cs.txt}</b></span><span>น้ำถัง <b>${d.jugs||0} ถัง · ${fmtN(d.jugAmount||0)} บาท</b></span><span>น้ำแพ็ค <b>${d.packs||0} แพ็ค · ${fmtN(d.packAmount||0)} บาท</b></span></div><div class="qr-debt-total">ยอดรายการ <b>${fmtN(d.total)} บาท</b></div></article>`).join('');
-  const sign=(t)=>`<div style="flex:1;text-align:center;font-size:12px"><div style="margin-top:50px;border-top:1px solid #333;padding-top:4px">${t}</div></div>`;
-  document.body.innerHTML=`
-  <style>
-  *{box-sizing:border-box}body{margin:0;background:#fff;color:#111;font-family:'Sarabun',sans-serif}.qr-page{max-width:940px;margin:0 auto;padding:18px}.qr-actions{display:flex;gap:9px;margin-bottom:14px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(180deg,#e6ecef 70%,transparent)}.qr-btn{padding:11px 17px;border:1px solid #254a62;border-radius:7px;font:800 14px 'Sarabun';cursor:pointer}.qr-btn.primary{background:#0a3b5b;color:#fff}.qr-btn.back{background:#fff;color:#153a52}.qr-sheet{background:#fff;padding:30px;color:#111;border:1px solid #8fa2af;border-radius:8px;box-shadow:0 20px 55px rgba(4,32,51,.18)}.qr-hero{text-align:center;border:1.5px solid #111;border-bottom:4px double #111;padding:14px;margin-bottom:0}.qr-hero:before{content:'เอกสารรายงาน';display:block;font-size:10px;font-weight:800;letter-spacing:.12em;text-align:right}.qr-hero .brand{font-size:23px;font-weight:900;color:#000}.qr-hero .contact{font-size:12px;color:#222}.qr-hero .title{font-size:17px;font-weight:900;margin-top:9px;color:#000;text-decoration:underline;text-underline-offset:4px}.qr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:15px;border:1px solid #333;border-top:0}.qr-meta div{padding:9px;border-radius:0;background:#fff;border:0;border-right:1px solid #777;border-bottom:1px solid #999;font-size:11.5px}.qr-meta div:nth-child(4n){border-right:0}.qr-meta b{display:block;color:#111;margin-bottom:2px}.qr-table-wrap{overflow-x:auto;border:1px solid #222;border-radius:0}.qr-table{width:100%;border-collapse:collapse;font-size:12px;min-width:720px}.qr-table th{background:#fff;color:#111;padding:8px;border:1px solid #111}.qr-table td{padding:8px;border:1px solid #666;text-align:center}.qr-table tbody tr:nth-child(even){background:#fff}.qr-table tfoot td{background:#fff;font-weight:900}.qr-mobile-list{display:none}.qr-summary{display:flex;gap:18px;align-items:center;margin-top:14px;padding:14px;border:1.5px solid #222;border-radius:0;background:#fff}.qr-summary .copy{flex:1;font-size:11.5px;color:#243746}.qr-summary .amount{font-size:22px;font-weight:900;color:#000;margin-top:6px}.qr-code{width:116px;height:116px;border:6px solid #fff;outline:1px solid #555;box-shadow:none}.qr-signs{display:flex;gap:12px;margin-top:36px;font-size:11px}
-  @media(max-width:640px){.qr-page{padding:9px}.qr-actions{padding-top:5px}.qr-btn{flex:1;padding:12px 8px}.qr-sheet{padding:13px 11px;border-radius:6px}.qr-hero{padding:11px 8px}.qr-hero .brand{font-size:20px}.qr-hero .title{font-size:15px}.qr-meta{grid-template-columns:1fr 1fr}.qr-meta div{padding:8px;font-size:11px;border-right:1px solid #777}.qr-meta div:nth-child(2n){border-right:0}.qr-table-wrap{display:none}.qr-mobile-list{display:grid;gap:8px}.qr-debt-card{border:1px solid #8799a5;border-left:5px solid #163f59;border-radius:6px;overflow:hidden;background:#fff}.qr-debt-head{display:flex;justify-content:space-between;padding:9px 11px;background:#e5ebef;color:#17384e}.qr-debt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;font-size:11.5px}.qr-debt-grid span{color:#596b78}.qr-debt-grid b{display:block;color:#18384d;margin-top:2px}.qr-debt-total{display:flex;justify-content:space-between;padding:9px 11px;background:#edf1f3;color:#475e6e}.qr-debt-total b{font-size:16px;color:#111}.qr-summary{align-items:flex-start;padding:11px;gap:9px}.qr-summary .amount{font-size:19px}.qr-code{width:90px;height:90px}.qr-signs{display:none}}
-  @media print{body{background:#fff!important}.no-print{display:none!important}.qr-page{max-width:none;padding:0}.qr-sheet{padding:0;border:0;box-shadow:none}.qr-mobile-list{display:none!important}.qr-table-wrap{display:block!important}.qr-signs{display:flex!important}@page{size:A4;margin:14mm 12mm}}
-  </style>
-  <div class="qr-page">
-    <div class="qr-sheet">
-      <div class="qr-hero">
-        <div class="brand">${esc(biz.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์')}</div>
-        <div class="contact">${esc(biz.address||'')} ${biz.phone?'· โทร. '+esc(biz.phone):''}</div>
-        <div class="title">ทะเบียนติดตามลูกหนี้ค้างชำระ</div>
-      </div>
-      <div class="qr-meta"><div><b>เลขที่เอกสาร</b>${docNo}</div><div><b>วันที่เปิดรายงาน</b>${thDateTimeSec(new Date().toISOString())}</div><div><b>รหัสลูกหนี้</b>${esc(c.code)}</div><div><b>ชื่อลูกหนี้</b>${esc(c.name)}</div><div><b>ผู้บันทึก</b>${esc(emp.name||'-')}</div><div><b>ตำแหน่ง</b>${emp.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน'}</div><div><b>จำนวนค้าง</b>${debts.length} รายการ</div><div><b>เครดิต</b>${cs.txt}</div></div>
-      <div class="qr-table-wrap"><table class="qr-table"><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ค้างมา (วัน)</th><th>เครดิต</th><th>ถัง</th><th>เงินน้ำถัง</th><th>แพ็ค</th><th>เงินน้ำแพ็ค</th><th>รวม (บาท)</th></tr></thead><tbody>${rows||'<tr><td colspan="9">ไม่มีรายการค้าง</td></tr>'}</tbody><tfoot><tr><td colspan="8" style="text-align:right">ยอดค้างรวมทั้งหมด</td><td>${fmtN(total)} บาท</td></tr></tfoot></table></div>
-      <div class="qr-mobile-list">${mobileRows||'<div style="text-align:center;padding:20px">ไม่มีรายการค้าง</div>'}</div>
-      <div class="qr-summary">
-        <div class="copy">เอกสารนี้ออกโดยระบบสารสนเทศจัดการลูกหนี้<br>โรงน้ำดื่ม เฟรชชี่ วอเตอร์ · เลขที่เอกสาร <b>${docNo}</b><div class="amount">ยอดค้างรวม ${fmtN(total)} บาท</div></div>
-      </div>
-      <div class="qr-signs">
-        ${sign('ผู้จัดการข้อมูล')}${sign('ผู้กรอกข้อมูล')}${sign('ผู้ออก QR Code')}${sign('ผู้ตรวจสอบ')}${sign('หัวหน้า / ผู้บริหาร')}
-      </div>
-    </div>
-  </div>`;
+  const c=payload?.customer||DB.customers.find(x=>x.id===cid);if(!c){document.body.innerHTML='<main class="document-screen"><h1>ไม่พบข้อมูลลูกหนี้</h1></main>';return;}
+  const debts=(payload?.debtors||DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid')).sort((a,b)=>String(a.debtDate).localeCompare(String(b.debtDate))),first=debts[0]||{},emp=payload?.recorder||DB.employees.find(e=>e.id===first.createdBy)||{name:'-'},biz=payload?.business||DB.settings.business,docNo=new URLSearchParams(location.search).get('doc')||'QR-'+String(c.code||cid).toUpperCase();
+  let html=docHeader('ทะเบียนติดตามลูกหนี้ค้างชำระ',docNo,{business:biz,author:emp});
+  html+='<section class="doc-customer-block"><table class="doc-table"><caption>ลูกหนี้: '+esc(c.name)+' · รหัส '+esc(c.code||'-')+' · '+esc(c.village||'บ้านนาไฮ')+(c.moo?' · หมู่ที่ '+esc(c.moo):'')+'</caption><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>';
+  html+=debts.map((d,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(thDate(d.debtDate))+'</td><td>'+Number(d.jugs||0)+'</td><td>'+Number(d.packs||0)+'</td><td class="r">'+fmtN(d.jugAmount)+'</td><td class="r">'+fmtN(d.packAmount)+'</td><td class="r">'+fmtN(d.total)+'</td></tr>').join('')||'<tr><td colspan="7">ไม่มีรายการค้างชำระ</td></tr>';
+  html+='</tbody></table></section><div class="doc-summary">ยอดค้างชำระรวม '+fmtN(debts.reduce((sum,d)=>sum+Number(d.total||0),0))+' บาท · '+debts.length+' รายการ</div>'+docFooter(docNo,emp);
+  document.body.innerHTML='<div class="document-toolbar"><p>เอกสารเลขที่ '+esc(docNo)+'</p><button id="printLegacyDocument" type="button">พิมพ์ / บันทึก PDF</button></div><main id="printArea" class="document-screen"><div class="doc-page">'+html+'</div></main>';
+  document.title=docNo+' ทะเบียนติดตามลูกหนี้';$('#printLegacyDocument').onclick=async()=>{if(document.fonts)await document.fonts.ready;window.print();};
 }
+let auditEmployee='all',auditPage=1;
 function renderAudit(){
-  const rows=DB.audit.slice().sort((a,b)=>a.ts<b.ts?1:-1).slice(0,200);
-  let html=rows.map(a=>`<div class="audit-item"><span class="ts">${thDateTime(a.ts)}</span><span class="who">${esc(a.userName)}</span><span>${esc(a.action)} — ${esc(a.detail||'')}</span></div>`).join('');
-  if(!rows.length)html='<div class="empty-state"><i data-lucide="history"></i><p>ยังไม่มีประวัติการแก้ไข</p></div>';
-  $('#pageContent').innerHTML='<div class="page-head"><h2>ประวัติการแก้ไขทั้งหมด</h2><span class="desc">แสดง 200 รายการล่าสุด</span></div><div class="panel"><div class="panel-body">'+html+'</div></div>';
+  const people=new Map(DB.employees.map(e=>[e.id,e.name]));DB.audit.forEach(a=>{if(a.userId&&!people.has(a.userId))people.set(a.userId,a.userName||'ผู้ใช้เดิม');});
+  const rows=DB.audit.filter(a=>auditEmployee==='all'||a.userId===auditEmployee).sort((a,b)=>String(b.ts).localeCompare(String(a.ts))),pages=Math.max(1,Math.ceil(rows.length/50));auditPage=Math.min(auditPage,pages);const shown=rows.slice((auditPage-1)*50,auditPage*50);
+  $('#pageContent').innerHTML=`<div class="page-head"><h2>ประวัติการแก้ไข</h2><span class="desc">ประวัติการทำงานของทุกคนในโรงงาน</span></div><div class="audit-filters"><div class="field"><label for="auditEmployeeFilter">เลือกพนักงาน</label><select id="auditEmployeeFilter"><option value="all">ทุกคนในโรงงาน</option>${[...people].sort((a,b)=>a[1].localeCompare(b[1],'th')).map(([id,name])=>'<option value="'+esc(id)+'" '+(auditEmployee===id?'selected':'')+'>'+esc(name)+'</option>').join('')}</select></div><p class="help-text" role="status">พบ ${rows.length.toLocaleString('th-TH')} รายการ · แสดงครั้งละ 50 รายการ</p></div><div class="panel"><div class="tbl-scroll"><table class="tbl audit-table"><thead><tr><th>วันและเวลา</th><th>ผู้ดำเนินการ</th><th>กิจกรรม</th><th>รายละเอียด</th></tr></thead><tbody>${shown.map(a=>'<tr><td class="audit-time">'+esc(thDateTime(a.ts))+'</td><td>'+esc(a.userName||people.get(a.userId)||'ระบบ')+'</td><td>'+esc(a.action)+'</td><td>'+esc(a.detail||'-')+'</td></tr>').join('')||'<tr><td colspan="4">ไม่พบประวัติของพนักงานที่เลือก</td></tr>'}</tbody></table></div></div><div class="pager"><button id="auditPrev" class="btn btn-ghost" ${auditPage===1?'disabled':''}>ก่อนหน้า</button><span>หน้า ${auditPage} / ${pages}</span><button id="auditNext" class="btn btn-ghost" ${auditPage===pages?'disabled':''}>ถัดไป</button></div>`;
+  $('#auditEmployeeFilter').onchange=e=>{auditEmployee=e.target.value;auditPage=1;renderAudit();};$('#auditPrev').onclick=()=>{auditPage--;renderAudit();};$('#auditNext').onclick=()=>{auditPage++;renderAudit();};
 }
 
 /* ---------- SETTINGS (tabs) ---------- */
@@ -1293,33 +1263,13 @@ function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=
    PRINT / PDF / EMAIL REPORT (A4, เลขที่เอกสารไม่ซ้ำ)
    ============================================================ */
 function nextDocNo(prefix){return FreshyFeatures.shortDocumentNumber(prefix,crypto);}
-function docHeader(reportTitle,docNo){
-  const s=DB.settings; const issued=FreshyFeatures.bangkokParts();
-  const logo=s.header.showLogo&&s.header.logoDataUrl?('<img src="'+esc(s.header.logoDataUrl)+'" alt="logo">'):'<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>';
-  return `<div class="doc-head">
-    <div class="doc-logo">${logo}</div>
-    <div class="doc-title">
-      ${s.header.showName?`<div class="factory">${esc(s.business.name)}</div>`:''}
-      <div class="factory-sub">${esc(s.business.address)}<br>โทรศัพท์ ${esc(s.business.phone)} · เลข อย. ${esc(s.business.taxId||'-')}</div>
-      <div class="report-name">${esc(reportTitle)}</div>
-    </div>
-    <div class="doc-control"><div class="control-label">เอกสารควบคุมขององค์กร</div><span>เลขที่</span><strong>${esc(docNo)}</strong><span>ฉบับที่ 1</span><span>เอกสารรายงาน</span></div>
-  </div>
-  <div class="doc-meta">
-    <div><b>ประเภทเอกสาร</b> ทะเบียนและติดตามลูกหนี้</div>
-    <div><b>วันที่ออกเอกสาร</b> ${pad2(issued.day)}/${pad2(issued.month)}/${issued.year+543} · ${issued.time} น.</div>
-    <div class="doc-no">เลขอ้างอิง ${esc(docNo)}</div>
-  </div>`;
+function docHeader(reportTitle,docNo,options={}){
+  const s=DB.settings,b=options.business||s.business,issued=FreshyFeatures.bangkokParts(options.issuedAt?new Date(options.issuedAt):new Date());
+  const logo=s.header.showLogo&&s.header.logoDataUrl?'<img src="'+esc(s.header.logoDataUrl)+'" alt="ตราสัญลักษณ์โรงน้ำ">':'';
+  return `<div class="doc-head"><div class="doc-logo">${logo}</div><div class="doc-title"><div class="factory">${esc(b.name)}</div><div class="factory-sub">${esc(b.address)}<br>โทรศัพท์ ${esc(b.phone||'-')}${b.taxId?' · เลข อย. '+esc(b.taxId):''}</div><div class="report-name">${esc(reportTitle)}</div></div><div class="doc-control"><span>เลขที่เอกสาร</span><strong>${esc(docNo)}</strong></div></div><div class="doc-meta"><span>วันที่ออกเอกสาร ${pad2(issued.day)}/${pad2(issued.month)}/${issued.year+543} เวลา ${issued.time} น.</span><span>ผู้จัดทำ ${esc(options.author?.name||me()?.name||'-')}</span></div>`;
 }
-function docFooter(docNo){
-  const u=me();
-  return `<div class="sign-row">
-    <div class="sign-box"><div class="line">${esc(u.name)}</div><div class="role">ผู้จัดทำข้อมูล</div><div class="sign-date">วันที่ ____/____/______</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">พนักงานส่งน้ำ</div><div class="sign-date">วันที่ ____/____/______</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ</div><div class="sign-date">วันที่ ____/____/______</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้อนุมัติ</div><div class="sign-date">วันที่ ____/____/______</div></div>
-  </div>
-  <div class="doc-foot"><span><strong>เลขที่เอกสาร ${esc(docNo)}</strong> · เอกสารภายใน ห้ามแก้ไขโดยไม่ได้รับอนุญาต</span><span>ระบบสารสนเทศจัดการลูกหนี้ · เฟรชชี่ วอเตอร์</span></div>`;
+function docFooter(docNo,author=me()||{name:''}){
+  return `<div class="sign-row"><div class="sign-box"><div class="line">(${esc(author.name||'........................................')})</div><div class="role">ผู้จัดทำข้อมูล</div><div class="sign-date">วันที่ .... / .... / ........</div></div><div class="sign-box"><div class="line">(........................................)</div><div class="role">พนักงานส่งน้ำ</div><div class="sign-date">วันที่ .... / .... / ........</div></div><div class="sign-box"><div class="line">(........................................)</div><div class="role">ผู้ตรวจสอบ</div><div class="sign-date">วันที่ .... / .... / ........</div></div><div class="sign-box"><div class="line">(........................................)</div><div class="role">ผู้อนุมัติ</div><div class="sign-date">วันที่ .... / .... / ........</div></div></div><div class="doc-foot"><span>เลขที่เอกสาร ${esc(docNo)} ออกโดยระบบสารสนเทศจัดการลูกหนี้</span><span>โรงน้ำดื่ม เฟรชชี่ วอเตอร์</span></div>`;
 }
 function buildDebtorReportHtml(area,filter,mode,customerId){
   let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='unpaid'&&(!customerId||d.customerId===customerId));
@@ -1369,13 +1319,7 @@ function buildCashReportHtml(date){
   rows.forEach((r,i)=>{body+=`<tr><td>${i+1}</td><td>${esc(r.customerCode)}</td><td class="l">${esc(r.customerName)}</td><td>${esc(r.village||'-')}</td><td>${esc(r.moo||'-')}</td><td>${r.jugs}</td><td>${r.packs}</td><td class="r">${fmtN(r.jugAmount)}</td><td class="r">${fmtN(r.packAmount)}</td><td class="r">${fmtN(r.jugAmount+r.packAmount)}</td></tr>`;});
   const tj=rows.reduce((s,r)=>s+r.jugs,0),tp=rows.reduce((s,r)=>s+r.packs,0),tt=rows.reduce((s,r)=>s+r.jugAmount+r.packAmount,0);
   body+=`<tr style="background:#eef2f7;font-weight:700"><td colspan="5">รวมทั้งหมด</td><td>${tj}</td><td>${tp}</td><td class="r">${fmtN(rows.reduce((s,r)=>s+r.jugAmount,0))}</td><td class="r">${fmtN(rows.reduce((s,r)=>s+r.packAmount,0))}</td><td class="r">${fmtN(tt)}</td></tr></tbody></table>`;
-  body+=`<div class="sign-row">
-    <div class="sign-box"><div class="line">${esc(me().name)}</div><div class="role">ผู้ออกเอกสาร</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ข้อมูลจากฐานระบบ</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ชื่อผู้รับผิดชอบ</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ส่งน้ำ</div></div>
-    <div class="sign-box"><div class="line">&nbsp;</div><div class="role">ผู้ตรวจสอบ / หัวหน้า</div></div>
-  </div><div class="doc-foot">เลขที่เอกสาร ${docNo} ออกเอกสารโดยระบบจัดการลูกหนี้โรงน้ำดื่ม เฟรชชี่ วอเตอร์</div>`;
+  body+=docFooter(docNo);
   return {html:body,docNo};
 }
 function printCashReport(date){const r=buildCashReportHtml(date);preparePrint(r.html,r.docNo);}
@@ -1383,8 +1327,8 @@ function openEmailReport(kind){
   openModal(`<div class="modal-head"><h3><i data-lucide="mail"></i> ส่งรายงานทางอีเมล</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
   <div class="modal-body"><div class="form-grid">
     <div class="field full"><label>อีเมลผู้รับ / กลุ่มผู้รับ (คั่นด้วยจุลภาค อัฒภาค หรือขึ้นบรรทัดใหม่)</label><textarea id="er_to" rows="3">${esc(DB.settings.email.adminEmail||'')}</textarea></div>
-    <div class="field full"><label>รูปแบบอีเมล</label><select id="er_fmt" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="simple">แบบเรียบง่าย</option><option value="formal">แบบเป็นทางการ</option></select></div>
-    <p style="font-size:12px;color:var(--muted);grid-column:1/-1">ส่งรายละเอียดรายงานในเนื้อหาอีเมลโดยใช้บัญชีผู้ส่งที่บันทึกไว้ รองรับผู้รับสูงสุด 10 อีเมล</p>${!DB.settings.email.enabled?'<div class="field full"><p>ยังไม่ได้เปิดใช้งานบัญชีผู้ส่ง กรุณาตั้งค่าครั้งแรกก่อนส่งรายงาน</p>'+(isAdmin()?'<button class="btn btn-ghost" id="setupReportEmail">ตั้งค่าบัญชีผู้ส่ง</button>':'<p>ให้ผู้ดูแลระบบบันทึกบัญชีผู้ส่งครั้งแรก</p>')+'</div>':''}<p id="emailReportStatus" role="status" class="help-text full"></p>
+    <div class="field full"><label>รูปแบบอีเมล</label><select id="er_fmt" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="simple">แบบเรียบง่าย</option><option value="formal" selected>แบบทางการ พร้อม PDF แนบ</option></select></div>
+    <p style="font-size:12px;color:var(--muted);grid-column:1/-1">แบบทางการจะส่งอีเมลแจ้งนำส่งเอกสารและแนบ PDF อัตโนมัติ แบบเรียบง่ายส่งรายละเอียดในอีเมล รองรับผู้รับสูงสุด 10 อีเมล</p>${!DB.settings.email.enabled?'<div class="field full"><p>ยังไม่ได้เปิดใช้งานบัญชีผู้ส่ง กรุณาตั้งค่าครั้งแรกก่อนส่งรายงาน</p>'+(isAdmin()?'<button class="btn btn-ghost" id="setupReportEmail">ตั้งค่าบัญชีผู้ส่ง</button>':'<p>ให้ผู้ดูแลระบบบันทึกบัญชีผู้ส่งครั้งแรก</p>')+'</div>':''}<p id="emailReportStatus" role="status" class="help-text full"></p>
   </div></div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-gold" id="doSendEmail" ${!DB.settings.email.enabled?'disabled':''}><i data-lucide="send"></i> ส่งรายงาน</button></div>`);
   if($('#setupReportEmail'))$('#setupReportEmail').onclick=()=>{closeModal();settingTab='email';navigate('settings');};
@@ -1395,7 +1339,8 @@ function openEmailReport(kind){
     if(kind==='cash')r=buildCashReportHtml(cashDateFilter);
     else if(kind&&kind.startsWith('customers-'))r=buildCustomerReportHtml(kind.split('-')[1]);
     else r=buildDebtorReportHtml(kind==='nai'?'nai':'other','all','combined');
-    const sent=await sendAlert('report','[รายงาน] '+ (kind==='cash'?'รายงานลูกค้าจ่ายสด':'รายงานลูกหนี้') +' เลขที่ '+r.docNo, ( $('#er_fmt').value==='formal'?'<p>เรียน ผู้เกี่ยวข้อง</p><p>ทางโรงน้ำดื่ม เฟรชชี่ วอเตอร์ ขอส่งรายงานฉบับนี้ให้เพื่อทราบ</p><hr>':'<p>ส่งรายงานให้ครับ</p>') + r.html,to);
+    const format=$('#er_fmt').value,snapshot=format==='formal'?FreshyFeatures.documentSnapshot(r.html,r.docNo,DB.settings.business,me(),document):undefined;
+    const sent=await sendAlert('report','[แจ้งนำส่งรายงาน] '+(snapshot?.title||(kind==='cash'?'รายงานลูกค้าจ่ายสด':'รายงานลูกหนี้'))+' · '+r.docNo,r.html,to,{format,snapshot});
     if(sent){closeModal();toast('ผู้ให้บริการรับรายงานแล้ว','success');}else if(status.isConnected){status.textContent=DB.sentEmails[0]?.status||'ยังไม่ส่งรายงาน กรุณาตรวจบัญชีผู้ส่งในหน้าตั้งค่าอีเมล';}
     }catch(e){if(status.isConnected)status.textContent=e.message;toast(e.message,'error');}finally{if(button.isConnected){button.disabled=false;button.innerHTML='<i data-lucide="send"></i> ส่งรายงาน';if(window.lucide)lucide.createIcons();}}
   });
