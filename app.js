@@ -1291,9 +1291,9 @@ function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=
 /* ============================================================
    PRINT / PDF / EMAIL REPORT (A4, เลขที่เอกสารไม่ซ้ำ)
    ============================================================ */
-function nextDocNo(prefix){const p=FreshyFeatures.bangkokParts();return String(prefix||'DOC')+p.date.replace(/-/g,'')+'-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomUUID().slice(0,8).toUpperCase();}
+function nextDocNo(prefix){return FreshyFeatures.shortDocumentNumber(prefix,crypto);}
 function docHeader(reportTitle,docNo){
-  const s=DB.settings; const d=new Date();
+  const s=DB.settings; const issued=FreshyFeatures.bangkokParts();
   const logo=s.header.showLogo&&s.header.logoDataUrl?('<img src="'+esc(s.header.logoDataUrl)+'" alt="logo">'):'<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>';
   return `<div class="doc-head">
     <div class="doc-logo">${logo}</div>
@@ -1306,7 +1306,7 @@ function docHeader(reportTitle,docNo){
   </div>
   <div class="doc-meta">
     <div><b>ประเภทเอกสาร</b> ทะเบียนและติดตามลูกหนี้</div>
-    <div><b>วันที่ออกเอกสาร</b> ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()+543} · ${pad2(d.getHours())}:${pad2(d.getMinutes())} น.</div>
+    <div><b>วันที่ออกเอกสาร</b> ${pad2(issued.day)}/${pad2(issued.month)}/${issued.year+543} · ${issued.time} น.</div>
     <div class="doc-no">เลขอ้างอิง ${esc(docNo)}</div>
   </div>`;
 }
@@ -1327,16 +1327,17 @@ function buildDebtorReportHtml(area,filter,mode,customerId){
   const groups={};rows.forEach(d=>{(groups[d.customerId]=groups[d.customerId]||[]).push(d);});
   const docNo=nextDocNo(DB.settings.docPrefix.debtor);
   let body=docHeader('รายงานลูกหนี้ค้างชำระ '+(area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ')+(filter&&filter!=='all'?' ('+(area==='nai'?'หมู่ที่ '+filter:filter)+')':''),docNo);
+  let reportIndex=0;
   const renderGroup=(list,title)=>{
-    let h='';if(title)h+='<div class="doc-section-title">'+esc(title)+'</div>';
-    Object.keys(list).forEach(cid=>{
-      const dl=list[cid].sort((a,b)=>a.debtDate<b.debtDate?-1:1);
-      const tj=dl.reduce((s,d)=>s+(d.jugs||0),0),tp=dl.reduce((s,d)=>s+(d.packs||0),0),tt=dl.reduce((s,d)=>s+d.total,0);
-      h+='<table class="doc-table"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม</th></tr></thead><tbody>';
-      dl.forEach((d,i)=>{h+=`<tr><td>${i+1}</td><td class="l">${i===0?esc(d.customerName):''}</td><td>${thDate(d.debtDate)}</td><td>${d.jugs||0}</td><td>${d.packs||0}</td><td class="r">${fmtN(d.jugAmount)}</td><td class="r">${fmtN(d.packAmount)}</td><td class="r">${fmtN(d.total)}</td></tr>`;});
-      h+='</tbody></table><div class="doc-summary">รวม '+esc(dl[0].customerName)+' : '+tj+' ถัง, '+tp+' แพ็ค, รวมทั้งหมด '+fmtN(tt)+' บาท</div><div class="doc-gap"></div>';
-    });
-    return h;
+    const customerIds=Object.keys(list);if(!customerIds.length)return '';
+    let h=title?'<div class="doc-section-title">'+esc(title)+'</div>':'';
+    h+='<table class="doc-table debtor-report-table"><colgroup><col style="width:5%"><col style="width:22%"><col style="width:12%"><col style="width:12%"><col style="width:5%"><col style="width:5%"><col style="width:13%"><col style="width:13%"><col style="width:13%"></colgroup><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th>'+(area==='nai'?'หมู่ที่':'หมู่บ้าน')+'</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม</th></tr></thead><tbody>';
+    for(const cid of customerIds){
+      const dl=[...list[cid]].sort((a,b)=>a.debtDate.localeCompare(b.debtDate));
+      for(const d of dl){h+=`<tr><td>${++reportIndex}</td><td class="l">${esc(d.customerName)}</td><td class="l">${esc(area==='nai'?d.moo:d.village||'-')}</td><td>${thDate(d.debtDate)}</td><td>${d.jugs||0}</td><td>${d.packs||0}</td><td class="r">${fmtN(d.jugAmount)}</td><td class="r">${fmtN(d.packAmount)}</td><td class="r">${fmtN(d.total)}</td></tr>`;}
+      if(dl.length>1){const sum=key=>dl.reduce((n,d)=>n+Number(d[key]||0),0);h+=`<tr class="doc-customer-total"><td></td><td colspan="3" class="l">รวม ${esc(dl[0].customerName)}</td><td>${sum('jugs')}</td><td>${sum('packs')}</td><td class="r">${fmtN(sum('jugAmount'))}</td><td class="r">${fmtN(sum('packAmount'))}</td><td class="r">${fmtN(sum('total'))}</td></tr>`;}
+    }
+    return h+'</tbody></table>';
   };
   if(mode==='split'&&area==='nai'){
     const g7={},g16={};Object.keys(groups).forEach(cid=>{const m=groups[cid][0].moo==='7'?g7:g16;m[cid]=groups[cid];});
@@ -1345,6 +1346,7 @@ function buildDebtorReportHtml(area,filter,mode,customerId){
     const byV={};Object.keys(groups).forEach(cid=>{const v=groups[cid][0].village||'อื่น ๆ';(byV[v]=byV[v]||{})[cid]=groups[cid];});
     Object.keys(byV).forEach(v=>{body+=renderGroup(byV[v],v);});
   }else body+=renderGroup(groups,'');
+  body+=`<div class="doc-summary report-total">ลูกหนี้ ${Object.keys(groups).length} ราย · ${rows.length} รายการ · ยอดค้างรวมทั้งหมด ${fmtN(rows.reduce((n,d)=>n+Number(d.total||0),0))} บาท</div>`;
   body+=docFooter(docNo);
   return {html:body,docNo};
 }
