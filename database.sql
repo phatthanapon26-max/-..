@@ -151,7 +151,7 @@ begin
   end if;
   inserted := old is null;
   if coalesce(old,'null'::jsonb) is distinct from coalesce(expected,'null'::jsonb) then
-   raise exception 'CONFLICT:%:%',k,coalesce(rid,'settings') using errcode='40001';
+   raise exception 'CONFLICT:%:%',k,coalesce(rid,'settings') using errcode='PT409';
   end if;
   if proposed='null'::jsonb then proposed:=null; end if;
   if proposed is not null and jsonb_typeof(proposed)<>'object' then raise exception 'INVALID_VALUE'; end if;
