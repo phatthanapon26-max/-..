@@ -218,8 +218,9 @@ async function flushOnline(){
    const before=FreshySync.shared(DB);
    const pending=FreshySync.diff(remoteBase,before);
    if(!pending.length)break;
-   // Small batches prevent one slow request from holding every unsent record.
-   const chunk=pending.slice(0,3);
+   // Send a normal mobile work session in one request. The server still caps
+   // every RPC at 2,500 changes, while groups of 10 keep retries lightweight.
+   const chunk=pending.slice(0,10);
    setStatus('กำลังส่งข้อมูล '+completed+'/'+Math.max(initialTotal,completed+pending.length)+' รายการ','warn');
    const payload=await rpc('freshy_apply',{changes:chunk});
    // Keep both records not included in this chunk and edits made while it was in flight.
