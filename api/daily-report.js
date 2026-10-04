@@ -23,15 +23,21 @@ function emailHtml(business,period,date,s){
 function pdfReport(business,period,date,s){return new Promise((resolve,reject)=>{
  const doc=new PDFDocument({size:'A4',margin:42,info:{Title:'Freshy Water Daily Report'}}),parts=[];
  doc.on('data',x=>parts.push(x));doc.on('end',()=>resolve(Buffer.concat(parts)));doc.on('error',reject);
- const thai=path.join(process.cwd(),'vendor/fonts/Sarabun-Regular.ttf');
- const thaiBold=path.join(process.cwd(),'vendor/fonts/Sarabun-Bold.ttf');
- doc.registerFont('Thai',thai).registerFont('ThaiBold',thaiBold);
- doc.fillColor('#000').font('ThaiBold').fontSize(21).text(business.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',42,34,{align:'center'});
- doc.fontSize(15).text('รายงานสรุปทะเบียนลูกหนี้ รอบ '+period+' น.',42,68,{align:'center'});
- doc.fillColor('#111').font('Thai').fontSize(12).text('วันที่รายงาน '+date,42,136);
+ doc.registerFont('Thai',path.join(process.cwd(),'vendor/fonts/Sarabun-Regular.ttf')).registerFont('ThaiBold',path.join(process.cwd(),'vendor/fonts/Sarabun-Bold.ttf'));
+ const title=business.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',ref='SUM'+date.replaceAll('-','')+'-'+period.replace(':','');
+ const bits=date.split('-'),printedDate=bits.length===3?bits[2]+'/'+bits[1]+'/'+(Number(bits[0])+543):date;
+ doc.fillColor('#000').font('ThaiBold').fontSize(19).text(title,42,34,{width:511,height:35,align:'center',ellipsis:true});
+ doc.fontSize(14).text('รายงานสรุปทะเบียนลูกหนี้ รอบ '+period+' น.',42,74,{width:511,align:'center'});
+ doc.font('Thai').fontSize(9).text([business.address,business.phone?'โทร. '+business.phone:''].filter(Boolean).join(' · '),42,101,{width:511,height:17,align:'center',ellipsis:true});
+ doc.moveTo(42,126).lineTo(553,126).strokeColor('#111').stroke();
+ doc.fontSize(10).text('วันที่รายงาน '+printedDate,42,139,{width:255}).text('เลขอ้างอิง '+ref,297,139,{width:256,align:'right'});
  const rows=[['ยอดขายเงินสดวันนี้',money(s.cashTotal)+' บาท'],['ยอดลูกหนี้ใหม่วันนี้',money(s.debtTotal)+' บาท'],['รับชำระวันนี้',money(s.paidTotal)+' บาท'],['ยอดค้างชำระทั้งหมด',money(s.unpaidTotal)+' บาท'],['ลูกหนี้คงค้าง',s.unpaidCount+' ราย'],['จำนวนถังวันนี้',s.jugs+' ถัง'],['จำนวนแพ็ควันนี้',s.packs+' แพ็ค']];
- let y=180;rows.forEach((r,i)=>{doc.rect(42,y,511,42).strokeColor('#555').stroke();doc.fillColor('#000').font('ThaiBold').fontSize(12).text(r[0],58,y+13);doc.fontSize(13).text(r[1],330,y+12,{width:205,align:'right'});y+=48;});
- doc.moveTo(42,545).lineTo(553,545).strokeColor('#555').stroke();doc.fillColor('#111').font('Thai').fontSize(10).text('เอกสารออกโดยระบบจัดการลูกหนี้โรงน้ำดื่ม เฟรชชี่ วอเตอร์',42,560,{align:'center'});
+ let y=178;doc.rect(42,y,511,30).stroke();doc.moveTo(385,y).lineTo(385,y+30).stroke();
+ doc.font('ThaiBold').fontSize(11).text('รายการ',55,y+7,{width:315}).text('จำนวน / ยอดรวม',398,y+7,{width:141,align:'right'});y+=30;
+ for(const r of rows){doc.rect(42,y,511,39).stroke();doc.moveTo(385,y).lineTo(385,y+39).stroke();doc.font('Thai').fontSize(11).text(r[0],55,y+11,{width:315});doc.font('ThaiBold').text(r[1],398,y+11,{width:141,align:'right'});y+=39;}
+ doc.font('Thai').fontSize(9).text('สรุปจากข้อมูลในฐานข้อมูล ณ รอบเวลารายงาน กรุณาตรวจสอบก่อนรับรองเอกสาร',42,500,{width:511});
+ const roles=['ผู้จัดทำรายงาน','ผู้ตรวจสอบ','ผู้บริหาร'];roles.forEach((role,i)=>{const x=42+i*174;doc.moveTo(x,625).lineTo(x+163,625).stroke();doc.fontSize(10).text(role,x,637,{width:163,align:'center'});doc.fontSize(9).text('วันที่ ____ / ____ / ______',x,663,{width:163,align:'center'});});
+ doc.moveTo(42,733).lineTo(553,733).stroke();doc.fontSize(8).text('เอกสารออกโดยระบบจัดการลูกหนี้ · '+title,42,743,{width:420,height:25,ellipsis:true}).text('หน้า 1 / 1',477,743,{width:76,align:'right'});
  doc.end();
 });}
 
