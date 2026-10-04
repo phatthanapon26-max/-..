@@ -90,7 +90,7 @@ const pad2 = n => String(n).padStart(2,'0');
 function todayStr(){return FreshyFeatures.bangkokParts().date;}
 function fmtDate(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return fmtDate(d);}
-function thDate(iso){if(!iso)return'-';const p=String(iso).split(' ')[0].split('-');if(p.length<3)return iso;return p[2]+'/'+p[1]+'/'+p[0];}
+function thDate(iso){if(!iso)return'-';const p=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);if(!p)return String(iso);const year=Number(p[1]);return p[3]+'/'+p[2]+'/'+(year<2400?year+543:year);}
 function thDateTime(iso){if(!iso)return'-';const d=new Date(iso);return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());}
 function thDateTimeSec(iso){if(!iso)return'-';const d=new Date(iso);return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds())+' น.';}
 function nextCustomerCode(){let max=0;DB.customers.forEach(c=>{const m=String(c.code||'').match(/(\d+)/);if(m)max=Math.max(max,+m[1]);});return 'C'+String(max+1).padStart(3,'0');}
