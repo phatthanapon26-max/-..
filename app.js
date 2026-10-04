@@ -146,7 +146,7 @@ function dbLoad(){
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
 const SUPA_COLS=FreshySync.collections;
 const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
-let authClient=null,authIdentity=null,remoteBase=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null;
+let authClient=null,authIdentity=null,remoteBase=null,remoteSettings=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null;
 function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
 function authFor(cfg){
  if(!window.supabase)throw Error('โหลดระบบล็อกอินไม่สำเร็จ');
@@ -164,7 +164,7 @@ function safeCache(){
  const config=DB.settings.db;
  localStorage.setItem('freshywater_dbconfig_v1',JSON.stringify(config));
  if(config.mode!=='supabase'){localStorage.setItem(DBKEY,JSON.stringify(DB));return;}
- if(authIdentity&&remoteBase)localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,data:FreshySync.shared(DB)}));
+ if(authIdentity&&remoteBase)localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,data:FreshySync.shared(DB)}));
 }
 function draftKey(){return 'freshy_draft_v2_'+authIdentity.id+'_'+supaCfg().url;}
 function installRemote(payload,preserve){
@@ -172,10 +172,11 @@ function installRemote(payload,preserve){
  const cfg=DB.settings.db;
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
- data.settings=Object.assign(defaults,data.settings||{});
+ remoteSettings=FreshySync.clone(data.settings||{});delete remoteSettings.db;
+ data.settings=Object.assign(defaults,remoteSettings);
  remoteBase=FreshySync.clone(data);
  const merged=FreshySync.overlay(data,preserve||[]);
- for(const k of SUPA_COLS){if(k==='settings')Object.assign(DB.settings,merged[k]);else DB[k]=merged[k];}
+ for(const k of SUPA_COLS){if(k==='settings')DB.settings=FreshySync.clone(merged[k]);else DB[k]=merged[k];}
  DB.settings.db=cfg;
  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
@@ -184,8 +185,10 @@ function installRemote(payload,preserve){
 async function rpc(name,body){
  const cfg=supaCfg();if(!cfg||!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');
  const client=authFor(cfg);
- const {data,error}=await client.rpc(name,body||{});
- if(error)throw Error(error.message||'คำขอฐานข้อมูลล้มเหลว');
+ const request=FreshySync.clone(body||{});
+ if(name==='freshy_apply')for(const c of request.changes||[])if(c.collection==='settings')c.expected=FreshySync.clone(remoteSettings||c.expected||{});
+ const {data,error}=await client.rpc(name,request);
+ if(error){const failure=Error(error.message||'คำขอฐานข้อมูลล้มเหลว');failure.code=error.code;throw failure;}
  return data;
 }
 async function supabaseFetch(){
@@ -225,13 +228,13 @@ async function flushOnline(){
    let payload;
    try{payload=await rpc('freshy_apply',{changes:chunk});}
    catch(e){
-    // Older open tabs can carry a stale settings snapshot. Never let that
-    // low-priority conflict block newly entered customers or debtor records.
-    if(/CONFLICT:settings:settings/.test(e.message||'')){
-     const businessPending=pending.filter(c=>c.collection!=='settings');
+    if(/CONFLICT:/.test(e.message||'')){
      const latest=await rpc('freshy_read');
-     installRemote(latest,businessPending);
-     toast('ปรับค่าตั้งค่าให้ตรงกับฐานข้อมูลแล้ว · กำลังส่งรายการต่อ','info');
+     // Include edits made while the request was running. Reconcile only
+     // disjoint changes or records already committed by a timed-out request.
+     const allPending=FreshySync.diff(remoteBase,FreshySync.shared(DB));
+     const rebased=FreshySync.rebase(latest.data,allPending);
+     installRemote(latest,rebased);
      continue;
     }
     throw e;
@@ -272,7 +275,7 @@ async function startRealtime(){
    clearTimeout(realtimeRefreshTimer);
    realtimeRefreshTimer=setTimeout(()=>{if(document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},700);
   })
-  .subscribe(status=>{if(status==='SUBSCRIBED'&&session)setStatus('เชื่อมต่อฐานข้อมูลแบบเรียลไทม์','ok');});
+  .subscribe(status=>{if(status==='SUBSCRIBED'&&session&&!syncBusy&&!syncBlocked&&!FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)setStatus('เชื่อมต่อฐานข้อมูลแบบเรียลไทม์','ok');});
 }
 function broadcastOnlineChange(){
  if(!realtimeChannel)return;
@@ -364,17 +367,16 @@ function resumeCachedOnline(user){
  if(!employee)return false;
  const cfg=DB.settings.db;
  for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),data.settings||{});else DB[k]=data[k]||[];}
- DB.settings.db=cfg;remoteBase=cached.base;session={empId:employee.id,loginAt:new Date().toISOString(),online:true,cached:true};
+ DB.settings.db=cfg;remoteBase=FreshySync.shared(cached.base);remoteSettings=FreshySync.clone(cached.rawSettings||remoteBase.settings);delete remoteSettings.db;session={empId:employee.id,loginAt:new Date().toISOString(),online:true,cached:true};
  return true;
 }
 async function hydrateOnline(){
  const payload=await rpc('freshy_read');
  let cached=null;try{cached=JSON.parse(localStorage.getItem(draftKey()));}catch(e){}
  if(cached&&cached.base&&cached.data&&FreshySync.diff(cached.base,cached.data).length){
-  const cfg=DB.settings.db;for(const k of SUPA_COLS)DB[k]=cached.data[k]||payload.data[k]||(k==='settings'?defaultSettings():[]);
-  DB.settings.db=cfg;remoteBase=cached.base;
-  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
-  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
+  const pending=FreshySync.diff(FreshySync.shared(cached.base),FreshySync.shared(cached.data));
+  const rebased=FreshySync.rebase(payload.data,pending);
+  installRemote(payload,rebased);
   await flushOnline();
  }else installRemote(payload,[]);
  enterApp();
@@ -1409,10 +1411,8 @@ setInterval(()=>{
   if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
 },15000);
-// No background polling: the previous timer could multiply across stale browser tabs
-// and overload a Nano database. Writes still sync immediately; users can tap the
-// database status badge to request a fresh read when needed.
-setInterval(()=>{if(authIdentity&&document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},120000);
+// Broadcast refreshes immediately; a visible-tab poll recovers missed events.
+setInterval(()=>{if(authIdentity&&document.visibilityState==='visible'&&!modalIsOpen())supabaseFetch();},15000);
 
 /* ============================================================
    INIT
