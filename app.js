@@ -172,8 +172,8 @@ function installRemote(payload,preserve){
  const cfg=DB.settings.db;
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
- remoteSettings=FreshySync.clone(data.settings||{});delete remoteSettings.db;
- data.settings=Object.assign(defaults,remoteSettings);
+ remoteSettings=FreshySync.clone(data.settings||{});
+ data.settings=Object.assign(defaults,remoteSettings);delete data.settings.db;
  remoteBase=FreshySync.clone(data);
  const merged=FreshySync.overlay(data,preserve||[]);
  for(const k of SUPA_COLS){if(k==='settings')DB.settings=FreshySync.clone(merged[k]);else DB[k]=merged[k];}
@@ -367,7 +367,7 @@ function resumeCachedOnline(user){
  if(!employee)return false;
  const cfg=DB.settings.db;
  for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),data.settings||{});else DB[k]=data[k]||[];}
- DB.settings.db=cfg;remoteBase=FreshySync.shared(cached.base);remoteSettings=FreshySync.clone(cached.rawSettings||remoteBase.settings);delete remoteSettings.db;session={empId:employee.id,loginAt:new Date().toISOString(),online:true,cached:true};
+ DB.settings.db=cfg;remoteBase=FreshySync.shared(cached.base);remoteSettings=FreshySync.clone(cached.rawSettings||remoteBase.settings);session={empId:employee.id,loginAt:new Date().toISOString(),online:true,cached:true};
  return true;
 }
 async function hydrateOnline(){
