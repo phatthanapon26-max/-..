@@ -222,7 +222,20 @@ async function flushOnline(){
    // every RPC at 2,500 changes, while groups of 10 keep retries lightweight.
    const chunk=pending.slice(0,10);
    setStatus('กำลังส่งข้อมูล '+completed+'/'+Math.max(initialTotal,completed+pending.length)+' รายการ','warn');
-   const payload=await rpc('freshy_apply',{changes:chunk});
+   let payload;
+   try{payload=await rpc('freshy_apply',{changes:chunk});}
+   catch(e){
+    // Older open tabs can carry a stale settings snapshot. Never let that
+    // low-priority conflict block newly entered customers or debtor records.
+    if(/CONFLICT:settings:settings/.test(e.message||'')){
+     const businessPending=pending.filter(c=>c.collection!=='settings');
+     const latest=await rpc('freshy_read');
+     installRemote(latest,businessPending);
+     toast('ปรับค่าตั้งค่าให้ตรงกับฐานข้อมูลแล้ว · กำลังส่งรายการต่อ','info');
+     continue;
+    }
+    throw e;
+   }
    // Keep both records not included in this chunk and edits made while it was in flight.
    const during=FreshySync.diff(before,FreshySync.shared(DB));
    installRemote(payload,pending.slice(chunk.length).concat(during));
