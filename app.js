@@ -772,7 +772,7 @@ function openAddDebtor(area){
     audit('เพิ่มลูกหนี้',c.name+' ค้าง '+fmtN(d.total)+' บาท');
     if(DB.settings.email.alerts.addDebtor)sendAlert('addDebtor','[แจ้งเตือน] พนักงานเพิ่มรายการลูกหนี้',
       `<p>พนักงาน <b>${esc(me().name)}</b> เพิ่มรายการลูกหนี้</p><ul><li>ชื่อลูกหนี้: ${esc(c.name)} (${esc(c.code)})</li><li>หมู่บ้าน/หมู่ที่: ${esc(area==='nai'?'บ้านนาไฮ หมู่ที่ '+moo:village)}</li><li>วันที่ค้าง: ${thDate(d.debtDate)}</li><li>จำนวนถังค้าง: ${jugs} ถัง</li><li>จำนวนแพ็คค้าง: ${packs} แพ็ค</li><li>เงินค้างน้ำแพ็ค: ${fmtN(pa)} บาท</li><li>ยอดค้างรวม: ${fmtN(d.total)} บาท</li></ul>`);
-    const ok=authIdentity?await flushOnline():true;closeModal();renderPage();if(!ok){toast('รายการยังอยู่ในเครื่องและรอส่ง ห้ามปิดระบบจนกว่าสถานะจะยืนยันบันทึกออนไลน์','error');return;}toast(authIdentity?'บันทึกลงฐานข้อมูลแล้ว (รหัส '+c.code+')':'บันทึกข้อมูลสาธิตแล้ว','success');askContinueDebtor(area);
+    const ok=authIdentity?await flushOnline():true,confirmed=!authIdentity||remoteBase?.debtors?.some(row=>row.id===d.id);closeModal();renderPage();if(!ok||!confirmed){toast(syncIssues.some(item=>item.change.id===d.id||item.change.id===c.id)?'เก็บรายการไว้ให้ตรวจสอบแล้ว · เปิดข้อมูลรอส่งเพื่อดูรายละเอียด':'เก็บรายการไว้ในเครื่องแล้ว · ระบบจะส่งต่อเมื่อเชื่อมต่อได้','info');return;}toast(authIdentity?'บันทึกลงฐานข้อมูลแล้ว (รหัส '+c.code+')':'บันทึกข้อมูลสาธิตแล้ว','success');askContinueDebtor(area);
   });
 }
 
