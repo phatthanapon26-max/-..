@@ -37,6 +37,11 @@ begin
    select x into old from jsonb_array_elements(vals) x where x->>'id'=rid limit 1;
   end if;
   inserted := old is null;
+  -- A lost response can retry an already committed audit. Only the author can
+  -- acknowledge identical immutable content; server timestamps are ignored.
+  if k='audit' and old is not null and expected='null'::jsonb
+   and old->>'userId'=aid and proposed->>'userId'=aid
+   and (old-'ts'-'userName')=(proposed-'ts'-'userName') then continue; end if;
   if coalesce(old,'null'::jsonb) is distinct from coalesce(expected,'null'::jsonb) then
    raise exception 'CONFLICT:%:%',k,coalesce(rid,'settings') using errcode='PT409';
   end if;
@@ -63,7 +68,9 @@ begin
     page_name := case k when 'cashsales' then 'cashsales'
      when 'customers' then case when proposed->>'area'='nai' then 'customersNai' else 'customersOther' end
      else case when proposed->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end;
-    if not coalesce((pages->>page_name)::boolean,false) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;
+    -- New debtors need a customer reference even when the separate customer menu is hidden.
+    -- Ownership still limits reads and writes; existing customer edits require that menu permission.
+    if not coalesce((pages->>page_name)::boolean,false) and not (k='customers' and inserted and coalesce((pages->>case when proposed->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end)::boolean,false)) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;
     if inserted then
      if proposed->>'createdBy' is distinct from aid then raise exception 'OWNER_REQUIRED'; end if;
      if k='debtors' and proposed->>'status' is distinct from 'unpaid' then raise exception 'NEW_DEBT_UNPAID'; end if;
@@ -79,6 +86,9 @@ begin
     end if;
    end if;
   end if;
+  if k='customers' and proposed is not null and coalesce(proposed->>'code','')<>''
+   and exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and lower(trim(x->>'code'))=lower(trim(proposed->>'code')))
+   and (inserted or proposed->>'code' is distinct from old->>'code') then raise exception 'DUPLICATE_CUSTOMER_CODE'; end if;
   if k='debtors' and proposed is not null and coalesce(proposed->>'status','') not in ('paid','unpaid') then raise exception 'INVALID_DEBT_STATUS'; end if;
   if k in ('debtors','cashsales') and proposed is not null then
    foreach field_name in array array['jugs','packs','jugAmount','packAmount'] loop

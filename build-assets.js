@@ -11,7 +11,7 @@ html=html.replace(/url\(['"]?(vendor\/fonts\/[^)'"\s]+)['"]?\)/g,(_,src)=>'url(d
 fs.writeFileSync(path.join(root,'freshy-water-standalone.html'),html);
 const output=path.join(root,'dist');
 fs.mkdirSync(output,{recursive:true});
-for(const name of ['index.html','app.js','sync.js','features.js','data-tools.js','ui.css','report.css','document.html','document.css','document-view.js','deploy-config.js','database-config.js','freshy-water-standalone.html','database.sql'])fs.copyFileSync(path.join(root,name),path.join(output,name));
+for(const name of ['index.html','app.js','dashboard.js','modern.css','sync.js','features.js','data-tools.js','ui.css','report.css','document.html','document.css','document-view.js','deploy-config.js','database-config.js','freshy-water-standalone.html','database.sql'])fs.copyFileSync(path.join(root,name),path.join(output,name));
 fs.cpSync(path.join(root,'vendor'),path.join(output,'vendor'),{recursive:true});
 const preview=read('index.html').replace('<script src="deploy-config.js"></script>', '<script>window.FRESHY_PREVIEW=true;window.FRESHY_CONFIG={mode:"demo"};</script>').replace('type="password" id="loginCode"','type="text" id="loginCode"').replace('<p class="sub">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</p>','<p class="sub">ตัวอย่างการออกแบบ · ข้อมูลจำลองเท่านั้น</p>');
 fs.writeFileSync(path.join(output,'design-preview.html'),preview);

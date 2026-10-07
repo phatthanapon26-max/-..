@@ -20,7 +20,7 @@ assert.throws(()=>S.rebase({settings:{business:{name:'Different',phone:'1'},docc
 const app=fs.readFileSync(__dirname+'/app.js','utf8');
 const install=app.slice(app.indexOf('function installRemote('),app.indexOf('async function rpc('));
 const raw={business:{name:'Live'},doccounters:{},db:{old:true}};
-const context={FreshySync:S,SUPA_COLS:S.collections,DB:{settings:{db:{mode:'supabase'}}},defaultSettings:()=>({business:{name:'Default'},email:{enabled:false},db:{mode:'demo'}}),safeCache:()=>{},remoteBase:null,remoteSettings:null};
+const context={FreshySync:S,SUPA_COLS:S.collections,DB:{settings:{db:{mode:'supabase'}}},defaultSettings:()=>({business:{name:'Default'},email:{enabled:false},db:{mode:'demo'}}),safeCache:()=>{},archiveSyncChanges:()=>{},remoteBase:null,remoteSettings:null};
 vm.createContext(context);vm.runInContext(install,context);
 context.installRemote({actor:{id:'admin'},data:{settings:raw,employees:[{id:'admin'}]}},[]);
 assert.equal(S.diff(context.remoteBase,S.shared(context.DB)).length,0,'UI defaults must not create phantom pending settings');
@@ -43,11 +43,11 @@ async function verifyFlush(){
   if(loseResponse){loseResponse=false;return {error:{message:'TimeoutError: signal timed out'}};}
   return {data:{actor:{id:'admin'},data:S.clone(database)}};
  }};
- const env={...context,DB:{settings:{db:{mode:'supabase'}}},remoteBase:null,remoteSettings:null,authIdentity:{id:'user'},syncPromise:null,syncBusy:false,syncBlocked:false,syncRetryCount:0,syncRetryTimer:null,supaCfg:()=>({url:'test'}),authFor:()=>client,setStatus:()=>{},toast:()=>{},broadcastOnlineChange:()=>{},clearTimeout:()=>{},setTimeout:()=>0};
+ const env={...context,DB:{settings:{db:{mode:'supabase'}}},remoteBase:null,remoteSettings:null,authIdentity:{id:'user'},syncPromise:null,syncReadPromise:null,syncIssues:[],syncViewDirty:false,lastSyncAt:0,updateSyncNotice:()=>{},refreshSyncedView:()=>{},syncBusy:false,syncBlocked:false,syncRetryCount:0,syncRetryTimer:null,supaCfg:()=>({url:'test'}),authFor:()=>client,setStatus:()=>{},toast:()=>{},broadcastOnlineChange:()=>{},clearTimeout:()=>{},setTimeout:()=>0};
  vm.createContext(env);vm.runInContext(install,env);
  vm.runInContext(app.slice(app.indexOf('async function rpc('),app.indexOf('async function supabaseFetch(')),env);
  vm.runInContext(app.slice(app.indexOf('async function flushOnline('),app.indexOf('function supabasePush(')),env);
- env.installRemote({actor:{id:'admin'},data:S.clone(database)},[]);
+ env.acceptRemote=(payload,changes)=>env.installRemote(payload,S.reconcile(payload.data,changes||[]).pending);env.installRemote({actor:{id:'admin'},data:S.clone(database)},[]);
  env.DB.customers=queued.map(c=>S.clone(c.value));env.DB.settings.business.name='Updated';
  assert.equal(await env.flushOnline(),false,'Lost response must leave the draft pending');
  assert.equal(await env.flushOnline(),true,'Retry must recognize the first committed batch and send the remaining row');

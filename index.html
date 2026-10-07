@@ -522,7 +522,8 @@ table.tbl tr:hover td{background:#fafbfd}
 }
 
 </style>
-<link rel="stylesheet" href="ui.css?v=8.0.0"><link rel="stylesheet" href="report.css?v=8.1.0"></head>
+<link rel="stylesheet" href="ui.css?v=8.0.0"><link rel="stylesheet" href="modern.css?v=8.3.0">
+<link rel="stylesheet" href="report.css?v=8.1.0"></head>
 <body>
 
 <!-- ============ LOGIN SCREEN ============ -->
@@ -553,7 +554,7 @@ table.tbl tr:hover td{background:#fafbfd}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo"><i data-lucide="droplets"></i></div>
-      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.2.0</small></div>
+      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.3.0</small></div>
     </div>
     <nav class="nav" id="navMenu"></nav>
     <div class="sidebar-foot">
@@ -571,7 +572,8 @@ table.tbl tr:hover td{background:#fafbfd}
       <button class="menu-toggle" id="menuToggle"><i data-lucide="menu"></i></button>
       <div class="page-title" id="pageTitle"><i data-lucide="layout-dashboard"></i> ภาพรวมระบบ</div>
       <div class="spacer"></div>
-      <button class="btn btn-ghost btn-sm" id="themeToggle" title="เปลี่ยนธีม"><i data-lucide="moon"></i><span id="themeLabel" style="font-size:11px;margin-left:2px">สว่าง</span></button>
+      <button type="button" class="notification-button" id="notificationsBtn" aria-label="การแจ้งเตือน"><i data-lucide="bell"></i></button>
+<button class="btn btn-ghost btn-sm" id="themeToggle" title="เปลี่ยนธีม"><i data-lucide="moon"></i><span id="themeLabel" style="font-size:11px;margin-left:2px">สว่าง</span></button>
       <button class="btn btn-ghost pending-btn" onclick="resolvePending()">ข้อมูลรอส่ง</button><span class="status-tag info" id="modeTag"><i data-lucide="database"></i> <span id="modeTagText">โหมดสาธิต</span></span>
       <div class="rt-dot"><span class="dot"></span><span id="rtText">อัปเดตแบบเรียลไทม์</span></div>
     </header>
@@ -601,9 +603,9 @@ table.tbl tr:hover td{background:#fafbfd}
 
 <script src="vendor/supabase.js"></script>
 <script src="deploy-config.js"></script>
-<script src="database-config.js?v=8.2.0"></script>
-<script src="sync.js?v=8.2.0"></script>
-<script src="data-tools.js?v=8.1.0"></script><script src="features.js?v=8.0.0"></script><script src="vendor/qrcode.js"></script><script src="app.js?v=8.2.0"></script>
+<script src="database-config.js?v=8.3.0"></script>
+<script src="sync.js?v=8.3.0"></script>
+<script src="data-tools.js?v=8.1.0"></script><script src="features.js?v=8.0.0"></script><script src="vendor/qrcode.js"></script><script src="dashboard.js?v=8.3.0"></script><script src="app.js?v=8.3.0"></script>
 </body>
 </html>
 

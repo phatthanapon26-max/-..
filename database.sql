@@ -104,9 +104,12 @@ $$;
 
 create or replace function public.freshy_visible(k text,v jsonb,a jsonb) returns boolean
 language sql immutable set search_path=pg_catalog as $$
- select case when k in ('customers','debtors','cashsales','audit') then coalesce((a#>>array['permissions','pages',
- case when k='customers' then case when v->>'area'='nai' then 'customersNai' else 'customersOther' end
- when k='debtors' then case when v->>'status'='paid' then case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end else case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end
+ select case when k='customers' then
+  coalesce((a#>>array['permissions','pages',case when v->>'area'='nai' then 'customersNai' else 'customersOther' end])::boolean,false)
+  or coalesce((a#>>array['permissions','pages',case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end])::boolean,false)
+  or coalesce((a#>>array['permissions','pages',case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end])::boolean,false)
+ when k in ('debtors','cashsales','audit') then coalesce((a#>>array['permissions','pages',
+ case when k='debtors' then case when v->>'status'='paid' then case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end else case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end
  else k end])::boolean,false) else true end
 $$;
 
@@ -128,6 +131,22 @@ begin
  end loop;
  return jsonb_build_object('actor',actor,'data',result);
 end $$;
+
+create or replace function public.freshy_customer_code() returns text
+language plpgsql security definer set search_path=pg_catalog,public as $$
+declare actor jsonb; serial bigint; existing bigint;
+begin
+ perform pg_advisory_xact_lock(7248219);
+ actor:=public.freshy_actor();
+ if actor->>'role'<>'admin' and not (coalesce((actor#>>'{permissions,pages,customersNai}')::boolean,false) or coalesce((actor#>>'{permissions,pages,customersOther}')::boolean,false) or coalesce((actor#>>'{permissions,pages,debtorsNai}')::boolean,false) or coalesce((actor#>>'{permissions,pages,debtorsOther}')::boolean,false)) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;
+ select coalesce(max(substring(x->>'code' from '^C([0-9]{1,12})$')::bigint),0) into existing from public.freshy_store s,jsonb_array_elements(s.value) x where s.key='customers';
+ select coalesce((value->>'next')::bigint,0) into serial from public.freshy_store where key='customer_sequence';
+ serial:=greatest(coalesce(serial,0),existing)+1;
+ insert into public.freshy_store(key,value) values('customer_sequence',jsonb_build_object('next',serial)) on conflict(key) do update set value=excluded.value,updated_at=now();
+ return 'C'||case when serial<1000 then lpad(serial::text,3,'0') else serial::text end;
+end $$;
+revoke all on function public.freshy_customer_code() from public,anon;
+grant execute on function public.freshy_customer_code() to authenticated;
 
 create or replace function public.freshy_apply(changes jsonb) returns jsonb
 language plpgsql security definer set search_path=pg_catalog,public as $$
@@ -153,6 +172,11 @@ begin
    select x into old from jsonb_array_elements(vals) x where x->>'id'=rid limit 1;
   end if;
   inserted := old is null;
+  -- A lost response can retry an already committed audit. Only the author can
+  -- acknowledge identical immutable content; server timestamps are ignored.
+  if k='audit' and old is not null and expected='null'::jsonb
+   and old->>'userId'=aid and proposed->>'userId'=aid
+   and (old-'ts'-'userName')=(proposed-'ts'-'userName') then continue; end if;
   if coalesce(old,'null'::jsonb) is distinct from coalesce(expected,'null'::jsonb) then
    raise exception 'CONFLICT:%:%',k,coalesce(rid,'settings') using errcode='PT409';
   end if;
@@ -179,7 +203,9 @@ begin
     page_name := case k when 'cashsales' then 'cashsales'
      when 'customers' then case when proposed->>'area'='nai' then 'customersNai' else 'customersOther' end
      else case when proposed->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end;
-    if not coalesce((pages->>page_name)::boolean,false) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;
+    -- New debtors need a customer reference even when the separate customer menu is hidden.
+    -- Ownership still limits reads and writes; existing customer edits require that menu permission.
+    if not coalesce((pages->>page_name)::boolean,false) and not (k='customers' and inserted and coalesce((pages->>case when proposed->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end)::boolean,false)) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;
     if inserted then
      if proposed->>'createdBy' is distinct from aid then raise exception 'OWNER_REQUIRED'; end if;
      if k='debtors' and proposed->>'status' is distinct from 'unpaid' then raise exception 'NEW_DEBT_UNPAID'; end if;
@@ -195,6 +221,9 @@ begin
     end if;
    end if;
   end if;
+  if k='customers' and proposed is not null and coalesce(proposed->>'code','')<>''
+   and exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and lower(trim(x->>'code'))=lower(trim(proposed->>'code')))
+   and (inserted or proposed->>'code' is distinct from old->>'code') then raise exception 'DUPLICATE_CUSTOMER_CODE'; end if;
   if k='debtors' and proposed is not null and coalesce(proposed->>'status','') not in ('paid','unpaid') then raise exception 'INVALID_DEBT_STATUS'; end if;
   if k in ('debtors','cashsales') and proposed is not null then
    foreach field_name in array array['jugs','packs','jugAmount','packAmount'] loop

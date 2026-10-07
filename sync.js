@@ -33,9 +33,13 @@ function committed(c,current){
 function rebase(remote,changes){const out=[];for(const c of changes){const latest=c.collection==='settings'?remote.settings||{}:(remote[c.collection]||[]).find(x=>x.id===c.id)||null;
  if(c.collection==='settings'){const old=clone(c.expected||{}),wanted=clone(c.value||{}),current=clone(latest);delete old.db;delete wanted.db;delete current.db;const value=mergeSettings(old,wanted,current,'');if(!equal(value,current))out.push({...c,expected:current,value});continue;}
  if(committed(c,latest))continue;
- if(!equal(c.expected,latest))throw Error('CONFLICT:'+c.collection+':'+c.id);
+ if(!equal(c.expected,latest)){
+  if(c.expected&&c.value&&latest){let value;try{value=mergeSettings(c.expected,c.value,latest,'row');}catch{throw Error('CONFLICT:'+c.collection+':'+c.id);}if(!equal(value,latest))out.push({...c,expected:latest,value});continue;}
+  throw Error('CONFLICT:'+c.collection+':'+c.id);
+ }
  out.push({...c,expected:latest});
  }return out;}
-const api={collections,clone,equal,shared,diff,overlay,rebase};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FreshySync=api;
+function reconcile(remote,changes){const pending=[],conflicts=[];for(const change of changes){try{pending.push(...rebase(remote,[change]));}catch(error){conflicts.push({change:clone(change),reason:error.message});}}return {pending,conflicts};}
+const api={collections,clone,equal,shared,diff,overlay,rebase,reconcile};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FreshySync=api;
 })(typeof window!=='undefined'?window:globalThis);
 
