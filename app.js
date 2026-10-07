@@ -1047,9 +1047,9 @@ function renderEmployees(){
     const perms=Object.keys((e.permissions&&e.permissions.pages)||{}).filter(k=>e.permissions.pages[k]).length;
     html+=`<div class="panel"><div class="panel-body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
       <div class="avatar" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">${esc(e.name.charAt(0))}</div>
-      <div style="flex:1;min-width:200px"><div style="font-weight:700;color:var(--navy)">${esc(e.name)} <span class="pill ${e.role==='admin'?'gold':'blue'}">${e.role==='admin'?'แอดมิน':'พนักงาน'}</span> ${e.status==='pending'?'<span class="pill gray">รอเปิดใช้งานบัญชี</span>':['inactive','disabled'].includes(e.status)?'<span class="pill red">ปิดใช้งาน</span>':''}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px">รหัส: ${esc(e.code)} · ${esc(e.email||'ไม่มีอีเมล')} · เห็นหน้า ${perms} หน้า · ปริ้น:${e.permissions.canPrint?'ได้':'ไม่ได้'} · ส่งอีเมล:${e.permissions.canEmail?'ได้':'ไม่ได้'}</div></div>
-      <button class="btn btn-ghost btn-sm printEmp" data-id="${e.id}"><i data-lucide="printer"></i> ปริ้นประวัติ</button> <button class="btn btn-ghost btn-sm editEmp" data-id="${e.id}"><i data-lucide="pencil"></i> แก้ไข</button></div></div>`;
+      <div style="flex:1;min-width:200px"><div style="font-weight:700;color:var(--navy)">${esc(e.name)} <span class="pill ${e.role==='admin'?'gold':'blue'}">${e.role==='admin'?'แอดมิน':'พนักงาน'}</span> ${e.status==='pending'?'<span class="pill gray">ยังไม่ได้เปิดบัญชี</span>':['inactive','disabled'].includes(e.status)?'<span class="pill red">ปิดใช้งาน</span>':''}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">รหัส: ${esc(e.code)} · ${esc(e.contactEmail||(!String(e.email||'').includes('@employees.freshywater.in.th')?e.email:'')||'ไม่มีอีเมลติดต่อ')} · เห็นหน้า ${perms} หน้า · ปริ้น:${e.permissions.canPrint?'ได้':'ไม่ได้'} · ส่งอีเมล:${e.permissions.canEmail?'ได้':'ไม่ได้'}</div></div>
+      <button class="btn btn-ghost btn-sm printEmp" data-id="${e.id}"><i data-lucide="printer"></i> ปริ้นประวัติ</button> <button class="btn btn-ghost btn-sm editEmp" data-id="${e.id}"><i data-lucide="pencil"></i> ${e.status==='pending'?'เปิดใช้งาน':'แก้ไข'}</button></div></div>`;
   });
   $('#pageContent').innerHTML='<div class="page-head"><h2>จัดการข้อมูลพนักงานและสิทธิ์</h2><span class="desc">ชื่อพนักงานที่แสดงในรายงานจะใช้ชื่อจริงที่ตั้งค่าไว้ ไม่ใช่ชื่อสิทธิ์ admin</span><div class="actions"><button class="btn btn-gold btn-sm" id="addEmpBtn"><i data-lucide="user-plus"></i> เพิ่มพนักงาน</button></div></div>'+html;
   $('#addEmpBtn').addEventListener('click',()=>openEditEmp(null));
@@ -1068,9 +1068,10 @@ function openEditEmp(id){
   <div class="modal-body"><div class="form-grid">
     <div class="field"><label>ชื่อพนักงาน (จริง)</label><input id="e_name" value="${esc(e.name)}"></div>
     <div class="field"><label>รหัสพนักงาน (รหัสล็อกอิน)</label><input id="e_code" value="${esc(e.code)}"></div>
-    <div class="field"><label>อีเมลสำหรับบัญชีเข้าสู่ระบบ (เว้นว่างได้)</label><input id="e_email" value="${esc(e.email||'')}"></div>
+    <div class="field"><label>อีเมลติดต่อ (เว้นว่างได้)</label><input id="e_email" value="${esc(e.contactEmail||(String(e.email||'').includes('@employees.freshywater.in.th')?'':e.email)||'')}"></div>
     <div class="field"><label>บทบาท</label><select id="e_role" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="staff" ${e.role==='staff'?'selected':''}>พนักงาน</option><option value="admin" ${e.role==='admin'?'selected':''}>แอดมิน</option></select></div>
-    <div class="field full"><label>สถานะบัญชี</label><select id="e_status"><option value="active" ${(e.status||'active')==='active'?'selected':''}>เปิดใช้งานเมื่อยืนยันบัญชีแล้ว</option><option value="pending" ${e.status==='pending'?'selected':''}>รอเปิดใช้งานบัญชี</option><option value="inactive" ${['inactive','disabled'].includes(e.status)?'selected':''}>ปิดใช้งาน</option></select><p class="help-text">บันทึกทะเบียนพนักงานได้ทันที แม้ยังไม่มีบัญชีเข้าสู่ระบบ ระบบจะเก็บเป็นรอเปิดใช้งาน และยังไม่อนุญาตให้เข้าข้อมูลโรงงาน</p></div>
+    ${!id||e.status==='pending'||!e.email?'<div class="field full"><label>รหัสผ่านเข้าใช้งาน (อย่างน้อย 6 ตัวอักษร)</label><input id="e_password" type="password" autocomplete="new-password"><p class="help-text">บันทึกครั้งเดียว แล้วให้พนักงานเข้าสู่ระบบด้วยรหัสพนักงานและรหัสผ่านนี้ได้เลย ไม่ต้องยืนยันอีเมล</p></div>':'<div class="field full"><p class="help-text">พนักงานใช้รหัสผ่านเดิมเข้าสู่ระบบได้</p></div>'}
+    <div class="field full"><label>สถานะบัญชี</label><select id="e_status"><option value="active" ${!['inactive','disabled'].includes(e.status)?'selected':''}>เปิดใช้งาน</option><option value="inactive" ${['inactive','disabled'].includes(e.status)?'selected':''}>ปิดใช้งาน</option></select></div>
     <div class="field full"><label>สิทธิ์การเข้าถึงแต่ละหน้า</label><div class="perm-grid">${pagePerms}</div></div>
     <label class="perm-item"><input type="checkbox" id="e_print" ${e.permissions.canPrint?'checked':''}> อนุญาตให้ปริ้นรายงาน</label>
     <label class="perm-item"><input type="checkbox" id="e_canEmail" ${e.permissions.canEmail?'checked':''}> อนุญาตให้ส่งรายงานทางอีเมล</label>
@@ -1084,11 +1085,22 @@ function openEditEmp(id){
     if(DB.employees.some(x=>x.id!==draftEmployeeId&&(x.code===code||(email&&String(x.email||'').toLowerCase()===email)))){toast('รหัสหรืออีเมลพนักงานซ้ำ','error');return;}
     const pages={};$('#modalBox').querySelectorAll('[data-page]').forEach(c=>pages[c.dataset.page]=c.checked);
     const patch={name,code,email,status:$('#e_status').value,role:$('#e_role').value,permissions:{pages,canPrint:$('#e_print').checked,canEmail:$('#e_canEmail').checked}};
-    const button=$('#saveEmp');button.disabled=true;button.textContent='กำลังบันทึก…';const employeeId=draftEmployeeId;
-    if(id){dbUpdate('employees',id,patch);audit('แก้ไขพนักงาน',name);}
-    else{const queued=DB.employees.find(x=>x.id===employeeId);if(queued)dbUpdate('employees',employeeId,patch);else dbAdd('employees',Object.assign({id:employeeId},patch));audit('เพิ่มพนักงาน',name);}
-    if(authIdentity){syncBlocked=false;const ok=await flushOnline();if(!ok){button.disabled=false;button.textContent='ลองบันทึกอีกครั้ง';toast('ยังบันทึกออนไลน์ไม่สำเร็จ: '+(flushOnline.lastError||'กรุณาตรวจการเชื่อมต่อ'),'error');return;}}
-    const saved=DB.employees.find(x=>x.id===employeeId);closeModal();toast(authIdentity?(saved?.status==='pending'?'บันทึกทะเบียนพนักงานออนไลน์แล้ว · รอเปิดใช้งานบัญชี':'บันทึกข้อมูลพนักงานออนไลน์แล้ว'):'บันทึกข้อมูลพนักงานสาธิตแล้ว','success');renderPage();
+    const password=$('#e_password')?.value||'';
+    if($('#e_password')&&password.length<6){toast('กรุณาตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร','error');return;}
+    const button=$('#saveEmp');button.disabled=true;button.textContent='กำลังบันทึกและเปิดบัญชี…';const employeeId=draftEmployeeId;
+    try{
+      if(authIdentity){
+        syncBlocked=false;if(!(await flushOnline()))throw Error(flushOnline.lastError||'ยังมีข้อมูลรอส่ง กรุณาลองอีกครั้ง');
+        const before=FreshySync.shared(DB),expectedEmployee=remoteBase.employees.find(x=>x.id===employeeId)||null;
+        const result=await apiRequest('/api/employees',{method:'POST',body:JSON.stringify({employee:{...patch,id:employeeId,contactEmail:email},password:(!expectedEmployee||expectedEmployee.status==='pending'||!expectedEmployee.email)?password:undefined,expectedEmployee,expectedRevision:remoteBase.settings?._resetRevision||''})});
+        installRemote(result.payload,FreshySync.diff(before,FreshySync.shared(DB)));broadcastOnlineChange();
+      }else{
+        const demoPatch={...patch,password:undefined};
+        if(id){dbUpdate('employees',id,demoPatch);audit('แก้ไขพนักงาน',name);}else{const queued=DB.employees.find(x=>x.id===employeeId);if(queued)dbUpdate('employees',employeeId,demoPatch);else dbAdd('employees',{id:employeeId,...demoPatch});audit('เพิ่มพนักงาน',name);}
+      }
+      if($('#e_password'))$('#e_password').value='';closeModal();toast(authIdentity?(patch.status==='inactive'?'บันทึกแล้ว · ปิดบัญชีพนักงาน':'บันทึกแล้ว · พนักงานใช้รหัส '+code+' เข้าสู่ระบบได้ทันที'):'บันทึกข้อมูลพนักงานสาธิตแล้ว','success');renderPage();
+    }catch(error){button.disabled=false;button.textContent='ลองบันทึกอีกครั้ง';toast(error.message,'error');}
+
   });
 }
 

@@ -1,0 +1,2 @@
+'use strict';const C=require('./_lib/core');
+module.exports=async(req,res)=>{C.noStore(res);try{if(req.method!=='POST')throw new C.HttpError(405,'ใช้ POST');await C.authenticate(req,true);const result=await C.json('/functions/v1/freshy-access',{method:'POST',headers:{apikey:C.anon,Authorization:'Bearer '+C.anon,'x-freshy-authorization':req.headers.authorization,'Content-Type':'application/json'},body:JSON.stringify({...req.body,action:'employee'})});if(!result.ok)throw new C.HttpError(400,result.error);return res.json(result);}catch(e){return C.fail(res,e);}};
