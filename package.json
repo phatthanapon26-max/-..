@@ -1,6 +1,6 @@
 {
   "name": "freshy-water-secure",
-  "version": "8.0.0",
+  "version": "8.1.0",
   "private": true,
   "scripts": {
     "build": "node build-assets.js",
