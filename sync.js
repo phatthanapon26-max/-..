@@ -17,7 +17,15 @@ function mergeSettings(old,wanted,latest,path){
 }
 function committed(c,current){
  if(equal(c.value,current))return true;
- if(!current||!c.value||c.expected!==null)return false;
+ if(!current||!c.value)return false;
+ if(c.collection==='employees'){
+  const wanted=clone(c.value),saved=clone(current);
+  for(const row of [wanted,saved]){row.name=String(row.name||'').trim();row.code=String(row.code||'').trim();row.email=String(row.email||'').trim().toLowerCase();}
+  // The server can keep an unverified account pending while saving its roster data.
+  if(saved.status==='pending'&&(!wanted.status||wanted.status==='active'))wanted.status='pending';
+  return equal(wanted,saved);
+ }
+ if(c.expected!==null)return false;
  if(c.collection==='audit')return current.id===c.id;
  if(!['debtors','cashsales'].includes(c.collection))return false;
  const a=clone(c.value),b=clone(current);delete a.createdAt;delete b.createdAt;return equal(a,b);
@@ -30,3 +38,4 @@ function rebase(remote,changes){const out=[];for(const c of changes){const lates
  }return out;}
 const api={collections,clone,equal,shared,diff,overlay,rebase};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FreshySync=api;
 })(typeof window!=='undefined'?window:globalThis);
+

@@ -90,7 +90,7 @@ begin
  select email into email_address from auth.users where id=auth.uid() and email_confirmed_at is not null;
  select x into actor from public.freshy_store s, jsonb_array_elements(s.value) x
  where s.key='employees' and lower(x->>'email')=lower(email_address)
- and coalesce(x->>'status','active') not in ('inactive','disabled') limit 1;
+ and coalesce(x->>'status','active') not in ('pending','inactive','disabled') limit 1;
  if actor is null then raise exception 'MEMBER_NOT_FOUND' using errcode='42501'; end if;
  return actor;
 end $$;
@@ -205,9 +205,17 @@ begin
    if inserted and not admin then proposed:=jsonb_set(proposed,'{createdAt}',to_jsonb(now())); end if;
   end if;
   if k='employees' and proposed is not null then
-   if coalesce(proposed->>'role','') not in ('admin','staff') or coalesce(proposed->>'email','')='' then raise exception 'EMPLOYEE_EMAIL_ROLE_REQUIRED'; end if;
-   if not exists(select 1 from auth.users where lower(email)=lower(proposed->>'email') and email_confirmed_at is not null) then raise exception 'CONFIRMED_AUTH_ACCOUNT_REQUIRED'; end if;
-   if exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and lower(x->>'email')=lower(proposed->>'email')) then raise exception 'DUPLICATE_EMAIL'; end if;
+   if coalesce(proposed->>'role','') not in ('admin','staff') or length(trim(coalesce(proposed->>'name','')))=0 or length(trim(coalesce(proposed->>'code','')))=0 then raise exception 'EMPLOYEE_NAME_CODE_ROLE_REQUIRED'; end if;
+   proposed:=proposed||jsonb_build_object('email',lower(trim(coalesce(proposed->>'email',''))),'code',trim(proposed->>'code'),'name',trim(proposed->>'name'));
+   if length(proposed->>'code')>80 or length(proposed->>'name')>200 or length(proposed->>'email')>254 then raise exception 'INVALID_EMPLOYEE'; end if;
+   if proposed->>'email'<>'' and proposed->>'email' !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$' then raise exception 'INVALID_EMPLOYEE_EMAIL'; end if;
+   if exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and x->>'code'=proposed->>'code') then raise exception 'DUPLICATE_EMPLOYEE_CODE'; end if;
+   if proposed->>'email'<>'' and exists(select 1 from jsonb_array_elements(vals) x where x->>'id'<>rid and lower(x->>'email')=proposed->>'email') then raise exception 'DUPLICATE_EMAIL'; end if;
+   -- A roster record is not a login grant. Unconfirmed or absent accounts stay pending.
+   if not exists(select 1 from auth.users where lower(email)=proposed->>'email' and email_confirmed_at is not null) then
+    proposed:=proposed||jsonb_build_object('status','pending');
+   elsif coalesce(proposed->>'status','active') not in ('active','pending','inactive','disabled') then raise exception 'INVALID_EMPLOYEE_STATUS';
+   end if;
   end if;
   if k='audit' and old is not null then raise exception 'AUDIT_IMMUTABLE'; end if;
   if k='audit' and proposed is not null then proposed:=proposed||jsonb_build_object('userId',aid,'userName',actor->>'name','ts',now()); end if;
@@ -220,7 +228,7 @@ begin
    if proposed is not null then vals:=vals||jsonb_build_array(proposed); end if;
   end if;
   if k='employees' then
-   select count(*) into count_admin from jsonb_array_elements(vals) x where x->>'role'='admin' and coalesce(x->>'status','active') not in ('inactive','disabled');
+   select count(*) into count_admin from jsonb_array_elements(vals) x where x->>'role'='admin' and coalesce(x->>'status','active') not in ('pending','inactive','disabled');
    if count_admin=0 then raise exception 'LAST_ADMIN_REQUIRED'; end if;
   end if;
   update public.freshy_store set value=vals,updated_at=now() where key=k;

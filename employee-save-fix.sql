@@ -1,4 +1,4 @@
--- Install definitions only. This migration does not reset any data.
+-- Definitions only: save employee roster records without granting unverified accounts access.
 begin;
 create or replace function public.freshy_actor() returns jsonb
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
@@ -123,56 +123,6 @@ begin
  end loop;
  return public.freshy_read();
 end $$;
-
-create or replace function public.freshy_reset(categories jsonb, confirmation_code text, expected_revision text, full_reset boolean default false) returns jsonb
-language plpgsql security definer set search_path=pg_catalog,public as $$
-declare actor jsonb; chosen text[]; k text; revision text; new_revision text:=gen_random_uuid()::text; removed_ids text[]; before_counts jsonb:='{}'; r record;
-begin
- perform pg_advisory_xact_lock(7248219);
- actor:=public.freshy_actor();
- if actor->>'role' is distinct from 'admin' then raise exception 'ADMIN_ONLY_RESET' using errcode='42501'; end if;
- if confirmation_code is null or confirmation_code not in ('7716','7816') then raise exception 'INVALID_RESET_CODE' using errcode='42501'; end if;
- select coalesce(value->>'_resetRevision','') into revision from public.freshy_store where key='settings';
- if coalesce(expected_revision,'') is distinct from coalesce(revision,'') then raise exception 'RESET_STALE' using errcode='PT409'; end if;
- if categories is null or jsonb_typeof(categories)<>'array' then raise exception 'INVALID_RESET_SELECTION'; end if;
- select array_agg(x) into chosen from jsonb_array_elements_text(categories) x;
- if not coalesce(full_reset,false) and coalesce(cardinality(chosen),0)=0 then raise exception 'RESET_SELECTION_REQUIRED'; end if;
- foreach k in array coalesce(chosen,array[]::text[]) loop
-  if k is null or k not in ('unpaid','paid','customers','cashsales','employees','products','villages','audit','approvals','documents','emailLogs','settings') then raise exception 'INVALID_RESET_SELECTION'; end if;
- end loop;
- for r in select key,value from public.freshy_store where jsonb_typeof(value)='array' loop
-  before_counts:=before_counts||jsonb_build_object(r.key,jsonb_array_length(r.value));
- end loop;
- if coalesce(full_reset,false) then
-  delete from public.freshy_store;
-  insert into public.freshy_store(key,value) values('employees',jsonb_build_array(actor)),('settings',jsonb_build_object('_resetRevision',new_revision));
- else
-  select coalesce(array_agg(x->>'id'),array[]::text[]) into removed_ids
-  from public.freshy_store s,jsonb_array_elements(s.value) x where s.key='debtors'
-  and ('customers'=any(chosen) or (x->>'status'='unpaid' and 'unpaid'=any(chosen)) or (x->>'status'='paid' and 'paid'=any(chosen)));
-  update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where not (x->>'id'=any(removed_ids))),updated_at=now() where key='debtors';
-  update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where not coalesce(x->>'debtorId'=any(removed_ids),false)),updated_at=now() where key='approvals';
-  foreach k in array chosen loop
-   if k in ('customers','cashsales','products','villages','audit','approvals') then
-    insert into public.freshy_store(key,value) values(k,'[]'::jsonb) on conflict(key) do update set value='[]'::jsonb,updated_at=now();
-   elsif k='employees' then update public.freshy_store set value=jsonb_build_array(actor),updated_at=now() where key=k;
-   elsif k='settings' then update public.freshy_store set value='{}'::jsonb,updated_at=now() where key=k;
-   elsif k='documents' then
-    delete from public.freshy_store where key like 'document:%';
-    update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where coalesce(x->>'type','')<>'document'),updated_at=now() where key='sentEmails';
-   elsif k='emailLogs' then
-    update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where x->>'type'='document'),updated_at=now() where key='sentEmails';
-    delete from public.freshy_store where key like 'mail-job:%';
-   end if;
-  end loop;
-  insert into public.freshy_store(key,value) values('settings',jsonb_build_object('_resetRevision',new_revision)) on conflict(key) do update set value=public.freshy_store.value||jsonb_build_object('_resetRevision',new_revision),updated_at=now();
- end if;
- insert into public.freshy_store(key,value) values('audit','[]'::jsonb) on conflict do nothing;
- update public.freshy_store set value=value||jsonb_build_array(jsonb_build_object('id',gen_random_uuid()::text,'ts',now(),'userId',actor->>'id','userName',actor->>'name','action','ล้างข้อมูล','detail',case when full_reset then 'ทั้งหมด (เก็บบัญชีแอดมินปัจจุบัน)' else array_to_string(chosen,', ') end)),updated_at=now() where key='audit';
- return public.freshy_read()||jsonb_build_object('reset',jsonb_build_object('full',coalesce(full_reset,false),'categories',categories,'before',before_counts));
-end $$;
-revoke all on function public.freshy_reset(jsonb,text,text,boolean) from public,anon;
-grant execute on function public.freshy_reset(jsonb,text,text,boolean) to authenticated;
 
 
 revoke all on function public.freshy_actor() from public,anon,authenticated;

@@ -11,6 +11,7 @@ const server=blank();server.customers=[{id:'other-device',name:'Existing'}];
 const recovered=S.overlay(server,S.rebase(server,queued));
 assert.equal(recovered.customers.length,11);
 assert.equal(S.rebase(recovered,queued).length,0,'A committed response lost to timeout must not duplicate writes');
+const employeeDraft={collection:'employees',id:'new-employee',expected:null,value:{id:'new-employee',name:' Worker ',code:' 1003 ',email:' Worker@Example.com ',role:'staff',status:'active'}};assert.equal(S.rebase({employees:[{...employeeDraft.value,name:'Worker',code:'1003',email:'worker@example.com',status:'pending'}]},[employeeDraft]).length,0,'A lost reply after saving a pending employee must not block all later writes');
 assert.throws(()=>S.rebase({customers:[{id:'test-0',name:'Other change'}]},[queued[0]]),/CONFLICT:customers/);
 const settings={collection:'settings',id:'settings',expected:{business:{name:'Old',phone:'1'},doccounters:{FWD:1},db:{mode:'supabase'}},value:{business:{name:'New',phone:'1'},doccounters:{FWD:2}}};
 const rebased=S.rebase({settings:{business:{name:'Old',phone:'2'},doccounters:{FWD:3}}},[settings])[0];
