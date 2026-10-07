@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),D=require('./data-tools'),F=require('./features'),S=require('./sync');
+let n=0;const actor={id:'admin',role:'admin'},id=()=>`import-${++n}`;
+const sample=[['debtors','d1','c1','','ลูกค้า,ทดสอบ','other','','บ้านตัวอย่าง','','','07/10/2569',2,1,40,25,65,'ข้อความ\nหลายบรรทัด'],['customers','c1','','C001','ลูกค้า,ทดสอบ','other','','บ้านตัวอย่าง','ที่อยู่ "ทดสอบ"','0123456789','','','','','','','']];
+const csv=F.csv(D.headers,sample),plan=D.plan(csv,{},actor,id);assert.equal(plan.counts.customers,1);assert.equal(plan.counts.debtors,1);const db=S.overlay({customers:[],debtors:[]},plan.changes);assert.equal(db.debtors[0].debtDate,'2026-10-07');assert.equal(db.debtors[0].customerId,db.customers[0].id);assert.equal(db.debtors[0].note,'ข้อความ\nหลายบรรทัด');assert.equal(db.customers[0].phone,'0123456789');
+assert.equal(D.plan(F.csv(D.headers,D.cells(db)),db,actor,id).changes.length,0,'CSV export/import must round trip without changes or duplicates');
+assert.throws(()=>D.plan(csv,db,{...actor,role:'staff'},id),/แอดมิน/);
+const withRows=rows=>F.csv(D.headers,rows);const paid=S.clone(db);paid.debtors[0].status='paid';assert.throws(()=>D.plan(csv,paid,actor,id),/ประวัติรับชำระ/);
+const bad=S.clone(sample);bad[0][15]=66;assert.throws(()=>D.plan(withRows(bad),{},actor,id),/total/);assert.equal(db.debtors.length,1);
+assert.throws(()=>D.parse('type,name\ncustomers,"unclosed'),/ยังไม่ปิด/);assert.throws(()=>D.parse('type,type\ncustomers,customers'),/ซ้ำ/);assert.throws(()=>D.date('31/02/2569'),/วันที่/);assert.throws(()=>D.plan(withRows([sample[0]]),{},actor,id),/customerId/);assert.throws(()=>D.plan(withRows([sample[1],sample[1]]),{},actor,id),/ซ้ำ/);
+const nodup=S.clone(sample);nodup[0][1]='';nodup[1][1]='';assert.equal(D.plan(withRows(nodup),db,actor,id).changes.length,0,'Matching ID-less records should be skipped');
+console.log('Passed: CSV Thai names, quoted commas/newlines, leading-zero phone, BE dates, customer links, round trip, duplicate prevention, paid history protection and atomic validation.');

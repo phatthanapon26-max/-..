@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict'),D=require('./data-tools'),F=require('./features'),S=require('./sync');
+let role='admin',applies=0,data={settings:{_resetRevision:'revision-1'},customers:[],debtors:[]};
+global.fetch=async(url,options)=>{assert.equal(options.headers.Authorization,'Bearer valid.token.test');if(url.endsWith('/freshy_read'))return new Response(JSON.stringify({actor:{id:'admin',role},data}));assert(url.endsWith('/freshy_apply'));assert.equal(options.headers['x-freshy-revision'],'revision-1');applies++;data=S.overlay(data,JSON.parse(options.body).changes);return new Response(JSON.stringify({actor:{id:'admin',role},data}));};
+const handler=require('./api/data-import');
+async function call(body,authorization='Bearer valid.token.test'){const res={statusCode:200,setHeader(){},status(v){this.statusCode=v;return this;},json(v){this.body=v;return this;}};await handler({method:'POST',body,headers:{authorization}},res);return res;}
+(async()=>{const csv=F.csv(D.headers,[['customers','c1','','C1','ทดสอบ','other','','บ้าน','','','','','','','','',''],['debtors','d1','c1','','ทดสอบ','other','','บ้าน','','','2026-10-07',1,0,20,0,20,'']]);const body={csv,expectedRevision:'revision-1'};
+ assert.equal((await call(body,null)).statusCode,401);role='staff';assert.equal((await call(body)).statusCode,403);role='admin';assert.equal((await call({...body,expectedRevision:'old'})).statusCode,409);assert.equal((await call({...body,csv:csv.replace('"20","0","20"','"20","0","99"')})).statusCode,400);assert.equal(applies,0);
+ let result=await call(body);assert.equal(result.statusCode,200);assert.equal(applies,1);assert.equal(result.body.counts.customers,1);assert.equal(data.debtors[0].customerId,'c1');result=await call(body);assert.equal(result.statusCode,200);assert.equal(applies,1,'Round trip import must be idempotent');data.debtors[0].status='paid';assert.equal((await call(body)).statusCode,400);assert.equal(applies,1);console.log('Passed: import API authentication, admin role, reset revision, validation before writes, atomic batch, idempotency and paid-history lock.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

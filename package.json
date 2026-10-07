@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node build-assets.js",
-    "test": "node sync.test.js && node features.test.js && node api.test.js && node document-view.test.js"
+    "test": "node data-tools.test.js && node data-import.test.js && node data-management.test.js && node sync.test.js && node features.test.js && node api.test.js && node document-view.test.js"
   },
   "dependencies": {
     "nodemailer": "10.0.12",
@@ -15,6 +15,7 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "jsdom": "^27.0.0"
   }
 }

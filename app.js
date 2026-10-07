@@ -152,7 +152,7 @@ let DB=null; let session=null;
 
 function defaultSettings(){
   return {
-    business:{name:'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',address:'บ้านนาไฮ ตำบลบ้านนาไฮ อำเภอเมือง จังหวัดนครราชสีมา',taxId:'',commercialId:'',phone:'08x-xxx-xxxx',email:'freshywater@example.com',menuName:'ระบบจัดการลูกหนี้'},
+    business:{name:'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',address:'',taxId:'',commercialId:'',phone:'',email:'',menuName:'ระบบจัดการลูกหนี้'},
     header:{showLogo:true,showName:true,logoDataUrl:''},
     db:Object.assign({mode:'demo',sheetUrl:'',sheetId:'',apiKey:'',serviceEmail:'',serviceKey:'',supabaseUrl:'',supabaseKey:'',adminEmail:''},window.FRESHY_CONFIG||{}),
     email:{enabled:false,adminEmail:'',provider:'gmail',apiKey:'',smtpHost:'',smtpPort:'587',smtpUser:'',smtpPass:'',reportTimes:['08:00','18:00'],reportsEnabled:false,alerts:{login:true,logout:true,addDebtor:true,undoRequest:true,newcustomer:true,profile:true,payment:true,cash:true}},
@@ -231,7 +231,7 @@ function authFor(cfg){
   // Preserve an existing session from earlier versions that used sessionStorage.
   for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i);if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')&&!localStorage.getItem(k)){const v=sessionStorage.getItem(k);if(v)localStorage.setItem(k,v);}}
   // localStorage keeps the authenticated session available when a QR report opens in a new tab.
-  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>fetch(url,Object.assign({},opts,{signal:AbortSignal.timeout(45000)}))}});
+  authClient=window.supabase.createClient(cfg.url,cfg.key,{auth:{storage:localStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:false},global:{fetch:(url,opts)=>{const headers=new Headers(opts?.headers);headers.set('x-freshy-revision',remoteBase?.settings?._resetRevision||'');return fetch(url,Object.assign({},opts,{headers,signal:AbortSignal.timeout(45000)}));}}});
   authClient._freshyUrl=cfg.url;authClient._freshyKey=cfg.key;
  }
  return authClient;
@@ -248,6 +248,7 @@ function installRemote(payload,preserve){
  const cfg=DB.settings.db;
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
+ if(remoteBase&&String(remoteBase.settings?._resetRevision||'')!==String(data.settings?._resetRevision||''))preserve=[];
  remoteSettings=FreshySync.clone(data.settings||{});
  data.settings=Object.assign(defaults,remoteSettings);for(const key of ['business','header','email','docPrefix','backup'])data.settings[key]=Object.assign({},defaultSettings()[key],remoteSettings[key]||{});data.settings.email.alerts=Object.assign({},defaultSettings().email.alerts,remoteSettings.email?.alerts||{});delete data.settings.db;
  remoteBase=FreshySync.clone(data);
@@ -304,12 +305,13 @@ async function flushOnline(){
    let payload;
    try{payload=await rpc('freshy_apply',{changes:chunk});}
    catch(e){
+    if(/RESET_STALE/.test(e.message||'')){installRemote(await rpc('freshy_read'),[]);toast('แอดมินล้างข้อมูลแล้ว ระบบโหลดข้อมูลใหม่และยกเลิกรายการรอส่งเดิม','info');return false;}
     if(/CONFLICT:/.test(e.message||'')){
      const latest=await rpc('freshy_read');
      // Include edits made while the request was running. Reconcile only
      // disjoint changes or records already committed by a timed-out request.
      const allPending=FreshySync.diff(remoteBase,FreshySync.shared(DB));
-     const rebased=FreshySync.rebase(latest.data,allPending);
+     const rebased=String(remoteBase.settings?._resetRevision||'')===String(latest.data.settings?._resetRevision||'')?FreshySync.rebase(latest.data,allPending):[];
      installRemote(latest,rebased);
      continue;
     }
@@ -380,7 +382,34 @@ function downloadSystemSnapshot(data,label){
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download=(label||'freshywater-backup')+'-'+todayStr()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);
 }
-function openRealReset(){clearDemoData();}
+function openRealReset(){
+ if(!isAdmin())return;
+ openModal(`<div class="modal-head"><h3>ล้างข้อมูลระบบ</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>เลือกข้อมูลที่ต้องการล้างจากฐานข้อมูลจริง การล้างไม่สามารถย้อนกลับได้ ควรดาวน์โหลดสำรองก่อน</p><label class="perm-item"><input type="radio" name="resetMode" value="partial" checked> ล้างเฉพาะข้อมูลที่เลือก</label><label class="perm-item"><input type="radio" name="resetMode" value="all"> ล้างระบบทั้งหมด</label><div id="resetCategories" class="perm-grid">${Object.entries(FreshyData.resetCategories).map(([k,label])=>`<label class="perm-item"><input type="checkbox" class="reset-category" value="${k}"> ${esc(label)}</label>`).join('')}</div><p class="help-text">ล้างทั้งหมด: ลบลูกค้า ลูกหนี้ ประวัติรับชำระ ขายสด พนักงานอื่น เอกสาร QR อีเมล และการตั้งค่า เก็บบัญชีแอดมินที่ใช้งานอยู่ การเชื่อมต่อ และบันทึกการล้างครั้งนี้ไว้ บัญชีเข้าสู่ระบบของพนักงานจะหมดสิทธิ์เข้าโรงงาน</p><div class="field"><label>รหัสยืนยันการล้างข้อมูล</label><input type="password" id="resetCode" autocomplete="off" inputmode="numeric" maxlength="4" placeholder="กรอกรหัสยืนยัน"></div><p id="resetError" role="alert"></p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmReset">ยืนยันล้างข้อมูล</button></div>`);
+ document.querySelectorAll('[name="resetMode"]').forEach(el=>el.onchange=()=>{const all=document.querySelector('[name="resetMode"]:checked').value==='all';document.querySelectorAll('.reset-category').forEach(x=>{x.disabled=all;});});
+ $('#confirmReset').onclick=async()=>{
+  const full=document.querySelector('[name="resetMode"]:checked').value==='all',categories=[...document.querySelectorAll('.reset-category:checked')].map(x=>x.value),code=$('#resetCode').value;
+  if(!full&&!categories.length){$('#resetError').textContent='กรุณาติ๊กเลือกข้อมูลอย่างน้อยหนึ่งส่วน';return;}
+  if(!['7716','7816'].includes(code)){$('#resetError').textContent='รหัสยืนยันไม่ถูกต้อง';return;}
+  const btn=$('#confirmReset');btn.disabled=true;btn.textContent='กำลังล้างข้อมูล…';
+  try{
+   if(authIdentity){if(!(await flushOnline()))throw Error('ต้องบันทึกข้อมูลรอส่งให้สำเร็จก่อนล้าง');const payload=await rpc('freshy_reset',{categories,confirmation_code:code,expected_revision:remoteBase.settings._resetRevision||'',full_reset:full});installRemote(payload,[]);broadcastOnlineChange();}
+   else{const actor=FreshySync.clone(me()),connection=DB.settings.db;const removed=DB.debtors.filter(d=>full||categories.includes('customers')||categories.includes(d.status==='paid'?'paid':'unpaid')).map(d=>d.id);if(full){for(const k of SUPA_COLS)DB[k]=k==='settings'?defaultSettings():[];DB.employees=[actor];}
+    else{DB.debtors=DB.debtors.filter(d=>!removed.includes(d.id));DB.approvals=DB.approvals.filter(a=>!removed.includes(a.debtorId));for(const k of categories){if(['customers','cashsales','products','villages','audit','approvals'].includes(k))DB[k]=[];if(k==='employees')DB.employees=[actor];if(k==='settings')DB.settings=defaultSettings();if(k==='documents')DB.sentEmails=DB.sentEmails.filter(x=>x.type!=='document');if(k==='emailLogs')DB.sentEmails=DB.sentEmails.filter(x=>x.type==='document');}}
+    DB.settings.db=connection;DB.settings._resetRevision=uid();audit('ล้างข้อมูล',full?'ทั้งหมด (เก็บแอดมินปัจจุบัน)':categories.join(', '));safeCache();}
+   closeModal();refreshUserChip();renderPage();toast(authIdentity?'ล้างข้อมูลที่เลือกจากฐานข้อมูลแล้ว':'ล้างข้อมูลในโหมดสาธิตแล้ว','success');
+  }catch(e){$('#resetError').textContent=e.message;btn.disabled=false;btn.textContent='ยืนยันล้างข้อมูล';}
+ };
+}
+async function exportSettingsCsv(){
+ if(!isAdmin())return;try{if(authIdentity){if(!(await flushOnline()))throw Error('กรุณาบันทึกข้อมูลรอส่งก่อนดาวน์โหลด');installRemote(await rpc('freshy_read'),[]);}const kind=$('#csvKind').value,blob=new Blob([FreshyFeatures.csv(FreshyData.headers,FreshyData.cells(DB,kind))],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='freshy-'+kind+'-'+todayStr()+'.csv';a.click();URL.revokeObjectURL(url);toast('ดาวน์โหลด CSV แล้ว','success');}catch(e){toast(e.message,'error');}
+}
+async function previewCsvImport(file){
+ if(!isAdmin()||!file)return;try{if(file.size>2000000)throw Error('ไฟล์ CSV ต้องไม่เกิน 2 MB');if(authIdentity){if(!(await flushOnline()))throw Error('กรุณาบันทึกข้อมูลรอส่งก่อนนำเข้า');installRemote(await rpc('freshy_read'),[]);}const text=await file.text(),plan=FreshyData.plan(text,DB,me(),uid),expectedRevision=DB.settings._resetRevision||'';const c=plan.counts;
+ openModal(`<div class="modal-head"><h3>ตรวจสอบก่อนนำเข้า CSV</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>${esc(file.name)} · ${plan.rows} แถว</p><p>ลูกค้าใหม่ ${c.customers} · ลูกหนี้ค้างชำระใหม่ ${c.debtors}<br>ปรับปรุงข้อมูลเดิม ${c.updated} · ข้ามข้อมูลซ้ำ ${c.skipped}</p><p>นำเข้าเฉพาะลูกค้าและลูกหนี้ค้างชำระ โดยคงประวัติรับชำระไว้ทั้งหมด</p><p id="importError" role="alert"></p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="confirmCsvImport" ${plan.changes.length?'':'disabled'}>ยืนยันนำเข้า</button></div>`);
+ $('#confirmCsvImport').onclick=async()=>{const btn=$('#confirmCsvImport');btn.disabled=true;try{if(authIdentity){const result=await apiRequest('/api/data-import',{method:'POST',body:JSON.stringify({csv:text,expectedRevision})});installRemote(result.payload,[]);broadcastOnlineChange();}else{const next=FreshySync.overlay(FreshySync.shared(DB),plan.changes);for(const k of ['customers','debtors'])DB[k]=next[k];audit('นำเข้า CSV',plan.rows+' แถว');dbSave();}closeModal();renderPage();toast('นำเข้า CSV สำเร็จ','success');}catch(e){$('#importError').textContent=e.message;btn.disabled=false;}};
+ }catch(e){toast(e.message,'error');}
+}
+
 async function clearDemoData(){
  if(!isAdmin())return;const keys=['customers','debtors','cashsales','approvals'];const count=keys.reduce((s,k)=>s+DB[k].filter(x=>x.isDemo===true).length,0);if(!count){toast('ไม่มีรายการที่ระบุว่าเป็นข้อมูลจำลอง ข้อมูลจริงยังคงอยู่','info');return;}
  if(!confirm('ล้างเฉพาะข้อมูลจำลอง '+count+' รายการ? ข้อมูลจริง ผู้ใช้ และค่าตั้งค่าจะคงอยู่'))return;
@@ -431,7 +460,7 @@ function resumeCachedOnline(user){
 async function hydrateOnline(){
  const payload=await rpc('freshy_read');
  let cached=null;try{cached=JSON.parse(localStorage.getItem(draftKey()));}catch(e){}
- if(cached&&cached.base&&cached.data&&FreshySync.diff(cached.base,cached.data).length){
+ if(cached&&cached.base&&cached.data&&String(cached.base.settings?._resetRevision||'')===String(payload.data.settings?._resetRevision||'')&&FreshySync.diff(cached.base,cached.data).length){
   const pending=FreshySync.diff(FreshySync.shared(cached.base),FreshySync.shared(cached.data));
   const rebased=FreshySync.rebase(payload.data,pending);
   installRemote(payload,rebased);
@@ -557,12 +586,11 @@ function renderDashboard(){
   const unpaidJugs=unpaid.reduce((s,d)=>s+(d.jugs||0),0);
   const paidTotal=scopeRows(DB.debtors).filter(d=>d.status==='paid').reduce((s,d)=>s+d.total,0)+scopeRows(DB.cashsales).reduce((s,r)=>s+r.jugAmount+r.packAmount,0);
   // ทะเบียนรายได้พนักงานวันนี้
-  const empRows=DB.employees.map(e=>{
+  const empRows=(isAdmin()?DB.employees:DB.employees.filter(e=>e.id===me().id)).map(e=>{
     const c=DB.cashsales.filter(r=>r.createdBy===e.id&&r.deliveryDate===today);
     const d=DB.debtors.filter(r=>r.createdBy===e.id&&r.debtDate===today&&r.status==='unpaid');
     return {code:e.code==='7716'?'ADMIN':e.code,name:e.name,cash:c.reduce((s,r)=>s+r.jugAmount+r.packAmount,0),debt:d.reduce((s,r)=>s+r.total,0)};
   });
-  if(!isAdmin()){empRows=empRows.filter(r=>DB.employees.find(e=>e.name===r.name)?.id===me().id);}
   let empHtml='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัสพนักงาน</th><th>ชื่อพนักงาน</th><th class="num">ยอดขายเงินสด</th><th class="num">ยอดลงลูกหนี้</th><th class="num">รวม</th></tr></thead><tbody>';
   empRows.forEach(r=>{
     empHtml+='<tr><td>'+esc(r.code)+'</td><td><b>'+esc(r.name)+'</b></td><td class="num" style="color:var(--green)">'+fmtN(r.cash)+'</td><td class="num" style="color:var(--red)">'+fmtN(r.debt)+'</td><td class="num"><b>'+fmtN(r.cash+r.debt)+'</b></td></tr>';
@@ -776,9 +804,10 @@ function renderPayments(area){
   let html='<div class="tbl-wrap payment-table"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
   let mobile='<div class="payment-cards">';
   rows.forEach((d,i)=>{
+    const pending=!isAdmin()&&DB.approvals.some(a=>a.debtorId===d.id&&a.employeeId===me().id&&a.status==='pending'),undoLabel=isAdmin()?'ยกเลิก กลับไปค้าง':pending?'รอแอดมินอนุมัติ':'ขอยกเลิกการรับชำระ';
     html+=`<tr><td>${i+1}</td><td><b>${esc(d.customerName)}</b></td><td class="num" style="color:var(--green);font-weight:700">${fmtN(d.total)} บาท</td><td>${thDate(d.debtDate)}</td><td>${thDateTimeSec(d.paidAt)}</td><td>${esc(d.paidByName||'-')}</td>
-    <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}"><i data-lucide="rotate-ccw"></i> ยกเลิก กลับไปค้าง</button></td></tr>`;
-    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}"><i data-lucide="rotate-ccw"></i><span>ยกเลิกและกลับไปค้าง</span></button></article>`;
+    <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}" ${pending?'disabled':''}><i data-lucide="rotate-ccw"></i> ${undoLabel}</button></td></tr>`;
+    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}" ${pending?'disabled':''}><i data-lucide="rotate-ccw"></i><span>${undoLabel}</span></button></article>`;
   });
   html+='</tbody></table></div>';mobile+='</div>';html+=mobile;
   if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ</p></div>';
@@ -792,31 +821,38 @@ function renderPayments(area){
   if(window.lucide)lucide.createIcons();
 }
 function requestUndo(id,area){
-  const d=DB.debtors.find(x=>x.id===id);
+  const d=scopeRows(DB.debtors).find(x=>x.id===id&&x.status==='paid');if(!d){toast('ไม่พบรายการรับชำระที่มีสิทธิ์จัดการ','error');return;}
+  if(!isAdmin()&&DB.approvals.some(a=>a.debtorId===id&&a.employeeId===me().id&&a.status==='pending')){toast('มีคำขอรอแอดมินอนุมัติแล้ว','info');return;}
   if(isAdmin()){
     openModal(`<div class="modal-head"><h3><i data-lucide="rotate-ccw"></i> ยืนยันยกเลิกกลับไปค้างชำระ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
       <div class="modal-body"><p>แอดมินสามารถยกเลิกได้ทันที รายการของ <b>${esc(d.customerName)}</b> (${fmtN(d.total)} บาท) จะกลับไปอยู่ในหน้าลูกหนี้ค้างชำระทันที</p></div>
       <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmUndo"><i data-lucide="check"></i> ยืนยันกลับไปค้าง</button></div>`);
-    $('#confirmUndo').addEventListener('click',()=>{
+    $('#confirmUndo').addEventListener('click',async()=>{
+      $('#confirmUndo').disabled=true;
+      if(authIdentity&&!(await flushOnline())){toast('ต้องบันทึกข้อมูลรอส่งก่อนดำเนินการ','error');$('#confirmUndo').disabled=false;return;}
       dbUpdate('debtors',id,{status:'unpaid',paidAt:null,paidBy:null,paidByName:null});
       audit('แอดมินยกเลิกการชำระ',d.customerName+' กลับไปค้าง '+fmtN(d.total)+' บาท');
-      closeModal();toast('ยกเลิกแล้ว ข้อมูลกลับไปค้างชำระ','success');renderPage();
+      const ok=authIdentity?await flushOnline():true;closeModal();toast(ok?'ยกเลิกแล้ว ข้อมูลกลับไปค้างชำระ':'รายการยกเลิกยังรอส่ง กรุณาตรวจสถานะฐานข้อมูล',ok?'success':'error');renderPage();
     });
   }else{
     openModal(`<div class="modal-head"><h3><i data-lucide="send"></i> ส่งคำขอยกเลิกกลับไปค้างชำระ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
       <div class="modal-body"><p>พนักงานไม่สามารถยกเลิกได้ทันที กรุณากรอกเหตุผล ระบบจะส่งคำขอให้แอดมินอนุมัติ</p>
       <div class="field"><label>เหตุผล (เช่น กดผิดครับ)</label><textarea id="undoReason" rows="3" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"></textarea></div></div>
       <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="sendUndo"><i data-lucide="send"></i> ส่งคำขอให้แอดมิน</button></div>`);
-    $('#sendUndo').addEventListener('click',()=>{
+    $('#sendUndo').addEventListener('click',async()=>{
       const reason=$('#undoReason').value.trim(); if(!reason){toast('กรุณากรอกเหตุผล','error');return;}
+      $('#sendUndo').disabled=true;
+      if(authIdentity&&!(await flushOnline())){toast('ต้องบันทึกข้อมูลรอส่งก่อนส่งคำขอ','error');$('#sendUndo').disabled=false;return;}
       const token=uid();
       const appr=dbAdd('approvals',{ts:new Date().toISOString(),employeeId:me().id,employeeName:me().name,area,debtorId:id,debtorName:d.customerName,amount:d.total,reason,status:'pending',token});
+      const ok=authIdentity?await flushOnline():true;
+      if(!ok){closeModal();renderPage();toast('คำขอยังรอส่ง กรุณาตรวจสถานะฐานข้อมูล','error');return;}
       if(DB.settings.email.alerts.undoRequest){
         const base=location.origin+location.pathname;
         sendAlert('undo','[คำขออนุมัติ] พนักงานขอยกเลิกกลับไปค้างชำระ',
           `<p>พนักงาน <b>${esc(me().name)}</b> ต้องการจัดการข้อมูลในหน้าประวัติรับชำระ (${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'})</p><p>ต้องการให้รายการ <b>${esc(d.customerName)}</b> (${fmtN(d.total)} บาท) กลับไปค้างชำระ เนื่องจากเหตุผล: <b>${esc(reason)}</b></p><p>เข้าสู่ระบบแอดมินเพื่อตัดสินใจ:<br><br><a href="${base}?approval=${appr.id}&token=${token}&action=approve" style="display:inline-block;background:#16a34a;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;margin-right:10px;font-weight:700">อนุมัติ (กลับไปค้าง)</a> <a href="${base}?approval=${appr.id}&token=${token}&action=reject" style="display:inline-block;background:#dc2626;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:700">ไม่อนุมัติ</a></p><p style="margin-top:10px">หรือเข้าระบบที่หน้า คำขออนุมัติ เพื่อตัดสินใจ</p>`);
       }
-      closeModal();toast('บันทึกคำขอแล้ว · ตรวจสถานะการซิงก์และอีเมล','success');renderPage();
+      closeModal();toast('ส่งคำขอแล้ว รอแอดมินอนุมัติ ประวัติรับชำระยังคงเดิม','success');renderPage();
     });
   }
 }
@@ -836,15 +872,17 @@ function renderApprovals(){
   });
   if(!rows.length)html='<div class="empty-state"><i data-lucide="clipboard-check"></i><p>ไม่มีคำขออนุมัติค้างอยู่</p></div>';
   $('#pageContent').innerHTML='<div class="page-head"><h2>คำขออนุมัติจากพนักงาน</h2><span class="desc">คำขอยกเลิกกลับไปค้างชำระจากพนักงาน รอแอดมินตัดสินใจ</span></div>'+html;
-  $('#pageContent').querySelectorAll('.appr').forEach(b=>b.addEventListener('click',()=>{
-    const a=DB.approvals.find(x=>x.id===b.dataset.id);
+  $('#pageContent').querySelectorAll('.appr').forEach(b=>b.addEventListener('click',async()=>{
+    if(!isAdmin())return;b.disabled=true;
+    if(authIdentity&&!(await flushOnline())){toast('ต้องบันทึกข้อมูลรอส่งก่อนอนุมัติ','error');b.disabled=false;return;}
+    const a=DB.approvals.find(x=>x.id===b.dataset.id&&x.status==='pending');if(!a){renderPage();return;}const debt=DB.debtors.find(d=>d.id===a.debtorId);if(b.dataset.v==='approved'&&debt?.status!=='paid'){toast('รายการนี้ไม่ได้อยู่ในประวัติรับชำระแล้ว','error');b.disabled=false;return;}
     dbUpdate('approvals',a.id,{status:b.dataset.v,decidedBy:me().name,decidedAt:new Date().toISOString()});
     if(b.dataset.v==='approved'){
       dbUpdate('debtors',a.debtorId,{status:'unpaid',paidAt:null,paidBy:null,paidByName:null});
       audit('อนุมัติยกเลิกการชำระ',a.debtorName+' กลับไปค้าง (โดย '+a.employeeName+')');
-      toast('อนุมัติแล้ว ข้อมูลกลับไปค้างชำระอัตโนมัติ','success');
-    }else{audit('ไม่อนุมัติยกเลิก',a.debtorName);toast('บันทึกการไม่อนุมัติแล้ว','success');}
-    renderPage();
+      
+    }else{audit('ไม่อนุมัติยกเลิก',a.debtorName);}
+    const ok=authIdentity?await flushOnline():true;toast(ok?(b.dataset.v==='approved'?'อนุมัติแล้ว ข้อมูลกลับไปค้างชำระ':'บันทึกการไม่อนุมัติแล้ว'):'การตัดสินใจยังรอส่ง กรุณาตรวจฐานข้อมูล',ok?'success':'error');renderPage();
   }));
   if(window.lucide)lucide.createIcons();
 }
@@ -1182,9 +1220,9 @@ function renderSettings(){
       <button class="btn btn-navy" id="backupBtn"><i data-lucide="download"></i> สำรองข้อมูลที่เลือก (JSON)</button>
       <button class="btn btn-ghost" id="restoreBtn"><i data-lucide="upload"></i> กู้คืนจากไฟล์สำรอง</button>
       <input type="file" id="restoreFile" accept="application/json" style="display:none">
-      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> ล้างเฉพาะข้อมูลจำลอง</button>
+      <button class="btn btn-danger" id="resetBtn"><i data-lucide="trash-2"></i> ล้างข้อมูลระบบ</button><button class="btn btn-ghost" id="clearDemoBtn">ล้างเฉพาะข้อมูลจำลอง</button>
     </div>
-    <div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.filter(e=>e.type!=='document').length} รายการ)</h4>
+    <div style="margin-top:18px"><h4>นำเข้าและส่งออก CSV</h4><p class="help-text">ลูกค้าและลูกหนี้ค้างชำระ · นำเข้าได้สูงสุด 2,000 แถว โดยตรวจสอบก่อนบันทึกทั้งหมด</p><div class="toolbar"><select id="csvKind"><option value="all">ลูกค้าและลูกหนี้ค้างชำระ</option><option value="customers">ลูกค้า</option><option value="debtors">ลูกหนี้ค้างชำระ</option></select><button id="settingsExportCsv" class="btn btn-navy">ดาวน์โหลด CSV</button><button id="settingsImportCsv" class="btn btn-primary">นำเข้า CSV</button><button id="csvTemplate" class="btn btn-ghost">ดาวน์โหลดแบบฟอร์ม CSV</button><input id="settingsCsvFile" type="file" accept=".csv,text/csv" hidden></div><p class="help-text">ใช้หัวคอลัมน์จากแบบฟอร์ม: type = customers หรือ debtors, area = nai หรือ other, วันที่ YYYY-MM-DD หรือ DD/MM/พ.ศ. · ระบุ customerId เพื่อเชื่อมลูกหนี้กับลูกค้า · ไฟล์ส่งออกนำกลับเข้าได้</p></div><div style="margin-top:18px"><h4 style="font-size:13px;color:var(--navy);margin-bottom:8px">อีเมลแจ้งเตือนที่ส่งล่าสุด (${DB.sentEmails.filter(e=>e.type!=='document').length} รายการ)</h4>
     ${DB.sentEmails.filter(e=>e.type!=='document').slice(0,5).map(e=>'<div class="audit-item"><span class="ts">'+thDateTime(e.ts)+'</span><span><b>'+esc(e.subject)+'</b> — '+esc(e.status)+'</span></div>').join('')||'<span style="color:var(--muted);font-size:12.5px">ยังไม่มี</span>'}</div>
   </div></div>`;
   $('#pageContent').innerHTML='<div class="page-head"><h2>การตั้งค่าระบบ</h2><span class="desc">แยกเป็นหมวดหมู่ชัดเจน ไม่ต้องแก้ไขโค้ด</span></div><div class="tabs">'+tabsHtml+'</div>'+body;
@@ -1248,12 +1286,15 @@ function renderSettings(){
         if(!data||typeof data!=='object')throw new Error('ไฟล์ไม่ถูกต้อง');
         if(!confirm('จะกู้คืนข้อมูลจากไฟล์นี้หรือ? ข้อมูลที่มีอยู่จะถูกผสานทับ (คีย์เดียวกันจะถูกแทนที่)'))return;
         Object.keys(data).forEach(k=>{if(SUPA_COLS.includes(k)&&Array.isArray(data[k])&&DB[k]!==undefined){if(authIdentity){const rows=new Map(DB[k].map(x=>[x.id,x]));data[k].forEach(x=>{if(x&&typeof x==='object'){x.id=x.id||uid();if(k!=='audit'||!rows.has(x.id))rows.set(x.id,x);}});DB[k]=Array.from(rows.values());}else DB[k]=data[k];}});
-        if(data.settings){const connection=DB.settings.db;Object.assign(DB.settings,data.settings);DB.settings.db=connection;}
+        if(data.settings){const connection=DB.settings.db;const revision=DB.settings._resetRevision;Object.assign(DB.settings,data.settings);DB.settings.db=connection;if(revision)DB.settings._resetRevision=revision;else delete DB.settings._resetRevision;}
         dbSave();toast(authIdentity?'ผสานไฟล์ในเครื่องแล้ว · รอผลบันทึกออนไลน์':'กู้คืนในเครื่องแล้ว','success');renderPage();
       }catch(err){toast('ไฟล์สำรองไม่ถูกต้อง: '+err.message,'error');}
     };rd.readAsText(f);
   });
-  bind('#resetBtn',clearDemoData);
+  bind('#resetBtn',openRealReset);bind('#clearDemoBtn',clearDemoData);
+  bind('#settingsExportCsv',exportSettingsCsv);bind('#settingsImportCsv',()=>$('#settingsCsvFile').click());
+  if($('#settingsCsvFile'))$('#settingsCsvFile').onchange=e=>{previewCsvImport(e.target.files[0]);e.target.value='';};
+  bind('#csvTemplate',()=>{const url=URL.createObjectURL(new Blob([FreshyFeatures.csv(FreshyData.headers,[['customers','customer-001','','C001','ลูกค้าตัวอย่าง','other','','บ้านตัวอย่าง','','','','','','','','',''],['debtors','debt-001','customer-001','','ลูกค้าตัวอย่าง','other','','บ้านตัวอย่าง','','',todayStr(),1,0,20,0,20,'ตัวอย่าง']])],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='freshy-import-template.csv';a.click();URL.revokeObjectURL(url);});
   attachSettingsFeatures();
   if(window.lucide)lucide.createIcons();
 }

@@ -26,6 +26,7 @@ assert.equal(S.diff(context.remoteBase,S.shared(context.DB)).length,0,'UI defaul
 assert.equal(context.remoteSettings.business.name,'Live');
 assert.equal(context.remoteSettings.db.old,true,'Expected settings must match the exact server JSON, including legacy keys');
 assert.equal(context.remoteBase.settings.db,undefined,'Device connection settings must stay out of the shared baseline');
+context.installRemote({actor:{id:'admin'},data:{settings:{_resetRevision:'after-reset'},employees:[{id:'admin'}]}},queued);assert.equal(context.DB.customers.length,0,'Old draft edits must be dropped after a reset revision changes');
 assert.match(fs.readFileSync(__dirname+'/database.sql','utf8'),/errcode='PT409'/);
 assert.doesNotMatch(fs.readFileSync(__dirname+'/database.sql','utf8'),/errcode='40001'/);
 const setup={window:{}};vm.createContext(setup);vm.runInContext(fs.readFileSync(__dirname+'/database-config.js','utf8'),setup);
@@ -56,3 +57,4 @@ async function verifyFlush(){
  console.log('Passed: real flush loop, 10 queued records, committed response lost, retry without duplicates, exact legacy settings, and PT409.');
 }
 verifyFlush().catch(e=>{console.error(e);process.exitCode=1;});
+
