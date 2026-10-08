@@ -9,7 +9,7 @@ do $$begin
   raise exception 'WRITE_FUNCTION_CHANGED: inspect the current function before installing';
  end if;
 end $$;
-create temporary table freshy_payment_migration_snapshot on commit drop as select key,value,updated_at from public.freshy_store;
+select set_config('freshy.payment_migration_hash',coalesce((select md5(string_agg(key||':'||value::text||':'||updated_at::text,'|' order by key)) from public.freshy_store),'empty'),true);
 
 create or replace function public.freshy_read() returns jsonb
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
@@ -261,8 +261,8 @@ grant execute on function public.freshy_payment(jsonb,text,text,jsonb,text,text)
 
 -- Roll back the installation if any business row or its update time changed.
 do $$begin
- if exists(select 1 from public.freshy_store a full join freshy_payment_migration_snapshot b using(key)
-  where a.key is null or b.key is null or a.value is distinct from b.value or a.updated_at is distinct from b.updated_at) then
+ if coalesce((select md5(string_agg(key||':'||value::text||':'||updated_at::text,'|' order by key)) from public.freshy_store),'empty')
+  is distinct from current_setting('freshy.payment_migration_hash') then
   raise exception 'BUSINESS_DATA_CHANGED_DURING_MIGRATION';
  end if;
 end $$;
