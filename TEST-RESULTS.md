@@ -1,6 +1,10 @@
-# Freshy Water 8.0 validation
+# Freshy Water 8.4 validation
 
 Run `npm test` and `npm run build`.
+
+- Payment workflow on isolated PostgreSQL: all members see every operational row; staff personnel/settings secrets stay private; migration preserves the complete data fingerprint; server stamps receiver/reviewer; staff receipt and approval request commit atomically; individual approval/rejection; mandatory cancellation reasons; receiver-only pending cancellation; approved-payment undo review; legacy receipts unchanged; anonymous and generic status-forging rejected.
+- Receipt recovery uses the actual production client queue against PostgreSQL: response lost after commit, client restart, retry without a second receipt/request/audit entry; simultaneous receivers result in one success; a stale row rolls back an entire bulk operation.
+- Staff/admin DOM history tests: staff immediately sees pending receipts and can cancel with a reason; admin history excludes pending receipts and includes them after approval; reviewer details appear; daily-report totals exclude pending amounts and expose a separate pending count/total.
 
 - Existing real flush loop: 10 queued records, lost successful response, safe retry, no duplicate IDs, exact old settings baseline, PT409 conflict handling.
 - UI workflows in a simulated DOM: debtor validation and continuation, Enter/Backspace behavior, village codes, unique employee controls, profile file picker, CSV exports, theme switching, QR print choice, demo-only reset preserving settings and 1,000 unmarked real-style records.

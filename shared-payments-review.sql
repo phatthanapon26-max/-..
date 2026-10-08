@@ -1,117 +1,15 @@
--- Freshy Water v2: authenticated RPC access, row-scoped reads, conflict-safe writes.
--- Change this email to a confirmed user created in Supabase Authentication > Users.
+-- Freshy Water 8.4: shared operational data and atomic payment review.
+-- This migration changes functions only; existing business records remain untouched.
 begin;
-create table if not exists public.freshy_store (
- key text primary key, value jsonb not null default '[]'::jsonb,
- updated_at timestamptz not null default now()
-);
-create table if not exists public.freshy_signal (
- id boolean primary key default true check (id),
- version bigint not null default 0,
- updated_at timestamptz not null default now()
-);
-insert into public.freshy_signal(id) values(true) on conflict do nothing;
-alter table public.freshy_signal enable row level security;
-drop policy if exists freshy_signal_authenticated_read on public.freshy_signal;
-create policy freshy_signal_authenticated_read on public.freshy_signal for select to authenticated using (true);
-revoke all on public.freshy_signal from public,anon;
-grant select on public.freshy_signal to authenticated;
-create or replace function public.freshy_emit_signal() returns trigger
-language plpgsql security definer set search_path=pg_catalog,public as $$
-begin
- insert into public.freshy_signal(id,version,updated_at) values(true,1,now())
- on conflict(id) do update set version=public.freshy_signal.version+1,updated_at=now();
- return new;
-end $$;
-drop trigger if exists freshy_store_emit_signal on public.freshy_store;
--- Cross-device refresh now uses lightweight Realtime Broadcast from the app.
--- Do not publish database rows: WAL decoding can saturate Nano compute.
-do $$ begin
- if exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='freshy_signal') then
-  alter publication supabase_realtime drop table public.freshy_signal;
+select pg_advisory_xact_lock(7248219);
+-- Stop if another update has changed the write function since this version was prepared.
+do $$begin
+ if not exists(select 1 from pg_proc where oid='public.freshy_apply(jsonb)'::regprocedure
+  and md5(prosrc) in ('ff58ab3db84aa97aca3c62a9b9d10e46','7d9e03cf34c3a987a81ddf2d8ac8705e')) then
+  raise exception 'WRITE_FUNCTION_CHANGED: inspect the current function before installing';
  end if;
 end $$;
--- Bound the append-only audit JSON so reads and writes stay fast on Nano plans.
-create or replace function public.freshy_cap_audit() returns trigger
-language plpgsql set search_path=pg_catalog,public as $$
-begin
- if new.key='audit' and jsonb_typeof(new.value)='array' and jsonb_array_length(new.value)>2000 then
-  select coalesce(jsonb_agg(x order by ord),'[]'::jsonb) into new.value
-  from jsonb_array_elements(new.value) with ordinality as a(x,ord)
-  where ord>jsonb_array_length(new.value)-1000;
- end if;
- return new;
-end $$;
-drop trigger if exists freshy_cap_audit_trigger on public.freshy_store;
-create trigger freshy_cap_audit_trigger before insert or update on public.freshy_store
-for each row execute function public.freshy_cap_audit();
-alter table public.freshy_store enable row level security;
-do $$ declare p record; begin
- for p in select policyname from pg_policies where schemaname='public' and tablename='freshy_store' loop
-  execute format('drop policy %I on public.freshy_store',p.policyname);
- end loop;
-end $$;
-revoke all on public.freshy_store from public, anon, authenticated;
-insert into public.freshy_store(key,value) values('employees','[]') on conflict do nothing;
--- Bootstrap an actual account. This does not copy demonstration customers or debts.
-do $$
-declare admin_email text := 'phatthanapon26@gmail.com'; existing jsonb; person jsonb;
-begin
- if admin_email = 'CHANGE_ADMIN_EMAIL@example.com' then
-  raise exception 'Replace CHANGE_ADMIN_EMAIL@example.com with the confirmed admin login email first';
- end if;
- if not exists(select 1 from auth.users where lower(email)=lower(admin_email) and email_confirmed_at is not null) then
-  raise exception 'Create and confirm the admin account in Authentication > Users first';
- end if;
- select value into existing from public.freshy_store where key='employees' for update;
- select x into person from jsonb_array_elements(existing) x where lower(x->>'email')=lower(admin_email) limit 1;
- if person is null then
-  person := jsonb_build_object('id','emp_'||gen_random_uuid()::text,'email',lower(admin_email),'name','ผู้ดูแลระบบ','code','7716','role','admin','permissions',jsonb_build_object('pages','{}'::jsonb,'canPrint',true,'canEmail',true));
-  existing := existing || jsonb_build_array(person);
- else
-  existing := (select jsonb_agg(case when x->>'id'=person->>'id' then x||'{"role":"admin","code":"7716"}'::jsonb else x end) from jsonb_array_elements(existing) x);
- end if;
- update public.freshy_store set value=existing where key='employees';
-end $$;
-
-do $$ declare r record; begin
- for r in select key,value from public.freshy_store where key<>'settings' and jsonb_typeof(value)='array' loop
-  update public.freshy_store set value=(select coalesce(jsonb_agg(case when x->>'id' is null then x||jsonb_build_object('id',gen_random_uuid()::text) else x end),'[]') from jsonb_array_elements(r.value) x) where key=r.key;
- end loop;
-end $$;
-
-insert into public.freshy_store(key,value) values('settings','{"business": {"name": "โรงน้ำดื่ม เฟรชชี่ วอเตอร์", "address": "", "taxId": "", "commercialId": "", "phone": "", "email": "", "menuName": "ระบบจัดการลูกหนี้"}, "header": {"showLogo": true, "showName": true, "logoDataUrl": ""}, "email": {"enabled": false, "adminEmail": "", "provider": "resend", "fromEmail": "", "apiKey": "", "smtpHost": "", "smtpPort": "587", "smtpUser": "", "smtpPass": "", "alerts": {"login": true, "logout": true, "addDebtor": true, "undoRequest": true}}, "docPrefix": {"debtor": "FWD", "cash": "CSH", "customer": "CUS"}, "doccounters": {}}'::jsonb) on conflict do nothing;
-
-create or replace function public.freshy_actor() returns jsonb
-language plpgsql stable security definer set search_path=pg_catalog,public as $$
-declare actor jsonb; email_address text;
-begin
- if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode='28000'; end if;
- select email into email_address from auth.users where id=auth.uid() and email_confirmed_at is not null;
- select x into actor from public.freshy_store s, jsonb_array_elements(s.value) x
- where s.key='employees' and lower(x->>'email')=lower(email_address)
- and coalesce(x->>'status','active') not in ('pending','inactive','disabled') limit 1;
- if actor is null then raise exception 'MEMBER_NOT_FOUND' using errcode='42501'; end if;
- return actor;
-end $$;
-
-create or replace function public.freshy_owns(v jsonb, actor_id text) returns boolean
-language sql immutable set search_path=pg_catalog as $$
- select coalesce(v->>'createdBy'=actor_id,false) or coalesce(v->>'responsibleBy'=actor_id,false)
- or coalesce(v->>'paidBy'=actor_id,false) or coalesce(v->>'userId'=actor_id,false)
- or coalesce(v->>'employeeId'=actor_id,false)
-$$;
-
-create or replace function public.freshy_visible(k text,v jsonb,a jsonb) returns boolean
-language sql immutable set search_path=pg_catalog as $$
- select case when k='customers' then
-  coalesce((a#>>array['permissions','pages',case when v->>'area'='nai' then 'customersNai' else 'customersOther' end])::boolean,false)
-  or coalesce((a#>>array['permissions','pages',case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end])::boolean,false)
-  or coalesce((a#>>array['permissions','pages',case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end])::boolean,false)
- when k in ('debtors','cashsales','audit') then coalesce((a#>>array['permissions','pages',
- case when k='debtors' then case when v->>'status'='paid' then case when v->>'area'='nai' then 'paymentsNai' else 'paymentsOther' end else case when v->>'area'='nai' then 'debtorsNai' else 'debtorsOther' end end
- else k end])::boolean,false) else true end
-$$;
+create temporary table freshy_payment_migration_snapshot on commit drop as select key,value,updated_at from public.freshy_store;
 
 create or replace function public.freshy_read() returns jsonb
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
@@ -136,22 +34,6 @@ begin
 end $$;
 revoke all on function public.freshy_read() from public,anon;
 grant execute on function public.freshy_read() to authenticated;
-
-create or replace function public.freshy_customer_code() returns text
-language plpgsql security definer set search_path=pg_catalog,public as $$
-declare actor jsonb; serial bigint; existing bigint;
-begin
- perform pg_advisory_xact_lock(7248219);
- actor:=public.freshy_actor();
- if actor->>'role'<>'admin' and not (coalesce((actor#>>'{permissions,pages,customersNai}')::boolean,false) or coalesce((actor#>>'{permissions,pages,customersOther}')::boolean,false) or coalesce((actor#>>'{permissions,pages,debtorsNai}')::boolean,false) or coalesce((actor#>>'{permissions,pages,debtorsOther}')::boolean,false)) then raise exception 'PAGE_FORBIDDEN' using errcode='42501'; end if;
- select coalesce(max(substring(x->>'code' from '^C([0-9]{1,12})$')::bigint),0) into existing from public.freshy_store s,jsonb_array_elements(s.value) x where s.key='customers';
- select coalesce((value->>'next')::bigint,0) into serial from public.freshy_store where key='customer_sequence';
- serial:=greatest(coalesce(serial,0),existing)+1;
- insert into public.freshy_store(key,value) values('customer_sequence',jsonb_build_object('next',serial)) on conflict(key) do update set value=excluded.value,updated_at=now();
- return 'C'||case when serial<1000 then lpad(serial::text,3,'0') else serial::text end;
-end $$;
-revoke all on function public.freshy_customer_code() from public,anon;
-grant execute on function public.freshy_customer_code() to authenticated;
 
 create or replace function public.freshy_apply(changes jsonb) returns jsonb
 language plpgsql security definer set search_path=pg_catalog,public as $$
@@ -377,82 +259,17 @@ revoke all on function public.freshy_payment(jsonb,text,text,jsonb,text,text) fr
 grant execute on function public.freshy_payment(jsonb,text,text,jsonb,text,text) to authenticated;
 
 
-create or replace function public.freshy_reset(categories jsonb, confirmation_code text, expected_revision text, full_reset boolean default false) returns jsonb
-language plpgsql security definer set search_path=pg_catalog,public as $$
-declare actor jsonb; chosen text[]; k text; revision text; new_revision text:=gen_random_uuid()::text; removed_ids text[]; before_counts jsonb:='{}'; r record;
-begin
- perform pg_advisory_xact_lock(7248219);
- actor:=public.freshy_actor();
- if actor->>'role' is distinct from 'admin' then raise exception 'ADMIN_ONLY_RESET' using errcode='42501'; end if;
- if confirmation_code is null or confirmation_code not in ('7716','7816') then raise exception 'INVALID_RESET_CODE' using errcode='42501'; end if;
- select coalesce(value->>'_resetRevision','') into revision from public.freshy_store where key='settings';
- if coalesce(expected_revision,'') is distinct from coalesce(revision,'') then raise exception 'RESET_STALE' using errcode='PT409'; end if;
- if categories is null or jsonb_typeof(categories)<>'array' then raise exception 'INVALID_RESET_SELECTION'; end if;
- select array_agg(x) into chosen from jsonb_array_elements_text(categories) x;
- if not coalesce(full_reset,false) and coalesce(cardinality(chosen),0)=0 then raise exception 'RESET_SELECTION_REQUIRED'; end if;
- foreach k in array coalesce(chosen,array[]::text[]) loop
-  if k is null or k not in ('unpaid','paid','customers','cashsales','employees','products','villages','audit','approvals','documents','emailLogs','settings') then raise exception 'INVALID_RESET_SELECTION'; end if;
- end loop;
- for r in select key,value from public.freshy_store where jsonb_typeof(value)='array' loop
-  before_counts:=before_counts||jsonb_build_object(r.key,jsonb_array_length(r.value));
- end loop;
- if coalesce(full_reset,false) then
-  delete from public.freshy_store;
-  insert into public.freshy_store(key,value) values('employees',jsonb_build_array(actor)),('settings',jsonb_build_object('_resetRevision',new_revision));
- else
-  select coalesce(array_agg(x->>'id'),array[]::text[]) into removed_ids
-  from public.freshy_store s,jsonb_array_elements(s.value) x where s.key='debtors'
-  and ('customers'=any(chosen) or (x->>'status'='unpaid' and 'unpaid'=any(chosen)) or (x->>'status'='paid' and 'paid'=any(chosen)));
-  update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where not (x->>'id'=any(removed_ids))),updated_at=now() where key='debtors';
-  update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where not coalesce(x->>'debtorId'=any(removed_ids),false)),updated_at=now() where key='approvals';
-  foreach k in array chosen loop
-   if k in ('customers','cashsales','products','villages','audit','approvals') then
-    insert into public.freshy_store(key,value) values(k,'[]'::jsonb) on conflict(key) do update set value='[]'::jsonb,updated_at=now();
-   elsif k='employees' then update public.freshy_store set value=jsonb_build_array(actor),updated_at=now() where key=k;
-   elsif k='settings' then update public.freshy_store set value='{}'::jsonb,updated_at=now() where key=k;
-   elsif k='documents' then
-    delete from public.freshy_store where key like 'document:%';
-    update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where coalesce(x->>'type','')<>'document'),updated_at=now() where key='sentEmails';
-   elsif k='emailLogs' then
-    update public.freshy_store set value=(select coalesce(jsonb_agg(x),'[]'::jsonb) from jsonb_array_elements(value) x where x->>'type'='document'),updated_at=now() where key='sentEmails';
-    delete from public.freshy_store where key like 'mail-job:%';
-   end if;
-  end loop;
-  insert into public.freshy_store(key,value) values('settings',jsonb_build_object('_resetRevision',new_revision)) on conflict(key) do update set value=public.freshy_store.value||jsonb_build_object('_resetRevision',new_revision),updated_at=now();
+-- Roll back the installation if any business row or its update time changed.
+do $$begin
+ if exists(select 1 from public.freshy_store a full join freshy_payment_migration_snapshot b using(key)
+  where a.key is null or b.key is null or a.value is distinct from b.value or a.updated_at is distinct from b.updated_at) then
+  raise exception 'BUSINESS_DATA_CHANGED_DURING_MIGRATION';
  end if;
- insert into public.freshy_store(key,value) values('audit','[]'::jsonb) on conflict do nothing;
- update public.freshy_store set value=value||jsonb_build_array(jsonb_build_object('id',gen_random_uuid()::text,'ts',now(),'userId',actor->>'id','userName',actor->>'name','action','ล้างข้อมูล','detail',case when full_reset then 'ทั้งหมด (เก็บบัญชีแอดมินปัจจุบัน)' else array_to_string(chosen,', ') end)),updated_at=now() where key='audit';
- return public.freshy_read()||jsonb_build_object('reset',jsonb_build_object('full',coalesce(full_reset,false),'categories',categories,'before',before_counts));
 end $$;
-revoke all on function public.freshy_reset(jsonb,text,text,boolean) from public,anon;
-grant execute on function public.freshy_reset(jsonb,text,text,boolean) to authenticated;
-
-create or replace function public.freshy_public_qr(customer_id text) returns jsonb
-language plpgsql stable security definer set search_path=pg_catalog,public as $$
-declare customer jsonb; debts jsonb; business jsonb; recorder jsonb;
-begin
- if customer_id is null or length(customer_id)>160 then return null; end if;
- select x into customer from public.freshy_store s, jsonb_array_elements(s.value) x
- where s.key='customers' and x->>'id'=customer_id limit 1;
- if customer is null then return null; end if;
- select coalesce(jsonb_agg(x order by x->>'debtDate'),'[]'::jsonb) into debts
- from public.freshy_store s, jsonb_array_elements(s.value) x
- where s.key='debtors' and x->>'customerId'=customer_id and x->>'status'='unpaid';
- select coalesce(value->'business','{}'::jsonb) into business from public.freshy_store where key='settings';
- select jsonb_build_object('name',coalesce(e->>'name','-'),'role',coalesce(e->>'role','staff')) into recorder
- from public.freshy_store s, jsonb_array_elements(s.value) e
- where s.key='employees' and e->>'id'=coalesce(debts->0->>'createdBy','') limit 1;
- return jsonb_build_object('customer',customer-'createdBy'-'managedBy'-'responsibleBy','debtors',debts,
-  'business',business-'email','recorder',coalesce(recorder,'{"name":"-","role":"staff"}'::jsonb));
-end $$;
-
-revoke all on function public.freshy_actor() from public,anon,authenticated;
-revoke all on function public.freshy_visible(text,jsonb,jsonb) from public,anon,authenticated;
-revoke all on function public.freshy_owns(jsonb,text) from public,anon,authenticated;
-revoke all on function public.freshy_read() from public,anon;
-revoke all on function public.freshy_apply(jsonb) from public,anon;
-revoke all on function public.freshy_public_qr(text) from public;
-grant execute on function public.freshy_read() to authenticated;
-grant execute on function public.freshy_apply(jsonb) to authenticated;
-grant execute on function public.freshy_public_qr(text) to anon,authenticated;
+notify pgrst, 'reload schema';
 commit;
+select 'installed; original business rows preserved by transaction check' as payment_review,
+ (select md5(string_agg(key||':'||value::text,'|' order by key)) from public.freshy_store) as data_fingerprint,
+ (select jsonb_object_agg(key,case when jsonb_typeof(value)='array' then jsonb_array_length(value)::text else jsonb_typeof(value) end) from public.freshy_store) as counts,
+ has_function_privilege('authenticated','public.freshy_payment(jsonb,text,text,jsonb,text,text)','execute') as members_can_receive,
+ has_function_privilege('anon','public.freshy_payment(jsonb,text,text,jsonb,text,text)','execute') as anonymous_can_receive;

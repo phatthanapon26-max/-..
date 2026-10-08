@@ -1,5 +1,5 @@
 'use strict';
-const report=require('./_lib/document-report');const C=require('./_lib/core'),mail=require('./_lib/mail'),F=require('../features');
+const report=require('./_lib/document-report');const C=require('./_lib/core'),mail=require('./_lib/mail'),F=require('../features'),P=require('../payments');
 
 function thaiNow(){return new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Bangkok'}));}
 function isoDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -10,13 +10,14 @@ function summarize(data,date){
  const cash=(data.cashsales||[]).filter(x=>x.deliveryDate===date);
  const debts=(data.debtors||[]).filter(x=>x.debtDate===date);
  const unpaid=(data.debtors||[]).filter(x=>x.status==='unpaid');
- const paidToday=(data.debtors||[]).filter(x=>x.status==='paid'&&x.paidAt&&F.bangkokParts(new Date(x.paidAt)).date===date);
+ const paidToday=(data.debtors||[]).filter(x=>P.confirmed(x)&&x.paidAt&&F.bangkokParts(new Date(x.paidAt)).date===date);
+ const pending=(data.debtors||[]).filter(x=>P.review(x)==='pending');
  const total=a=>a.reduce((s,x)=>s+Number(x.total??Number(x.jugAmount||0)+Number(x.packAmount||0)),0);
- return {cashCount:cash.length,cashTotal:total(cash),debtCount:debts.length,debtTotal:total(debts),paidCount:paidToday.length,paidTotal:total(paidToday),unpaidCount:new Set(unpaid.map(x=>x.customerId||x.customerName)).size,unpaidTotal:total(unpaid),jugs:cash.concat(debts).reduce((s,x)=>s+Number(x.jugs||0),0),packs:cash.concat(debts).reduce((s,x)=>s+Number(x.packs||0),0),cash,debts};
+ return {pendingCount:pending.length,pendingTotal:total(pending),cashCount:cash.length,cashTotal:total(cash),debtCount:debts.length,debtTotal:total(debts),paidCount:paidToday.length,paidTotal:total(paidToday),unpaidCount:new Set(unpaid.map(x=>x.customerId||x.customerName)).size,unpaidTotal:total(unpaid),jugs:cash.concat(debts).reduce((s,x)=>s+Number(x.jugs||0),0),packs:cash.concat(debts).reduce((s,x)=>s+Number(x.packs||0),0),cash,debts};
 }
 function reportSnapshot(business,period,date,s){
  const bits=date.split('-'),printed=bits[2]+'/'+bits[1]+'/'+(Number(bits[0])+543),ref='SUM'+date.replaceAll('-','')+'-'+period.replace(':','');
- return {schema:1,docNo:ref,title:'รายงานสรุปลูกหนี้และการส่งน้ำประจำวัน',business,author:{name:'ระบบรายงานอัตโนมัติ',role:'system'},issuedAt:new Date().toISOString(),metadata:'วันที่รายงาน '+printed+' · รอบเวลา '+period+' น.',tables:[{title:'สรุปผลการดำเนินงาน',headers:['รายการ','จำนวน / ยอดรวม'],widths:[67,33],alignments:['left','right'],rows:[['ยอดขายเงินสดประจำวัน',money(s.cashTotal)+' บาท'],['ยอดลูกหนี้ใหม่ประจำวัน',money(s.debtTotal)+' บาท'],['ยอดรับชำระประจำวัน',money(s.paidTotal)+' บาท'],['ยอดค้างชำระทั้งหมด',money(s.unpaidTotal)+' บาท'],['ลูกหนี้คงค้าง',s.unpaidCount+' ราย'],['จำนวนถังที่ส่งประจำวัน',s.jugs+' ถัง'],['จำนวนแพ็คที่ส่งประจำวัน',s.packs+' แพ็ค']]}],summaries:['รายการเงินสด '+s.cashCount+' รายการ · ลูกหนี้ใหม่ '+s.debtCount+' รายการ · รับชำระ '+s.paidCount+' รายการ'],signatures:[{name:'',role:'ผู้จัดทำรายงาน'},{name:'',role:'ผู้ตรวจสอบ'},{name:'',role:'ผู้บริหาร'}]};
+ return {schema:1,docNo:ref,title:'รายงานสรุปลูกหนี้และการส่งน้ำประจำวัน',business,author:{name:'ระบบรายงานอัตโนมัติ',role:'system'},issuedAt:new Date().toISOString(),metadata:'วันที่รายงาน '+printed+' · รอบเวลา '+period+' น.',tables:[{title:'สรุปผลการดำเนินงาน',headers:['รายการ','จำนวน / ยอดรวม'],widths:[67,33],alignments:['left','right'],rows:[['ยอดขายเงินสดประจำวัน',money(s.cashTotal)+' บาท'],['ยอดลูกหนี้ใหม่ประจำวัน',money(s.debtTotal)+' บาท'],['รับชำระรอแอดมินตรวจสอบ',money(s.pendingTotal)+' บาท'],['ยอดรับชำระที่อนุมัติประจำวัน',money(s.paidTotal)+' บาท'],['ยอดค้างชำระทั้งหมด',money(s.unpaidTotal)+' บาท'],['ลูกหนี้คงค้าง',s.unpaidCount+' ราย'],['จำนวนถังที่ส่งประจำวัน',s.jugs+' ถัง'],['จำนวนแพ็คที่ส่งประจำวัน',s.packs+' แพ็ค']]}],summaries:['รายการเงินสด '+s.cashCount+' รายการ · ลูกหนี้ใหม่ '+s.debtCount+' รายการ · รับชำระ '+s.paidCount+' รายการ'],signatures:[{name:'',role:'ผู้จัดทำรายงาน'},{name:'',role:'ผู้ตรวจสอบ'},{name:'',role:'ผู้บริหาร'}]};
 }
 function emailHtml(business,period,date,s){const d=reportSnapshot(business,period,date,s);return report.notificationHtml(d).replace('<p>จึงเรียนมา', '<table style="width:100%;border-collapse:collapse">'+d.tables[0].rows.map(r=>'<tr><td style="border:1px solid #333;padding:8px">'+esc(r[0])+'</td><td style="border:1px solid #333;padding:8px;text-align:right">'+esc(r[1])+'</td></tr>').join('')+'</table><p>จึงเรียนมา');}
 function pdfReport(business,period,date,s){return report.pdfDocument(reportSnapshot(business,period,date,s));}

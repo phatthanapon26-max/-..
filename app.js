@@ -42,7 +42,7 @@ function attachCsv(){
  button.onclick=()=>{const area=currentPage.endsWith('Nai')?'nai':'other';let headers,rows;
  if(currentPage.startsWith('customers')){let data=DB.customers.filter(x=>x.area===area);const query=custSearch[area]||'';if(query)data=data.filter(x=>x.name.includes(query)||String(x.code||'').toLowerCase().includes(query.toLowerCase()));if(custCredit[area]!=='all')data=data.filter(x=>creditStatus(x.id).txt===custCredit[area]);headers=['รหัสลูกค้า','ชื่อลูกค้า','หมู่ที่','หมู่บ้าน','รหัสหมู่บ้าน','ที่อยู่','วันที่บันทึก'];rows=data.map(x=>[x.code,x.name,x.moo,x.village,x.villageCode,x.address,x.createdAt]);}
  else if(currentPage==='cashsales'){const data=scopeRows(DB.cashsales).filter(x=>x.deliveryDate===cashDateFilter);headers=['รหัสลูกค้า','ชื่อลูกค้า','วันที่ส่ง','หมู่ที่','หมู่บ้าน','ถัง','แพ็ค','เงินถัง','เงินแพ็ค','ยอดรวม'];rows=data.map(x=>[x.customerCode,x.customerName,x.deliveryDate,x.moo,x.village,x.jugs,x.packs,x.jugAmount,x.packAmount,Number(x.jugAmount||0)+Number(x.packAmount||0)]);}
- else{const paid=currentPage.startsWith('payments');let data=scopeRows(DB.debtors).filter(x=>x.area===area&&x.status===(paid?'paid':'unpaid'));const query=paid?paySearch:debtorSearch;if(query)data=data.filter(x=>x.customerName.includes(query));if(!paid&&debtorFilter[area]!=='all')data=data.filter(x=>String(area==='nai'?x.moo:x.village)===debtorFilter[area]);const customers=new Map(DB.customers.map(x=>[x.id,x]));headers=['รหัสลูกค้า','ชื่อลูกหนี้','วันที่ค้าง','หมู่ที่','หมู่บ้าน','รหัสหมู่บ้าน','ถัง','แพ็ค','เงินถัง','เงินแพ็ค','ยอดรวม','สถานะ','วันที่รับชำระ'];rows=data.map(x=>[customers.get(x.customerId)?.code||'',x.customerName,x.debtDate,x.moo,x.village,x.villageCode,x.jugs,x.packs,x.jugAmount,x.packAmount,x.total,paid?'รับชำระแล้ว':'ค้างชำระ',x.paidAt||'']);}
+ else{const paid=currentPage.startsWith('payments');let data=scopeRows(DB.debtors).filter(x=>x.area===area&&x.status===(paid?'paid':'unpaid'));const query=paid?paySearch:debtorSearch;if(query)data=data.filter(x=>x.customerName.includes(query));if(!paid&&debtorFilter[area]!=='all')data=data.filter(x=>String(area==='nai'?x.moo:x.village)===debtorFilter[area]);const customers=new Map(DB.customers.map(x=>[x.id,x]));headers=['รหัสลูกค้า','ชื่อลูกหนี้','วันที่ค้าง','หมู่ที่','หมู่บ้าน','รหัสหมู่บ้าน','ถัง','แพ็ค','เงินถัง','เงินแพ็ค','ยอดรวม','สถานะ','วันที่รับชำระ'];rows=data.map(x=>[customers.get(x.customerId)?.code||'',x.customerName,x.debtDate,x.moo,x.village,x.villageCode,x.jugs,x.packs,x.jugAmount,x.packAmount,x.total,paid?FreshyPayments.label(x):'ค้างชำระ',x.paidAt||'']);}
  const blob=new Blob([FreshyFeatures.csv(headers,rows)],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='freshy-'+currentPage+'-'+todayStr()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('เริ่มดาวน์โหลด CSV '+rows.length+' รายการ','info');};
 }
 async function loginByCode(){
@@ -279,13 +279,13 @@ function acceptRemote(payload,changes){
  for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key.startsWith(journalPrefix())||key===journalKey())continue;try{const raw=localStorage.getItem(key),entry=JSON.parse(raw);entry.issues=(entry.issues||[]).filter(stillUncommitted);entry.changes=(entry.changes||[]).filter(change=>{try{return FreshySync.rebase(normalizedRemote(payload.data),[change]).length>0;}catch{return true;}});if(raw===localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(entry));}catch{}}
  syncViewDirty=true;updateSyncNotice();refreshSyncedView();
 }
-function updateSyncNotice(){const button=document.querySelector('.pending-btn');if(button&&authIdentity){const count=remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)).length:0;button.textContent=syncIssues.length?'ตรวจสอบ '+syncIssues.length+' รายการ':count?'รอส่ง '+count+' รายการ':'ข้อมูลบันทึกแล้ว';button.dataset.state=syncIssues.length?'review':count?'sending':'saved';}const time=$('#syncLastUpdated');if(time)time.textContent=lastSyncAt?'อัปเดต '+new Date(lastSyncAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):authIdentity?'กำลังตรวจข้อมูล':'ข้อมูลสาธิต';}
+function updateSyncNotice(){const button=document.querySelector('.pending-btn');if(button&&authIdentity){const commands=typeof paymentQueue==='function'?paymentQueue():[];const count=(remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)).length:0)+commands.length;button.textContent=syncIssues.length?'ตรวจสอบ '+syncIssues.length+' รายการ':count?'รอส่ง '+count+' รายการ':'ข้อมูลบันทึกแล้ว';button.dataset.state=syncIssues.length?'review':count?'sending':'saved';}const time=$('#syncLastUpdated');if(time)time.textContent=lastSyncAt?'อัปเดต '+new Date(lastSyncAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):authIdentity?'กำลังตรวจข้อมูล':'ข้อมูลสาธิต';}
 function refreshSyncedView(){
  if(!session||!syncViewDirty||modalIsOpen()||currentPage==='settings')return;
  const active=document.activeElement,filterIds=['debtorSearch','paySearch','custSearch','cashDate','auditEmployeeFilter'];
  if(['INPUT','TEXTAREA','SELECT'].includes(active?.tagName)&&!filterIds.includes(active.id))return;
  const focus=filterIds.includes(active?.id)?{id:active.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
- syncViewDirty=false;refreshUserChip();renderPage();
+ syncViewDirty=false;refreshUserChip();if(typeof renderNav==='function')renderNav();renderPage();
  if(focus){const input=$('#'+focus.id);if(input){input.value=focus.value;input.focus({preventScroll:true});if(Number.isInteger(focus.start)&&typeof input.setSelectionRange==='function')input.setSelectionRange(focus.start,focus.end);}}
 }
 
@@ -298,6 +298,7 @@ function quarantineSyncChange(change,message){
 function installRemote(payload,preserve){
  if(!payload||!payload.actor||!payload.data)throw Error('รูปแบบข้อมูลออนไลน์ไม่ถูกต้อง');
  const cfg=DB.settings.db;
+ const approvedNotices=(payload.data.debtors||[]).filter(row=>row.paymentReviewStatus==='approved'&&row.paidBy===payload.actor.id&&remoteBase?.debtors?.some(old=>old.id===row.id&&old.paymentReviewStatus==='pending'));
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
  if(remoteBase&&String(remoteBase.settings?._resetRevision||'')!==String(data.settings?._resetRevision||'')){archiveSyncChanges(preserve,'ข้อมูลก่อนแอดมินล้างระบบ');preserve=[];}
@@ -310,7 +311,7 @@ function installRemote(payload,preserve){
  DB.settings.db=cfg;
  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
- safeCache();
+ safeCache();for(const row of approvedNotices)toast('รายการของ '+row.customerName+' ตรวจสอบและอนุมัติแล้ว','success');
 }
 async function rpc(name,body){
  const cfg=supaCfg();if(!cfg||!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');
@@ -324,6 +325,7 @@ async function rpc(name,body){
 async function supabaseFetch(){
  if(!supaCfg()||!authIdentity)return false;
  if(syncReadPromise)return syncReadPromise;
+ if(typeof retryPaymentCommands==='function')await retryPaymentCommands();
  if(syncPromise){await syncPromise;if(!authIdentity)return false;}
  if(remoteBase&&!syncBlocked&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)await flushOnline();
  syncBusy=true;
@@ -517,11 +519,11 @@ function audit(action,detail){dbAdd('audit',{ts:new Date().toISOString(),userId:
 /* ---------- session / auth ---------- */
 function me(){if(!session)return null;return DB.employees.find(e=>e.id===session.empId)||null;}
 function isAdmin(){const u=me();return !!(u&&u.role==='admin');}
-function canSee(page){const u=me();if(!u)return false;if(u.role==='admin')return true;return !!(u.permissions&&u.permissions.pages&&u.permissions.pages[page]);}
+function canSee(page){const u=me();if(!u)return false;if(u.role==='admin'||['dashboard','debtorsNai','debtorsOther','paymentsNai','paymentsOther','customersNai','customersOther','cashsales','approvals'].includes(page))return true;return !!(u.permissions&&u.permissions.pages&&u.permissions.pages[page]);}
 function canPrint(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.canPrint));}
 function canEmail(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.canEmail));}
 function canManageRecord(row){const id=me()?.id;return !!row&&(isAdmin()||row.createdBy===id||row.responsibleBy===id||row.paidBy===id);}
-function scopeRows(rows){if(isAdmin()||authIdentity)return rows;return rows.filter(canManageRecord);}
+function scopeRows(rows){return rows;}
 function recorderName(id){return (DB.employees.find(e=>e.id===id)||remoteRecorders.find(e=>e.id===id)||{}).name||'-';}
 
 /* ---------- email alerts (ส่งผ่าน /api/email ถ้าตั้งค่าไว้ มิฉะนั้นบันทึก log) ---------- */
@@ -553,7 +555,7 @@ const PAGES=[
   {id:'customersNai',label:'จัดการข้อมูลลูกค้า · บ้านนาไฮ',icon:'users',group:'ข้อมูลลูกค้า'},
   {id:'customersOther',label:'จัดการข้อมูลลูกค้า · บ้านอื่น ๆ',icon:'users',group:'ข้อมูลลูกค้า'},
   {id:'cashsales',label:'รายงานลูกค้าจ่ายสด',icon:'receipt-text',group:'ข้อมูลลูกค้า'},
-  {id:'approvals',label:'คำขออนุมัติ',icon:'clipboard-check',group:'จัดการระบบ',admin:true},
+  {id:'approvals',label:'ตรวจสอบการรับชำระ',icon:'clipboard-check',group:'ประวัติรับชำระ'},
   {id:'employees',label:'จัดการพนักงาน',icon:'user-cog',group:'จัดการระบบ',admin:true},
   {id:'audit',label:'ประวัติการแก้ไข',icon:'history',group:'จัดการระบบ',admin:true},
   {id:'settings',label:'การตั้งค่า',icon:'settings',group:'จัดการระบบ',admin:true}
@@ -602,14 +604,14 @@ function renderPage(){
 function renderDashboard(){
  const today=todayStr(),cashRows=scopeRows(DB.cashsales),debtRows=scopeRows(DB.debtors),cash=cashRows.filter(r=>r.deliveryDate===today),unpaid=debtRows.filter(d=>d.status==='unpaid');
  const sum=(rows,key)=>rows.reduce((total,row)=>total+Number(row[key]||0),0),cashSum=rows=>sum(rows,'jugAmount')+sum(rows,'packAmount');
- const cashTotal=cashSum(cash),debtToday=sum(unpaid.filter(d=>d.debtDate===today),'total'),jugsToday=sum(cash,'jugs')+sum(debtRows.filter(d=>d.debtDate===today),'jugs'),unpaidTotal=sum(unpaid,'total'),paidTotal=sum(debtRows.filter(d=>d.status==='paid'),'total')+cashSum(cashRows),unpaidCust=new Set(unpaid.map(d=>d.customerId)).size,unpaidJugs=sum(unpaid,'jugs');
+ const cashTotal=cashSum(cash),debtToday=sum(unpaid.filter(d=>d.debtDate===today),'total'),jugsToday=sum(cash,'jugs')+sum(debtRows.filter(d=>d.debtDate===today),'jugs'),unpaidTotal=sum(unpaid,'total'),paidTotal=sum(debtRows.filter(FreshyPayments.confirmed),'total')+cashSum(cashRows),unpaidCust=new Set(unpaid.map(d=>d.customerId)).size,unpaidJugs=sum(unpaid,'jugs');
  const days=FreshyDashboard.series(cashRows,debtRows,today,dashboardDays),paidPercent=paidTotal+unpaidTotal?Math.round(paidTotal/(paidTotal+unpaidTotal)*100):0;
  const employees=(isAdmin()?DB.employees:DB.employees.filter(e=>e.id===me().id)).map(e=>{const employeeCash=cash.filter(r=>r.createdBy===e.id),employeeDebts=debtRows.filter(r=>r.createdBy===e.id&&r.debtDate===today);return {code:e.code==='7716'?'ADMIN':e.code,name:e.name,cash:cashSum(employeeCash),debt:sum(employeeDebts,'total')};});
  const empHtml='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัสพนักงาน</th><th>ชื่อพนักงาน</th><th class="num">ยอดขายเงินสด</th><th class="num">ยอดลงลูกหนี้</th><th class="num">รวม</th></tr></thead><tbody>'+employees.map(r=>'<tr><td>'+esc(r.code)+'</td><td><b>'+esc(r.name)+'</b></td><td class="num" style="color:var(--green)">'+fmtN(r.cash)+'</td><td class="num" style="color:var(--red)">'+fmtN(r.debt)+'</td><td class="num"><b>'+fmtN(r.cash+r.debt)+'</b></td></tr>').join('')+'</tbody></table></div>';
  const card=(tone,icon,label,value,unit,sub='')=>'<div class="stat-card '+tone+'"><div class="label"><i data-lucide="'+icon+'"></i>'+label+'</div><div class="value">'+fmtN(value)+' <span style="font-size:13px;font-weight:500">'+unit+'</span></div><div class="sub">'+sub+'</div></div>';
  $('#pageContent').innerHTML='<div class="dashboard-hero"><div class="page-head"><p class="hero-eyebrow">FRESHY WATER · ภาพรวมการทำงาน</p><h2>ภาพรวมประจำวัน '+thDate(today)+'</h2><span class="desc">สวัสดี '+esc(me()?.name||'')+' · ติดตามยอดและผลงานของวันนี้</span></div><div class="hero-status"><i></i><div><b>'+(authIdentity?'เชื่อมต่อฐานข้อมูลกลาง':'ตัวอย่างข้อมูลสาธิต')+'</b><span id="syncLastUpdated"></span></div></div></div>'+
  '<div class="command-bar"><div><b><i data-lucide="zap"></i> เมนูทำงานด่วน</b><span>เลือกงานที่ใช้ประจำโดยไม่ต้องค้นหาเมนู</span></div><div class="command-actions"><button class="btn btn-primary btn-sm" id="quickDebt"><i data-lucide="plus-circle"></i> เพิ่มลูกหนี้</button><button class="btn btn-success btn-sm" id="quickCash"><i data-lucide="banknote"></i> ลงยอดเงินสด</button><button class="btn btn-ghost btn-sm" id="quickCustomer"><i data-lucide="user-plus"></i> เพิ่มลูกค้า</button></div></div>'+
- '<div class="stats-grid">'+card('green','banknote','ยอดขายเงินสดวันนี้',cashTotal,'บาท','จาก '+cash.length+' รายการ')+card('red','wallet','ลูกหนี้ค้างจ่ายวันนี้',debtToday,'บาท','ยอดค้างใหม่วันนี้')+card('orange','package','จำนวนถังที่ขายได้วันนี้',jugsToday,'ถัง','รวมทั้งเงินสดและลูกหนี้')+'</div>'+
+ '<div class="stats-grid">'+card('green','banknote','ยอดขายเงินสดวันนี้',cashTotal,'บาท','จาก '+cash.length+' รายการ')+card('red','wallet','ลูกหนี้ค้างจ่ายวันนี้',debtToday,'บาท','ยอดค้างใหม่วันนี้')+card('orange','package','จำนวนถังที่ขายได้วันนี้',jugsToday,'ถัง','รวมทั้งเงินสดและลูกหนี้')+card('gold','clock-3','รับชำระรอตรวจสอบ',sum(debtRows.filter(d=>FreshyPayments.review(d)==='pending'),'total'),'บาท',debtRows.filter(d=>FreshyPayments.review(d)==='pending').length+' รายการ · ยังไม่รวมยอดอนุมัติ')+'</div>'+
  '<div class="analytics-grid"><div class="panel"><div class="panel-body"><div class="chart-toolbar"><div class="chart-title"><h3>แนวโน้มยอดบันทึกรายวัน</h3><p>เงินสดและยอดบันทึกลูกหนี้ · '+dashboardDays+' วันล่าสุด</p></div><div class="chart-ranges" aria-label="ช่วงวันที่กราฟ">'+[7,14,30].map(d=>'<button type="button" data-chart-days="'+d+'" aria-pressed="'+(d===dashboardDays)+'">'+d+' วัน</button>').join('')+'</div></div><div class="chart-legend"><span><i></i>เงินสด</span><span><i class="debt-key"></i>ยอดบันทึกลูกหนี้</span></div>'+FreshyDashboard.chart(days)+'<div class="chart-readout" id="chartReadout" aria-live="polite">เลือกจุดบนกราฟเพื่อดูยอดของแต่ละวัน</div></div></div>'+
  '<div class="panel"><div class="panel-head"><h3><i data-lucide="chart-pie"></i> เปรียบเทียบยอดรวมระบบ</h3></div><div class="panel-body"><div class="donut-wrap"><div class="debt-donut" role="img" aria-label="ชำระแล้ว '+paidPercent+' เปอร์เซ็นต์" style="background:conic-gradient(#12a878 0% '+paidPercent+'%,#e94d65 '+paidPercent+'% 100%)"><div><b>'+paidPercent+'%</b><span>สัดส่วนยอดชำระแล้ว</span></div></div></div><div class="donut-legend"><div><span>ยอดชำระแล้ว</span><b>'+fmtN(paidTotal)+' บาท</b></div><div><span class="unpaid">ยอดค้างชำระ</span><b>'+fmtN(unpaidTotal)+' บาท</b></div></div></div></div></div>'+
  '<div class="panel"><div class="panel-head"><h3><i data-lucide="users"></i> ทะเบียนรายได้และผลงานพนักงานวันนี้</h3><span class="sync-tag">ข้อมูลตามสิทธิ์ของบัญชี</span></div><div class="panel-body">'+empHtml+'</div></div>'+
@@ -654,12 +656,12 @@ function renderDebtors(area){
 
     let rowsHtml='';
     list.forEach(d=>{
-      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce">${canManageRecord(d)?`<button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button>`:'<span class="pill gray">ดูข้อมูล</span>'}</td></tr>`;
+      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce">${FreshyPayments.canReceive(d,me())?`<button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button>`:'<span class="pill gray">ดูข้อมูล</span>'}</td></tr>`;
     });
     const meta=area==='nai'?('หมู่ที่ '+(c.moo||list[0].moo||'-')):(c.village||list[0].village||'-');
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
-      ${list.every(canManageRecord)?`<button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>`:''}
+      ${list.every(d=>FreshyPayments.canReceive(d,me()))?`<button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>`:''}
       <button class="btn btn-ghost btn-sm debtorDocument" data-cid="${cid}" aria-label="เปิดเอกสารลูกหนี้ ${esc(list[0].customerName)}"><i data-lucide="file-text"></i> เอกสารลูกหนี้</button></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
@@ -684,21 +686,18 @@ function renderDebtors(area){
   $('#debtPrev').onclick=()=>{debtorPage[area]--;renderDebtors(area);attachCsv();};$('#debtNext').onclick=()=>{debtorPage[area]++;renderDebtors(area);attachCsv();};
   $('#addDebtorBtn').addEventListener('click',()=>openAddDebtor(area));
   $('#pageContent').querySelectorAll('.payOne').forEach(b=>b.addEventListener('click',()=>markPaid(b.dataset.id)));
-  $('#pageContent').querySelectorAll('.payAll').forEach(b=>b.addEventListener('click',()=>{
-    scopeRows(DB.debtors).filter(d=>d.customerId===b.dataset.cid&&d.status==='unpaid').forEach(d=>markPaid(d.id,true));
-    renderDebtors(area);
-  }));
+  $('#pageContent').querySelectorAll('.payAll').forEach(b=>b.addEventListener('click',()=>markPaid(scopeRows(DB.debtors).filter(d=>d.customerId===b.dataset.cid&&d.status==='unpaid').map(d=>d.id))));
   if(printBtn)$('#printReportBtn').addEventListener('click',()=>openPrintOptions(area));
   if(emailBtn)$('#emailReportBtn').addEventListener('click',()=>openEmailReport(area));
   attachCsv();updateSyncNotice();
   if(window.lucide)lucide.createIcons();
 }
-function markPaid(id,silent){
-  if(!canManageRecord(DB.debtors.find(row=>row.id===id))){if(!silent)toast('รายการนี้ดูได้ ผู้บันทึกหรือแอดมินเป็นผู้จัดการรับชำระ','info');return;}
-  const d=dbUpdate('debtors',id,{status:'paid',paidAt:new Date().toISOString(),paidBy:me().id,paidByName:me().name});
-  audit('รับชำระเงิน','ลูกหนี้ '+d.customerName+' จ่าย '+fmtN(d.total)+' บาท');
-  sendAlert('payment','[แจ้งเตือน] รับชำระลูกหนี้','<p>'+esc(d.customerName)+' · '+fmtN(d.total)+' บาท</p>');
-  if(!silent){toast('บันทึกรับชำระเงินแล้ว ย้ายไปประวัติรับชำระ','success');renderPage();}
+async function markPaid(value){
+ const ids=Array.isArray(value)?value:[value];if(!ids.length)return;
+ const rows=ids.map(id=>DB.debtors.find(d=>d.id===id));if(rows.some(d=>!FreshyPayments.canReceive(d,me()))){toast('รายการนี้รับชำระไปแล้ว กรุณาตรวจข้อมูลล่าสุด','info');return;}
+ const buttons=[...document.querySelectorAll('.payOne,.payAll')];buttons.forEach(b=>b.disabled=true);
+ try{await paymentAction('receive',ids);toast(isAdmin()?'บันทึกรับชำระและอนุมัติแล้ว':'รับชำระเรียบร้อยแล้ว รอแอดมินตรวจสอบหรืออนุมัติ','success');renderNav();renderPage();}
+ catch(e){toast(e.message,'error');}finally{buttons.forEach(b=>b.disabled=false);}
 }
 function openAddDebtor(area){
   const villageList=DB.villages.map(v=>v.name);
@@ -788,96 +787,126 @@ function openAddDebtor(area){
   });
 }
 
-/* ---------- PAYMENTS (ประวัติรับชำระ) ---------- */
-let paySearch='';
+/* ---------- PAYMENTS (ประวัติรับชำระและการตรวจสอบ) ---------- */
+let paySearch='',paymentReplayPromise=null;
+function paymentQueueKey(){return authIdentity?'freshy-payment-commands:'+supaCfg().url+':'+authIdentity.id:null;}
+function paymentQueue(){try{return JSON.parse(localStorage.getItem(paymentQueueKey())||'[]');}catch{return [];}}
+function savePaymentQueue(queue){const key=paymentQueueKey();if(!key)return;if(queue.length)localStorage.setItem(key,JSON.stringify(queue));else localStorage.removeItem(key);updateSyncNotice();}
+function paymentError(error){
+ const message=error.message||'';
+ if(/PAYMENT_STALE|ALREADY_RECEIVED|NOT_PENDING|NOT_RECEIVED|UNDO_NOT_PENDING/.test(message))return 'รายการเปลี่ยนไปแล้ว กรุณาตรวจข้อมูลล่าสุดก่อนทำรายการใหม่';
+ if(/FORBIDDEN|ADMIN_ONLY/.test(message))return 'บัญชีนี้ไม่มีสิทธิ์ทำรายการที่เลือก';
+ if(/REASON_REQUIRED/.test(message))return 'กรุณากรอกเหตุผลก่อนยกเลิก';
+ if(/PGRST202|WORKFLOW_REQUIRED/.test(message))return 'ระบบรับชำระกำลังอัปเดต กรุณารีเฟรชแล้วลองใหม่';
+ return 'ยังยืนยันการบันทึกไม่ได้ ระบบเก็บรายการไว้และจะตรวจสอบซ้ำเมื่อเชื่อมต่อได้';
+}
+async function retryPaymentCommands(){
+ if(!authIdentity||!remoteBase)return;
+ if(paymentReplayPromise)return paymentReplayPromise;
+ paymentReplayPromise=(async()=>{
+  while(authIdentity){
+   const command=paymentQueue().find(x=>!x.failed);if(!command)break;
+   const before=FreshySync.shared(DB);
+   try{
+    const payload=await rpc('freshy_payment',command.body);
+    acceptRemote(payload,FreshySync.diff(before,FreshySync.shared(DB)));
+    savePaymentQueue(paymentQueue().filter(x=>x.body.request_id!==command.body.request_id));
+    lastSyncAt=Date.now();broadcastOnlineChange();refreshSyncedView();
+   }catch(error){
+    const permanent=/^PT409$|^42501$/.test(error.code||'')||/REQUIRED|INVALID|REUSED|DUPLICATE|PGRST202/.test(error.message||'');
+    if(permanent){savePaymentQueue(paymentQueue().map(x=>x.body.request_id===command.body.request_id?{...x,failed:paymentError(error)}:x));toast(paymentError(error),'error');}
+    break;
+   }
+  }
+ })();
+ try{await paymentReplayPromise;}finally{paymentReplayPromise=null;updateSyncNotice();}
+}
+async function paymentAction(action,ids,reason=''){
+ if(authIdentity){
+  if(!(await flushOnline()))throw Error('กรุณารอให้ข้อมูลที่กำลังบันทึกส่งสำเร็จก่อนรับชำระ');
+  const expected=Object.fromEntries(ids.map(id=>[id,FreshySync.clone(DB.debtors.find(d=>d.id===id)||null)]));
+  const queued=paymentQueue().find(x=>!x.failed&&x.body.action===action&&FreshySync.equal(x.body.debtor_ids,ids)&&x.body.reason===reason);
+  const command=queued||{body:{action,debtor_ids:ids,reason,expected,expected_revision:remoteBase.settings?._resetRevision||'',request_id:uid()},names:ids.map(id=>DB.debtors.find(d=>d.id===id)?.customerName||id),createdAt:new Date().toISOString()};
+  if(!queued)savePaymentQueue([...paymentQueue(),command]);
+  await retryPaymentCommands();
+  const remaining=paymentQueue().find(x=>x.body.request_id===command.body.request_id);
+  if(remaining)throw Error(remaining.failed||'ยังยืนยันการบันทึกไม่ได้ ระบบเก็บรายการไว้และจะตรวจสอบซ้ำเมื่อเชื่อมต่อได้');
+  return;
+ }
+ // Design preview only: the production path always uses the authenticated RPC.
+ const rows=ids.map(id=>DB.debtors.find(d=>d.id===id)),now=new Date().toISOString(),actor=me();
+ if(rows.some(d=>!d))throw Error('ไม่พบรายการ');
+ if(['approve','reject','approve_undo','reject_undo'].includes(action)&&!isAdmin())throw Error('เฉพาะแอดมินตรวจสอบได้');
+ if(['cancel','reject','request_undo'].includes(action)&&!reason.trim())throw Error('กรุณากรอกเหตุผล');
+ if(action==='receive'&&rows.some(d=>d.status!=='unpaid'))throw Error('รับชำระไปแล้ว');
+ if(action==='cancel'&&rows.some(d=>!FreshyPayments.canCancel(d,actor)))throw Error('ไม่มีสิทธิ์ยกเลิกรายการนี้');
+ const requestId=uid();
+ for(const d of rows){
+  if(action==='receive'){
+   Object.assign(d,{status:'paid',paidAt:now,paidBy:actor.id,paidByName:actor.name,paymentReviewStatus:isAdmin()?'approved':'pending',paymentRequestId:requestId});
+   if(isAdmin())Object.assign(d,{paymentApprovedBy:actor.id,paymentApprovedByName:actor.name,paymentApprovedAt:now});
+   else DB.approvals.push({id:uid(),type:'payment',status:'pending',debtorId:d.id,debtorName:d.customerName,employeeId:actor.id,employeeName:actor.name,area:d.area,amount:d.total,ts:now,paymentRequestId:requestId,isDemo:true});
+  }else if(action==='request_undo'){
+   DB.approvals.push({id:uid(),type:'undo',status:'pending',debtorId:d.id,debtorName:d.customerName,employeeId:actor.id,employeeName:actor.name,area:d.area,amount:d.total,reason,ts:now,isDemo:true});
+  }else{
+   const a=DB.approvals.find(x=>x.debtorId===d.id&&x.status==='pending'&&(action.endsWith('_undo')?x.type!=='payment':x.type==='payment'));
+   if(action==='approve')Object.assign(d,{paymentReviewStatus:'approved',paymentApprovedBy:actor.id,paymentApprovedByName:actor.name,paymentApprovedAt:now});
+   if(['cancel','reject','approve_undo'].includes(action)){const why=reason||a?.reason||'';Object.assign(d,{status:'unpaid',paymentReviewStatus:'cancelled',paidAt:null,paidBy:null,paidByName:null,paymentCancellationReason:why,paymentCancelledBy:actor.id,paymentCancelledAt:now});}
+   if(a)Object.assign(a,{status:['approve','approve_undo'].includes(action)?'approved':action==='cancel'?'cancelled':'rejected',decidedBy:actor.name,decidedById:actor.id,decidedAt:now,decisionReason:reason});
+  }
+ }
+ audit('การรับชำระ · '+action,rows.map(d=>d.customerName).join(', ')+(reason?' · '+reason:''));dbSave();
+}
 function renderPayments(area){
-  let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='paid');
-  if(paySearch)rows=rows.filter(d=>d.customerName.includes(paySearch));
-  rows.sort((a,b)=>a.paidAt<b.paidAt?1:-1);
-  let html='<div class="tbl-wrap payment-table"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
-  let mobile='<div class="payment-cards">';
-  rows.forEach((d,i)=>{
-    const pending=!isAdmin()&&DB.approvals.some(a=>a.debtorId===d.id&&a.employeeId===me().id&&a.status==='pending'),undoLabel=!canManageRecord(d)?'ดูข้อมูล':isAdmin()?'ยกเลิก กลับไปค้าง':pending?'รอแอดมินอนุมัติ':'ขอยกเลิกการรับชำระ';
-    html+=`<tr><td>${i+1}</td><td><b>${esc(d.customerName)}</b></td><td class="num" style="color:var(--green);font-weight:700">${fmtN(d.total)} บาท</td><td>${thDate(d.debtDate)}</td><td>${thDateTimeSec(d.paidAt)}</td><td>${esc(d.paidByName||'-')}</td>
-    <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}" ${pending||!canManageRecord(d)?'disabled':''}><i data-lucide="rotate-ccw"></i> ${undoLabel}</button></td></tr>`;
-    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}" ${pending||!canManageRecord(d)?'disabled':''}><i data-lucide="rotate-ccw"></i><span>${undoLabel}</span></button></article>`;
-  });
-  html+='</tbody></table></div>';mobile+='</div>';html+=mobile;
-  if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ</p></div>';
-  $('#pageContent').innerHTML=`
-  <div class="page-head"><h2>ประวัติรับชำระ ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h2><span class="desc">รายการที่จ่ายแล้ว แยกจากหน้าลูกหนี้ค้างชำระอัตโนมัติ</span></div>
-  <div class="toolbar"><div class="search-box"><i data-lucide="search"></i><input id="paySearch" placeholder="ค้นหาชื่อคนที่จ่ายแล้ว..." value="${esc(paySearch)}"></div></div>
-  <div class="panel"><div class="panel-body">${html}</div></div>`;
-  $('#paySearch').addEventListener('input',e=>{paySearch=e.target.value.trim();renderPayments(area);const i=$('#paySearch');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}});
-  $('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.addEventListener('click',()=>requestUndo(b.dataset.id,area)));
-  attachCsv();updateSyncNotice();
-  if(window.lucide)lucide.createIcons();
+ let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='paid'&&(!isAdmin()||FreshyPayments.confirmed(d)));
+ if(paySearch)rows=rows.filter(d=>d.customerName.includes(paySearch));
+ rows.sort((a,b)=>String(b.paidAt).localeCompare(String(a.paidAt)));
+ let html='<div class="tbl-wrap payment-table"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">ยอดรับชำระ</th><th>วันที่ค้าง</th><th>วันที่รับชำระ</th><th>ผู้รับชำระ</th><th>สถานะตรวจสอบ</th><th class="ce">จัดการ</th></tr></thead><tbody>',mobile='<div class="payment-cards">';
+ rows.forEach((d,i)=>{
+  const pending=FreshyPayments.review(d)==='pending',undoPending=DB.approvals.some(a=>a.debtorId===d.id&&a.type!=='payment'&&a.status==='pending');
+  const allowed=FreshyPayments.canCancel(d,me())||d.paidBy===me().id,disabled=undoPending||!allowed;
+  const undoLabel=undoPending?'รอแอดมินอนุมัติยกเลิก':pending||isAdmin()?'ยกเลิก กลับไปค้างชำระ':'ขอยกเลิกการรับชำระ';
+  const status=`<span class="pill ${pending?'gold':'green'}">${esc(FreshyPayments.label(d))}</span>${d.paymentApprovedAt?`<small class="payment-reviewer">ตรวจโดย ${esc(d.paymentApprovedByName||recorderName(d.paymentApprovedBy))} · ${thDateTimeSec(d.paymentApprovedAt)}</small>`:''}`;
+  const button=`<button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}" ${disabled?'disabled':''}><i data-lucide="rotate-ccw"></i> ${undoLabel}</button>`;
+  html+=`<tr><td>${i+1}</td><td><b>${esc(d.customerName)}</b></td><td class="num"><b>${fmtN(d.total)} บาท</b></td><td>${thDate(d.debtDate)}</td><td>${thDateTimeSec(d.paidAt)}</td><td>${esc(d.paidByName||'-')}</td><td>${status}</td><td class="ce">${button}</td></tr>`;
+  mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><div>${status}</div><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้รับชำระ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl>${button}</article>`;
+ });
+ html+='</tbody></table></div>';mobile+='</div>';html+=mobile;if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ'+(isAdmin()?'ที่อนุมัติแล้ว':'')+'</p></div>';
+ $('#pageContent').innerHTML=`<div class="page-head"><h2>ประวัติรับชำระ ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h2><span class="desc">${isAdmin()?'รายการที่ตรวจสอบและอนุมัติแล้ว · รายการรอตรวจอยู่ในเมนูตรวจสอบการรับชำระ':'แสดงประวัติทันทีหลังรับชำระ พร้อมสถานะการตรวจสอบจากแอดมิน'}</span></div><div class="toolbar"><div class="search-box"><i data-lucide="search"></i><input id="paySearch" placeholder="ค้นหาชื่อผู้ชำระ..." value="${esc(paySearch)}"></div><button class="btn btn-gold" id="openPaymentReviews">รอแอดมินตรวจสอบ ${DB.debtors.filter(d=>d.area===area&&FreshyPayments.review(d)==='pending').length} รายการ</button></div><div class="panel"><div class="panel-body">${html}</div></div>`;
+ $('#paySearch').oninput=e=>{paySearch=e.target.value.trim();renderPayments(area);const input=$('#paySearch');input.focus();input.setSelectionRange(input.value.length,input.value.length);};
+ $('#openPaymentReviews').onclick=()=>navigate('approvals');$('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.onclick=()=>requestUndo(b.dataset.id,area));attachCsv();updateSyncNotice();if(window.lucide)lucide.createIcons();
 }
 function requestUndo(id,area){
-  const d=scopeRows(DB.debtors).find(x=>x.id===id&&x.status==='paid');if(!d||!canManageRecord(d)){toast('ไม่พบรายการรับชำระที่มีสิทธิ์จัดการ','error');return;}
-  if(!isAdmin()&&DB.approvals.some(a=>a.debtorId===id&&a.employeeId===me().id&&a.status==='pending')){toast('มีคำขอรอแอดมินอนุมัติแล้ว','info');return;}
-  if(isAdmin()){
-    openModal(`<div class="modal-head"><h3><i data-lucide="rotate-ccw"></i> ยืนยันยกเลิกกลับไปค้างชำระ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
-      <div class="modal-body"><p>แอดมินสามารถยกเลิกได้ทันที รายการของ <b>${esc(d.customerName)}</b> (${fmtN(d.total)} บาท) จะกลับไปอยู่ในหน้าลูกหนี้ค้างชำระทันที</p></div>
-      <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmUndo"><i data-lucide="check"></i> ยืนยันกลับไปค้าง</button></div>`);
-    $('#confirmUndo').addEventListener('click',async()=>{
-      $('#confirmUndo').disabled=true;
-      if(authIdentity&&!(await flushOnline())){toast('ต้องบันทึกข้อมูลรอส่งก่อนดำเนินการ','error');$('#confirmUndo').disabled=false;return;}
-      dbUpdate('debtors',id,{status:'unpaid',paidAt:null,paidBy:null,paidByName:null});
-      audit('แอดมินยกเลิกการชำระ',d.customerName+' กลับไปค้าง '+fmtN(d.total)+' บาท');
-      const ok=authIdentity?await flushOnline():true;closeModal();toast(ok?'ยกเลิกแล้ว ข้อมูลกลับไปค้างชำระ':'รายการยกเลิกยังรอส่ง กรุณาตรวจสถานะฐานข้อมูล',ok?'success':'error');renderPage();
-    });
-  }else{
-    openModal(`<div class="modal-head"><h3><i data-lucide="send"></i> ส่งคำขอยกเลิกกลับไปค้างชำระ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
-      <div class="modal-body"><p>พนักงานไม่สามารถยกเลิกได้ทันที กรุณากรอกเหตุผล ระบบจะส่งคำขอให้แอดมินอนุมัติ</p>
-      <div class="field"><label>เหตุผล (เช่น กดผิดครับ)</label><textarea id="undoReason" rows="3" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"></textarea></div></div>
-      <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="sendUndo"><i data-lucide="send"></i> ส่งคำขอให้แอดมิน</button></div>`);
-    $('#sendUndo').addEventListener('click',async()=>{
-      const reason=$('#undoReason').value.trim(); if(!reason){toast('กรุณากรอกเหตุผล','error');return;}
-      $('#sendUndo').disabled=true;
-      if(authIdentity&&!(await flushOnline())){toast('ต้องบันทึกข้อมูลรอส่งก่อนส่งคำขอ','error');$('#sendUndo').disabled=false;return;}
-      const token=uid();
-      const appr=dbAdd('approvals',{ts:new Date().toISOString(),employeeId:me().id,employeeName:me().name,area,debtorId:id,debtorName:d.customerName,amount:d.total,reason,status:'pending',token});
-      const ok=authIdentity?await flushOnline():true;
-      if(!ok){closeModal();renderPage();toast('คำขอยังรอส่ง กรุณาตรวจสถานะฐานข้อมูล','error');return;}
-      if(DB.settings.email.alerts.undoRequest){
-        const base=location.origin+location.pathname;
-        sendAlert('undo','[คำขออนุมัติ] พนักงานขอยกเลิกกลับไปค้างชำระ',
-          `<p>พนักงาน <b>${esc(me().name)}</b> ต้องการจัดการข้อมูลในหน้าประวัติรับชำระ (${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'})</p><p>ต้องการให้รายการ <b>${esc(d.customerName)}</b> (${fmtN(d.total)} บาท) กลับไปค้างชำระ เนื่องจากเหตุผล: <b>${esc(reason)}</b></p><p>เข้าสู่ระบบแอดมินเพื่อตัดสินใจ:<br><br><a href="${base}?approval=${appr.id}&token=${token}&action=approve" style="display:inline-block;background:#16a34a;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;margin-right:10px;font-weight:700">อนุมัติ (กลับไปค้าง)</a> <a href="${base}?approval=${appr.id}&token=${token}&action=reject" style="display:inline-block;background:#dc2626;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:700">ไม่อนุมัติ</a></p><p style="margin-top:10px">หรือเข้าระบบที่หน้า คำขออนุมัติ เพื่อตัดสินใจ</p>`);
-      }
-      closeModal();toast('ส่งคำขอแล้ว รอแอดมินอนุมัติ ประวัติรับชำระยังคงเดิม','success');renderPage();
-    });
-  }
+ const d=DB.debtors.find(x=>x.id===id&&x.status==='paid');if(!d)return;
+ const direct=isAdmin()||FreshyPayments.review(d)==='pending';
+ if(direct&&!FreshyPayments.canCancel(d,me())||!direct&&d.paidBy!==me().id){toast('ยกเลิกได้เฉพาะผู้รับชำระรายการนี้หรือแอดมิน','error');return;}
+ const action=direct?'cancel':'request_undo',buttonId=direct?'confirmUndo':'sendUndo';
+ openModal(`<div class="modal-head"><h3> ${direct?'ยกเลิก กลับไปค้างชำระ':'ขอยกเลิกการรับชำระ'}</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p><b>${esc(d.customerName)}</b> · ${fmtN(d.total)} บาท</p><p>${direct?'กรอกเหตุผล รายการจะกลับไปหน้าลูกหนี้ค้างชำระ และเก็บประวัติการยกเลิกไว้':'รายการนี้อนุมัติแล้ว กรุณากรอกเหตุผลและรอแอดมินพิจารณาการยกเลิก'}</p><div class="field"><label for="undoReason">เหตุผลที่ยกเลิก</label><textarea id="undoReason" rows="3" maxlength="2000"></textarea></div></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ปิด</button><button class="btn btn-danger" id="${buttonId}">${direct?'ยืนยันยกเลิก กลับไปค้าง':'ส่งคำขอให้แอดมิน'}</button></div>`);
+ $('#'+buttonId).onclick=async()=>{const reason=$('#undoReason').value.trim();if(!reason){toast('กรุณากรอกเหตุผล','error');return;}const b=$('#'+buttonId);b.disabled=true;try{await paymentAction(action,[id],reason);closeModal();toast(direct?'ยกเลิกแล้ว รายการกลับไปค้างชำระ':'ส่งคำขอยกเลิกแล้ว รอแอดมินอนุมัติ','success');renderNav();renderPage();}catch(e){toast(e.message,'error');b.disabled=false;}};
 }
-
-/* ---------- APPROVALS (admin) ---------- */
+function rejectPayment(id){
+ const d=DB.debtors.find(x=>x.id===id);if(!d||!isAdmin())return;
+ openModal(`<div class="modal-head"><h3>ไม่อนุมัติการรับชำระ</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>${esc(d.customerName)} · ${fmtN(d.total)} บาท จะกลับไปค้างชำระ</p><div class="field"><label for="decisionReason">เหตุผลที่ไม่อนุมัติ</label><textarea id="decisionReason" rows="3" maxlength="2000"></textarea></div></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ปิด</button><button class="btn btn-danger" id="confirmPaymentReject">ยืนยันไม่อนุมัติ กลับไปค้าง</button></div>`);
+ $('#confirmPaymentReject').onclick=async()=>{const reason=$('#decisionReason').value.trim();if(!reason){toast('กรุณากรอกเหตุผล','error');return;}const b=$('#confirmPaymentReject');b.disabled=true;try{await paymentAction('reject',[id],reason);closeModal();toast('บันทึกการไม่อนุมัติแล้ว รายการกลับไปค้างชำระ','success');renderNav();renderPage();}catch(e){toast(e.message,'error');b.disabled=false;}};
+}
 function renderApprovals(){
-  const rows=DB.approvals.slice().sort((a,b)=>a.ts<b.ts?1:-1);
-  let html='';
-  rows.forEach(a=>{
-    const st=a.status==='pending'?'<span class="pill gold">รออนุมัติ</span>':a.status==='approved'?'<span class="pill green">อนุมัติแล้ว</span>':'<span class="pill red">ไม่อนุมัติ';
-    html+=`<div class="panel"><div class="panel-body" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-      <div style="flex:1;min-width:240px"><div style="font-weight:700;color:var(--navy)">${esc(a.employeeName)} ขอยกเลิกรายการ ${esc(a.debtorName)} (${fmtN(a.amount)} บาท)</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:3px">เหตุผล: ${esc(a.reason)} · ${thDateTime(a.ts)} · หมวด: ${a.area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</div></div>
-      <div>${st}</div>
-      ${a.status==='pending'?`<button class="btn btn-success btn-sm appr" data-id="${a.id}" data-v="approved"><i data-lucide="check"></i> อนุมัติ</button> <button class="btn btn-danger btn-sm appr" data-id="${a.id}" data-v="rejected"><i data-lucide="x"></i> ไม่อนุมัติ</button>`:''}
-    </div></div>`;
-  });
-  if(!rows.length)html='<div class="empty-state"><i data-lucide="clipboard-check"></i><p>ไม่มีคำขออนุมัติค้างอยู่</p></div>';
-  $('#pageContent').innerHTML='<div class="page-head"><h2>คำขออนุมัติจากพนักงาน</h2><span class="desc">คำขอยกเลิกกลับไปค้างชำระจากพนักงาน รอแอดมินตัดสินใจ</span></div>'+html;
-  $('#pageContent').querySelectorAll('.appr').forEach(b=>b.addEventListener('click',async()=>{
-    if(!isAdmin())return;b.disabled=true;
-    if(authIdentity&&!(await flushOnline())){toast('ต้องบันทึกข้อมูลรอส่งก่อนอนุมัติ','error');b.disabled=false;return;}
-    const a=DB.approvals.find(x=>x.id===b.dataset.id&&x.status==='pending');if(!a){renderPage();return;}const debt=DB.debtors.find(d=>d.id===a.debtorId);if(b.dataset.v==='approved'&&debt?.status!=='paid'){toast('รายการนี้ไม่ได้อยู่ในประวัติรับชำระแล้ว','error');b.disabled=false;return;}
-    dbUpdate('approvals',a.id,{status:b.dataset.v,decidedBy:me().name,decidedAt:new Date().toISOString()});
-    if(b.dataset.v==='approved'){
-      dbUpdate('debtors',a.debtorId,{status:'unpaid',paidAt:null,paidBy:null,paidByName:null});
-      audit('อนุมัติยกเลิกการชำระ',a.debtorName+' กลับไปค้าง (โดย '+a.employeeName+')');
-      
-    }else{audit('ไม่อนุมัติยกเลิก',a.debtorName);}
-    const ok=authIdentity?await flushOnline():true;toast(ok?(b.dataset.v==='approved'?'อนุมัติแล้ว ข้อมูลกลับไปค้างชำระ':'บันทึกการไม่อนุมัติแล้ว'):'การตัดสินใจยังรอส่ง กรุณาตรวจฐานข้อมูล',ok?'success':'error');renderPage();
-  }));
-  if(window.lucide)lucide.createIcons();
+ const pending=DB.debtors.filter(d=>FreshyPayments.review(d)==='pending').sort((a,b)=>String(b.paidAt).localeCompare(String(a.paidAt)));
+ let html=`<div class="page-head"><h2>${isAdmin()?'ตรวจสอบและอนุมัติการรับชำระ':'รับชำระแล้ว รอแอดมินตรวจสอบ'}</h2><span class="desc">${pending.length} รายการ · ${fmtN(pending.reduce((n,d)=>n+Number(d.total||0),0))} บาท</span></div>`;
+ const commands=paymentQueue();if(commands.length)html+='<div class="payment-command-notice" role="status"><b>รายการที่ยังยืนยันการบันทึกไม่ได้</b>'+commands.map(c=>'<p>'+esc(c.names.join(', '))+' · '+esc(c.failed||'กำลังตรวจสอบกับฐานข้อมูล')+'</p>').join('')+'<button class="btn btn-ghost" id="retryPaymentCommands">ตรวจสอบอีกครั้ง</button></div>';
+ for(const d of pending){
+  html+=`<article class="panel payment-review-card"><div class="panel-body"><div><h3>${esc(d.customerName)}</h3><strong>${fmtN(d.total)} บาท</strong><p>ผู้รับชำระ ${esc(d.paidByName||recorderName(d.paidBy))} · ${thDateTimeSec(d.paidAt)}</p><p>${d.area==='nai'?'บ้านนาไฮ · หมู่ที่ '+esc(d.moo||'-'):esc(d.village||'บ้านอื่น ๆ')}</p><span class="pill gold">รับชำระเรียบร้อยแล้ว รอแอดมินตรวจสอบหรืออนุมัติ</span></div><div class="payment-review-actions">${isAdmin()?`<button class="btn btn-success reviewApprove" data-id="${d.id}">ตรวจสอบและอนุมัติ</button><button class="btn btn-danger reviewReject" data-id="${d.id}">ไม่อนุมัติ กลับไปค้าง</button>`:FreshyPayments.canCancel(d,me())?`<button class="btn btn-danger undoBtn" data-id="${d.id}">ยกเลิก กลับไปค้างชำระ</button>`:''}</div></div></article>`;
+ }
+ if(!pending.length)html+='<div class="empty-state"><i data-lucide="circle-check-big"></i><p>ไม่มีรายการรับชำระรอตรวจสอบ</p></div>';
+ const requests=DB.approvals.filter(a=>a.type!=='payment'&&(isAdmin()||a.employeeId===me().id)).sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
+ if(requests.length)html+='<h3>คำขอยกเลิกรายการที่รับชำระแล้ว</h3>';
+ for(const a of requests)html+=`<div class="panel"><div class="panel-body"><b>${esc(a.employeeName)} ขอยกเลิกรายการ ${esc(a.debtorName)} · ${fmtN(a.amount)} บาท</b><p>เหตุผล: ${esc(a.reason)} · ${thDateTime(a.ts)}</p><span class="pill ${a.status==='pending'?'gold':a.status==='approved'?'green':'gray'}">${a.status==='pending'?'รอแอดมินอนุมัติ':a.status==='approved'?'อนุมัติแล้ว':a.status==='cancelled'?'ยกเลิกแล้ว':'ไม่อนุมัติ'}</span>${isAdmin()&&a.status==='pending'?`<button class="btn btn-success appr" data-id="${a.id}" data-v="approve_undo">อนุมัติยกเลิก กลับไปค้าง</button><button class="btn btn-danger appr" data-id="${a.id}" data-v="reject_undo">ไม่อนุมัติยกเลิก</button>`:''}</div></div>`;
+ $('#pageContent').innerHTML=html;
+ $('#retryPaymentCommands')?.addEventListener('click',async()=>{await retryPaymentCommands();await supabaseFetch();renderApprovals();});
+ $('#pageContent').querySelectorAll('.reviewApprove').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await paymentAction('approve',[b.dataset.id]);toast('รายการนี้ตรวจสอบและอนุมัติแล้ว','success');renderNav();renderPage();}catch(e){toast(e.message,'error');b.disabled=false;}});
+ $('#pageContent').querySelectorAll('.reviewReject').forEach(b=>b.onclick=()=>rejectPayment(b.dataset.id));
+ $('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.onclick=()=>requestUndo(b.dataset.id,DB.debtors.find(d=>d.id===b.dataset.id)?.area));
+ $('#pageContent').querySelectorAll('.appr').forEach(b=>b.onclick=async()=>{b.disabled=true;const a=DB.approvals.find(x=>x.id===b.dataset.id);try{await paymentAction(b.dataset.v,[a.debtorId]);toast(b.dataset.v==='approve_undo'?'อนุมัติยกเลิกแล้ว รายการกลับไปค้างชำระ':'บันทึกการไม่อนุมัติยกเลิกแล้ว','success');renderNav();renderPage();}catch(e){toast(e.message,'error');b.disabled=false;}});
+ if(window.lucide)lucide.createIcons();updateSyncNotice();
 }
 
 /* ---------- CUSTOMERS ---------- */
@@ -1443,6 +1472,7 @@ $('#logoutBtn').addEventListener('click',()=>{
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-danger" id="confirmLogout"><i data-lucide="log-out"></i> ยืนยันออกจากระบบ</button></div>`);
   $('#confirmLogout').addEventListener('click',async()=>{
     if(authIdentity){const pending=FreshySync.diff(remoteBase||{},FreshySync.shared(DB));if(pending.length&&!(await flushOnline())){toast('ยังมีข้อมูลรอส่ง กรุณาจัดการก่อนออกจากระบบ','error');return;}}
+    if(authIdentity&&paymentQueue().some(c=>!c.failed)){toast('ยังมีรายการรับชำระรอยืนยัน กรุณารอการตรวจสอบก่อนออกจากระบบ','error');return;}
     const u=me();
     if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')await sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
     if(authIdentity){await flushOnline();if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch(e){}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;remoteRecorders=[];syncBlocked=false;}
