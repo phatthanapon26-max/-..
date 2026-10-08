@@ -1,10 +1,10 @@
 {
   "name": "freshy-water-secure",
-  "version": "8.3.1",
+  "version": "8.3.2",
   "private": true,
   "scripts": {
     "build": "node build-assets.js",
-    "test": "node dashboard.test.js && node multi-device.test.js && node employee-access.test.js && node connection.test.js && node data-tools.test.js && node data-import.test.js && node data-management.test.js && node sync.test.js && node features.test.js && node api.test.js && node document-view.test.js"
+    "test": "node visibility.test.js && node dashboard.test.js && node multi-device.test.js && node employee-access.test.js && node connection.test.js && node data-tools.test.js && node data-import.test.js && node data-management.test.js && node sync.test.js && node features.test.js && node api.test.js && node document-view.test.js"
   },
   "dependencies": {
     "nodemailer": "10.0.12",

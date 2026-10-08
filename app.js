@@ -226,7 +226,7 @@ function dbLoad(){
 /* ---------- Supabase (ฐานข้อมูลออนไลน์) ---------- */
 const SUPA_COLS=FreshySync.collections;
 const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
-let authClient=null,authIdentity=null,remoteBase=null,remoteSettings=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null,syncReadPromise=null,syncIssues=[],syncViewDirty=false,lastSyncAt=0;
+let authClient=null,authIdentity=null,remoteBase=null,remoteSettings=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null,syncReadPromise=null,syncIssues=[],syncViewDirty=false,lastSyncAt=0,remoteRecorders=[];
 const syncTabId=uid();
 function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
 function authFor(cfg){
@@ -251,7 +251,7 @@ function safeCache(){
  if(authIdentity&&remoteBase){
   // A separate small journal per tab prevents one device/tab from replacing another's unsent work.
   localStorage.setItem(journalKey(),JSON.stringify({changes:FreshySync.diff(remoteBase,FreshySync.shared(DB)),issues:syncIssues,revision:remoteBase.settings?._resetRevision||'',updatedAt:Date.now()}));
-  try{localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,data:remoteBase}));}catch(error){console.warn('Snapshot cache is full; the pending journal remains saved.');}
+  try{localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,data:remoteBase,recorders:remoteRecorders}));}catch(error){console.warn('Snapshot cache is full; the pending journal remains saved.');}
  }
  return true;
  }catch(error){toast('พื้นที่เก็บข้อมูลในเครื่องเต็ม กรุณาส่งข้อมูลออนไลน์หรือดาวน์โหลดสำเนาก่อนปิดหน้า','error');return false;}
@@ -280,7 +280,15 @@ function acceptRemote(payload,changes){
  syncViewDirty=true;updateSyncNotice();refreshSyncedView();
 }
 function updateSyncNotice(){const button=document.querySelector('.pending-btn');if(button&&authIdentity){const count=remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)).length:0;button.textContent=syncIssues.length?'ตรวจสอบ '+syncIssues.length+' รายการ':count?'รอส่ง '+count+' รายการ':'ข้อมูลบันทึกแล้ว';button.dataset.state=syncIssues.length?'review':count?'sending':'saved';}const time=$('#syncLastUpdated');if(time)time.textContent=lastSyncAt?'อัปเดต '+new Date(lastSyncAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):authIdentity?'กำลังตรวจข้อมูล':'ข้อมูลสาธิต';}
-function refreshSyncedView(){if(!session||!syncViewDirty||modalIsOpen()||currentPage==='settings'||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;syncViewDirty=false;refreshUserChip();renderPage();}
+function refreshSyncedView(){
+ if(!session||!syncViewDirty||modalIsOpen()||currentPage==='settings')return;
+ const active=document.activeElement,filterIds=['debtorSearch','paySearch','custSearch','cashDate','auditEmployeeFilter'];
+ if(['INPUT','TEXTAREA','SELECT'].includes(active?.tagName)&&!filterIds.includes(active.id))return;
+ const focus=filterIds.includes(active?.id)?{id:active.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
+ syncViewDirty=false;refreshUserChip();renderPage();
+ if(focus){const input=$('#'+focus.id);if(input){input.value=focus.value;input.focus({preventScroll:true});if(Number.isInteger(focus.start)&&typeof input.setSelectionRange==='function')input.setSelectionRange(focus.start,focus.end);}}
+}
+
 function quarantineSyncChange(change,message){
  const pending=FreshySync.diff(remoteBase,FreshySync.shared(DB)),affected=[change];
  if(change.collection==='customers')affected.push(...pending.filter(c=>['debtors','cashsales'].includes(c.collection)&&c.value?.customerId===change.id));
@@ -293,6 +301,7 @@ function installRemote(payload,preserve){
  const defaults=defaultSettings();delete defaults.db;
  const data=Object.assign(Object.fromEntries(SUPA_COLS.map(k=>[k,k==='settings'?{}:[]])),payload.data);
  if(remoteBase&&String(remoteBase.settings?._resetRevision||'')!==String(data.settings?._resetRevision||'')){archiveSyncChanges(preserve,'ข้อมูลก่อนแอดมินล้างระบบ');preserve=[];}
+ remoteRecorders=FreshySync.clone(payload.recorders||remoteRecorders||[]);
  remoteSettings=FreshySync.clone(data.settings||{});
  data.settings=Object.assign(defaults,remoteSettings);for(const key of ['business','header','email','docPrefix','backup'])data.settings[key]=Object.assign({},defaultSettings()[key],remoteSettings[key]||{});data.settings.email.alerts=Object.assign({},defaultSettings().email.alerts,remoteSettings.email?.alerts||{});delete data.settings.db;
  remoteBase=FreshySync.clone(data);
@@ -472,7 +481,7 @@ async function startOnline(email,password){
 function resumeCachedOnline(user){
  let cached=loadDraft();
  if(!cached||!cached.base||!cached.data)return false;
- syncIssues=cached.issues||[];const data=cached.data,employee=(data.employees||[]).find(e=>String(e.email||'').toLowerCase()===String(user.email||'').toLowerCase());
+ syncIssues=cached.issues||[];remoteRecorders=cached.recorders||[];const data=cached.data,employee=(data.employees||[]).find(e=>String(e.email||'').toLowerCase()===String(user.email||'').toLowerCase());
  if(!employee)return false;
  const cfg=DB.settings.db;
  for(const k of SUPA_COLS){if(k==='settings')DB.settings=Object.assign(defaultSettings(),data.settings||{});else DB[k]=data[k]||[];}
@@ -511,7 +520,9 @@ function isAdmin(){const u=me();return !!(u&&u.role==='admin');}
 function canSee(page){const u=me();if(!u)return false;if(u.role==='admin')return true;return !!(u.permissions&&u.permissions.pages&&u.permissions.pages[page]);}
 function canPrint(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.canPrint));}
 function canEmail(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.canEmail));}
-function scopeRows(rows){if(isAdmin())return rows;const id=me().id;return rows.filter(r=>r.createdBy===id||r.responsibleBy===id||r.paidBy===id);}
+function canManageRecord(row){const id=me()?.id;return !!row&&(isAdmin()||row.createdBy===id||row.responsibleBy===id||row.paidBy===id);}
+function scopeRows(rows){if(isAdmin()||authIdentity)return rows;return rows.filter(canManageRecord);}
+function recorderName(id){return (DB.employees.find(e=>e.id===id)||remoteRecorders.find(e=>e.id===id)||{}).name||'-';}
 
 /* ---------- email alerts (ส่งผ่าน /api/email ถ้าตั้งค่าไว้ มิฉะนั้นบันทึก log) ---------- */
 async function sendAlert(type,subject,bodyHtml,toOverride,reportOptions={}){
@@ -639,16 +650,16 @@ function renderDebtors(area){
     const c=customerMap.get(cid)||{};
     const tj=list.reduce((s,d)=>s+(d.jugs||0),0), tp=list.reduce((s,d)=>s+(d.packs||0),0), tt=list.reduce((s,d)=>s+d.total,0);
     const latest=list.reduce((a,b)=>String(a.createdAt)>String(b.createdAt)?a:b);
-    const creator=(DB.employees.find(e=>e.id===latest.createdBy)||{}).name||'-';
+    const creator=recorderName(latest.createdBy);
 
     let rowsHtml='';
     list.forEach(d=>{
-      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce"><button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button></td></tr>`;
+      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce">${canManageRecord(d)?`<button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button>`:'<span class="pill gray">ดูข้อมูล</span>'}</td></tr>`;
     });
     const meta=area==='nai'?('หมู่ที่ '+(c.moo||list[0].moo||'-')):(c.village||list[0].village||'-');
     cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
-      <button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>
+      ${list.every(canManageRecord)?`<button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>`:''}
       <button class="btn btn-ghost btn-sm debtorDocument" data-cid="${cid}" aria-label="เปิดเอกสารลูกหนี้ ${esc(list[0].customerName)}"><i data-lucide="file-text"></i> เอกสารลูกหนี้</button></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
@@ -683,6 +694,7 @@ function renderDebtors(area){
   if(window.lucide)lucide.createIcons();
 }
 function markPaid(id,silent){
+  if(!canManageRecord(DB.debtors.find(row=>row.id===id))){if(!silent)toast('รายการนี้ดูได้ ผู้บันทึกหรือแอดมินเป็นผู้จัดการรับชำระ','info');return;}
   const d=dbUpdate('debtors',id,{status:'paid',paidAt:new Date().toISOString(),paidBy:me().id,paidByName:me().name});
   audit('รับชำระเงิน','ลูกหนี้ '+d.customerName+' จ่าย '+fmtN(d.total)+' บาท');
   sendAlert('payment','[แจ้งเตือน] รับชำระลูกหนี้','<p>'+esc(d.customerName)+' · '+fmtN(d.total)+' บาท</p>');
@@ -785,10 +797,10 @@ function renderPayments(area){
   let html='<div class="tbl-wrap payment-table"><table class="tbl"><thead><tr><th>ลำดับ</th><th>ชื่อลูกหนี้</th><th class="num">จ่ายแล้ว</th><th>วันที่ค้างชำระ</th><th>วันที่กดจ่ายแล้ว</th><th>ผู้ดำเนินการ</th><th class="ce">จัดการ</th></tr></thead><tbody>';
   let mobile='<div class="payment-cards">';
   rows.forEach((d,i)=>{
-    const pending=!isAdmin()&&DB.approvals.some(a=>a.debtorId===d.id&&a.employeeId===me().id&&a.status==='pending'),undoLabel=isAdmin()?'ยกเลิก กลับไปค้าง':pending?'รอแอดมินอนุมัติ':'ขอยกเลิกการรับชำระ';
+    const pending=!isAdmin()&&DB.approvals.some(a=>a.debtorId===d.id&&a.employeeId===me().id&&a.status==='pending'),undoLabel=!canManageRecord(d)?'ดูข้อมูล':isAdmin()?'ยกเลิก กลับไปค้าง':pending?'รอแอดมินอนุมัติ':'ขอยกเลิกการรับชำระ';
     html+=`<tr><td>${i+1}</td><td><b>${esc(d.customerName)}</b></td><td class="num" style="color:var(--green);font-weight:700">${fmtN(d.total)} บาท</td><td>${thDate(d.debtDate)}</td><td>${thDateTimeSec(d.paidAt)}</td><td>${esc(d.paidByName||'-')}</td>
-    <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}" ${pending?'disabled':''}><i data-lucide="rotate-ccw"></i> ${undoLabel}</button></td></tr>`;
-    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}" ${pending?'disabled':''}><i data-lucide="rotate-ccw"></i><span>${undoLabel}</span></button></article>`;
+    <td class="ce"><button class="btn btn-danger btn-sm undoBtn" data-id="${d.id}" ${pending||!canManageRecord(d)?'disabled':''}><i data-lucide="rotate-ccw"></i> ${undoLabel}</button></td></tr>`;
+    mobile+=`<article class="payment-card"><div class="payment-card-head"><span>รายการที่ ${i+1}</span><strong>${fmtN(d.total)} บาท</strong></div><h3>${esc(d.customerName)}</h3><dl><div><dt>วันที่ค้างชำระ</dt><dd>${thDate(d.debtDate)}</dd></div><div><dt>วันที่รับชำระ</dt><dd>${thDateTimeSec(d.paidAt)}</dd></div><div><dt>ผู้ดำเนินการ</dt><dd>${esc(d.paidByName||'-')}</dd></div></dl><button class="btn btn-danger undoBtn" data-id="${d.id}" ${pending||!canManageRecord(d)?'disabled':''}><i data-lucide="rotate-ccw"></i><span>${undoLabel}</span></button></article>`;
   });
   html+='</tbody></table></div>';mobile+='</div>';html+=mobile;
   if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ</p></div>';
@@ -802,7 +814,7 @@ function renderPayments(area){
   if(window.lucide)lucide.createIcons();
 }
 function requestUndo(id,area){
-  const d=scopeRows(DB.debtors).find(x=>x.id===id&&x.status==='paid');if(!d){toast('ไม่พบรายการรับชำระที่มีสิทธิ์จัดการ','error');return;}
+  const d=scopeRows(DB.debtors).find(x=>x.id===id&&x.status==='paid');if(!d||!canManageRecord(d)){toast('ไม่พบรายการรับชำระที่มีสิทธิ์จัดการ','error');return;}
   if(!isAdmin()&&DB.approvals.some(a=>a.debtorId===id&&a.employeeId===me().id&&a.status==='pending')){toast('มีคำขอรอแอดมินอนุมัติแล้ว','info');return;}
   if(isAdmin()){
     openModal(`<div class="modal-head"><h3><i data-lucide="rotate-ccw"></i> ยืนยันยกเลิกกลับไปค้างชำระ</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
@@ -887,7 +899,7 @@ function renderCustomers(area){
   let html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ลำดับ</th><th>รหัสลูกค้า</th><th>ชื่อลูกค้า</th>'+(area==='nai'?'<th>หมู่ที่</th>':'<th>หมู่บ้านที่อยู่</th>')+'<th>ที่อยู่</th><th>วันที่นำลงระบบ</th><th>ผู้นำลงระบบ</th><th>ผู้จัดการข้อมูล</th><th>ผู้รับผิดชอบ</th><th>ประวัติลูกหนี้</th></tr></thead><tbody>';
   rows.forEach((c,i)=>{
     const cs=creditFor(c.id);
-    const byName=id=>(DB.employees.find(e=>e.id===id)||{}).name||'-';
+    const byName=recorderName;
     html+=`<tr><td>${i+1}</td><td>${esc(c.code)}</td><td><b>${esc(c.name)}</b></td><td>${esc(area==='nai'?('หมู่ที่ '+c.moo):c.village)}</td><td>${esc(c.address||'-')}</td><td>${thDate(c.createdAt)}</td><td>${esc(byName(c.createdBy))}</td><td>${esc(byName(c.managedBy))}</td><td>${esc(byName(c.responsibleBy))}</td><td><span class="pill ${cs.cls}">${cs.txt}</span></td></tr>`;
   });
   html+='</tbody></table></div>';
@@ -959,7 +971,7 @@ function renderCashsales(){
   let html='<div class="tbl-wrap"><table class="tbl" style="font-size:12px"><thead><tr><th>ลำดับ</th><th>รหัสลูกค้า</th><th>ชื่อลูกค้า</th><th>หมู่บ้าน</th><th>หมู่ที่</th><th>วันที่จัดส่ง</th><th>ผู้ลงระบบ</th><th>ข้อมูลจาก DB</th><th>ผู้รับผิดชอบ</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินถัง</th><th class="num">เงินแพ็ค</th><th class="ce">แก้ไข</th></tr></thead><tbody>';
   rows.forEach((r,i)=>{
     const age=now-new Date(r.createdAt).getTime();
-    const editable=isAdmin()||age<120000;
+    const editable=isAdmin()||(canManageRecord(r)&&age<120000);
     const lockText=isAdmin()?'แอดมินแก้ได้ตลอด':(editable?'เหลือ '+Math.ceil((120000-age)/1000)+' วิ':'ล็อกแล้ว');
     html+=`<tr><td>${i+1}</td><td>${esc(r.customerCode)}</td><td><b>${esc(r.customerName)}</b></td><td>${esc(r.village||'-')}</td><td>${esc(r.moo||'-')}</td><td>${thDate(r.deliveryDate)}</td><td>${esc(r.createdByName)}</td><td>${esc(r.dbSource)}</td><td>${esc((DB.employees.find(e=>e.id===r.responsibleBy)||{}).name||'-')}</td><td class="num">${r.jugs}</td><td class="num">${r.packs}</td><td class="num">${fmtN(r.jugAmount)}</td><td class="num">${fmtN(r.packAmount)}</td>
     <td class="ce">${editable?`<button class="btn btn-ghost btn-sm editCash" data-id="${r.id}"><i data-lucide="pencil"></i> แก้ไข</button>`:'<span class="countdown-lock"><i data-lucide="lock"></i> '+lockText+'</span>'}</td></tr>`;
@@ -1433,7 +1445,7 @@ $('#logoutBtn').addEventListener('click',()=>{
     if(authIdentity){const pending=FreshySync.diff(remoteBase||{},FreshySync.shared(DB));if(pending.length&&!(await flushOnline())){toast('ยังมีข้อมูลรอส่ง กรุณาจัดการก่อนออกจากระบบ','error');return;}}
     const u=me();
     if(DB.settings.email.alerts.logout&&u&&u.role!=='admin')await sendAlert('logout','[แจ้งเตือน] พนักงานออกจากระบบ','<p>พนักงาน <b>'+esc(u.name)+'</b> ออกจากระบบเมื่อ '+thDateTime(new Date().toISOString())+'</p>');
-    if(authIdentity){await flushOnline();if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch(e){}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;syncBlocked=false;}
+    if(authIdentity){await flushOnline();if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch(e){}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut();authIdentity=null;remoteBase=null;remoteRecorders=[];syncBlocked=false;}
     if(adminScheduleTimer)clearInterval(adminScheduleTimer);adminScheduleTimer=null;notificationHistory=[];syncIssues=[];session=null;localStorage.removeItem(SESSKEY);
     closeModal();$('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#loginCode').value='';
     toast('ออกจากระบบแล้ว','success');

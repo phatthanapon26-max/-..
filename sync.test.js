@@ -20,7 +20,7 @@ assert.throws(()=>S.rebase({settings:{business:{name:'Different',phone:'1'},docc
 const app=fs.readFileSync(__dirname+'/app.js','utf8');
 const install=app.slice(app.indexOf('function installRemote('),app.indexOf('async function rpc('));
 const raw={business:{name:'Live'},doccounters:{},db:{old:true}};
-const context={FreshySync:S,SUPA_COLS:S.collections,DB:{settings:{db:{mode:'supabase'}}},defaultSettings:()=>({business:{name:'Default'},email:{enabled:false},db:{mode:'demo'}}),safeCache:()=>{},archiveSyncChanges:()=>{},remoteBase:null,remoteSettings:null};
+const context={FreshySync:S,SUPA_COLS:S.collections,DB:{settings:{db:{mode:'supabase'}}},defaultSettings:()=>({business:{name:'Default'},email:{enabled:false},db:{mode:'demo'}}),safeCache:()=>{},archiveSyncChanges:()=>{},remoteBase:null,remoteSettings:null,remoteRecorders:[]};
 vm.createContext(context);vm.runInContext(install,context);
 context.installRemote({actor:{id:'admin'},data:{settings:raw,employees:[{id:'admin'}]}},[]);
 assert.equal(S.diff(context.remoteBase,S.shared(context.DB)).length,0,'UI defaults must not create phantom pending settings');
