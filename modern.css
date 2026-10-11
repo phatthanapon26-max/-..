@@ -20,7 +20,11 @@ body{background:radial-gradient(ellipse at 90% 0%,#ffede26b,transparent 40%),rad
 /* Opaque surfaces avoid resampling the scrolling page behind fixed chrome. */
 .sidebar,.topbar,.toast{background:var(--card)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .stat-card,.modal-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-/* Skip layout and paint for long card lists outside the viewport. */
-.debtor-card,.payment-card,.payment-review-card{content-visibility:auto;contain-intrinsic-size:auto 320px}
+/* Debtor tables are bounded in the DOM; retain their measured heights while scrolling. */
+.debtor-card{content-visibility:visible;contain-intrinsic-size:none;transition:none!important}
+.payment-card,.payment-review-card{content-visibility:auto;contain-intrinsic-size:auto 320px}
+.debtor-card thead th{position:static!important}
+.debtor-row-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+@media screen and (max-width:768px){body{background:var(--bg)!important}.debtor-card,.debtor-card .btn{box-shadow:none!important}.debtor-card .btn{transition:none!important}.topbar{box-shadow:none!important}.debtor-row-pager{gap:8px;font-size:11px}.debtor-row-pager .btn{padding:7px 9px!important;font-size:11px!important}}
 @media(hover:none),(pointer:coarse){.nav-item:hover,.btn:hover,.stat-card:hover{transform:none!important}.btn,.nav-item,.stat-card{transition:background-color .15s!important}}
 @media print{.debtor-card,.payment-card,.payment-review-card{content-visibility:visible;contain-intrinsic-size:none}}

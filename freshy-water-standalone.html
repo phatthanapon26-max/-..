@@ -597,8 +597,12 @@ body{background:radial-gradient(ellipse at 90% 0%,#ffede26b,transparent 40%),rad
 /* Opaque surfaces avoid resampling the scrolling page behind fixed chrome. */
 .sidebar,.topbar,.toast{background:var(--card)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .stat-card,.modal-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-/* Skip layout and paint for long card lists outside the viewport. */
-.debtor-card,.payment-card,.payment-review-card{content-visibility:auto;contain-intrinsic-size:auto 320px}
+/* Debtor tables are bounded in the DOM; retain their measured heights while scrolling. */
+.debtor-card{content-visibility:visible;contain-intrinsic-size:none;transition:none!important}
+.payment-card,.payment-review-card{content-visibility:auto;contain-intrinsic-size:auto 320px}
+.debtor-card thead th{position:static!important}
+.debtor-row-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+@media screen and (max-width:768px){body{background:var(--bg)!important}.debtor-card,.debtor-card .btn{box-shadow:none!important}.debtor-card .btn{transition:none!important}.topbar{box-shadow:none!important}.debtor-row-pager{gap:8px;font-size:11px}.debtor-row-pager .btn{padding:7px 9px!important;font-size:11px!important}}
 @media(hover:none),(pointer:coarse){.nav-item:hover,.btn:hover,.stat-card:hover{transform:none!important}.btn,.nav-item,.stat-card{transition:background-color .15s!important}}
 @media print{.debtor-card,.payment-card,.payment-review-card{content-visibility:visible;contain-intrinsic-size:none}}
 </style>
@@ -688,7 +692,7 @@ body{background:radial-gradient(ellipse at 90% 0%,#ffede26b,transparent 40%),rad
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo"><i data-lucide="droplets"></i></div>
-      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.4.2</small></div>
+      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.4.3</small></div>
     </div>
     <nav class="nav" id="navMenu"></nav>
     <div class="sidebar-foot">
@@ -3510,12 +3514,19 @@ function acceptRemote(payload,changes){
  syncViewDirty=syncViewDirty||!FreshySync.equal(before,FreshySync.shared(DB))||!FreshySync.equal(recordersBefore,remoteRecorders);updateSyncNotice();refreshSyncedView();
 }
 function updateSyncNotice(){const button=document.querySelector('.pending-btn');if(button&&authIdentity){const commands=typeof paymentQueue==='function'?paymentQueue():[];const count=(remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)).length:0)+commands.length;button.textContent=syncIssues.length?'ตรวจสอบ '+syncIssues.length+' รายการ':count?'รอส่ง '+count+' รายการ':'ข้อมูลบันทึกแล้ว';button.dataset.state=syncIssues.length?'review':count?'sending':'saved';}const time=$('#syncLastUpdated');if(time)time.textContent=lastSyncAt?'อัปเดต '+new Date(lastSyncAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):authIdentity?'กำลังตรวจข้อมูล':'ข้อมูลสาธิต';}
+let lastScrollActivity=0,scrollRefreshTimer=null;
+// Scroll listeners record time only: no DOM work or layout reads per frame.
+for(const type of ['scroll','touchmove','wheel'])document.addEventListener(type,()=>{lastScrollActivity=Date.now();},{passive:true,capture:true});
 function refreshSyncedView(){
  if(!session||!syncViewDirty||modalIsOpen()||currentPage==='settings')return;
+ if(lastScrollActivity&&Date.now()-lastScrollActivity<250){if(!scrollRefreshTimer)scrollRefreshTimer=setTimeout(()=>{scrollRefreshTimer=null;refreshSyncedView();},250);return;}
  const active=document.activeElement,filterIds=['debtorSearch','paySearch','custSearch','cashDate','auditEmployeeFilter'];
  if(['INPUT','TEXTAREA','SELECT'].includes(active?.tagName)&&!filterIds.includes(active.id))return;
  const focus=filterIds.includes(active?.id)?{id:active.id,value:active.value,start:active.selectionStart,end:active.selectionEnd}:null;
+ const top=$('.topbar')?.getBoundingClientRect().bottom||0;
+ const anchor=currentPage.startsWith('debtors')?[...document.querySelectorAll('.debtor-card')].map(card=>({id:card.dataset.cid,top:card.getBoundingClientRect().top,bottom:card.getBoundingClientRect().bottom})).find(card=>card.bottom>top):null;
  syncViewDirty=false;refreshUserChip();if(typeof renderNav==='function')renderNav();renderPage();
+ if(anchor){const card=[...document.querySelectorAll('.debtor-card')].find(card=>card.dataset.cid===anchor.id);if(card){const shift=card.getBoundingClientRect().top-anchor.top;if(Math.abs(shift)>1)window.scrollTo({top:window.scrollY+shift,behavior:'instant'});}}
  if(focus){const input=$('#'+focus.id);if(input){input.value=focus.value;input.focus({preventScroll:true});if(Number.isInteger(focus.start)&&typeof input.setSelectionRange==='function')input.setSelectionRange(focus.start,focus.end);}}
 }
 
@@ -3862,7 +3873,9 @@ function showNotifications(){const bell=$('#notificationsBtn');if(bell)bell.data
 /* ---------- DEBTORS (nai / other) ---------- */
 let debtorFilter={nai:'all',other:'all'}, debtorSearch='';
 let custSearch={nai:'',other:''}, custCredit={nai:'all',other:'all'};
-let debtorPage={nai:0,other:0};
+let debtorPage={nai:0,other:0},debtorRowPages=Object.create(null);
+const DEBT_ROWS_PER_PAGE=10;
+function debtorRowsHtml(list){return list.map(d=>`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce">${FreshyPayments.canReceive(d,me())?`<button class="btn btn-success btn-sm payOne" data-id="${esc(d.id)}"><i data-lucide="check"></i> จ่ายแล้ว</button>`:'<span class="pill gray">ดูข้อมูล</span>'}</td></tr>`).join('');}
 function renderDebtors(area){
   const tone=area==='nai'?'tone-blue':'tone-orange';
   let rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='unpaid');
@@ -3881,25 +3894,25 @@ function renderDebtors(area){
   const emailBtn=canEmail()?'<button class="btn btn-ghost btn-sm" id="emailReportBtn"><i data-lucide="mail"></i> ส่งรายงานทางอีเมล</button>':'';
   const printBtn=canPrint()?'<button class="btn btn-ghost btn-sm" id="printReportBtn"><i data-lucide="printer"></i> ปริ้น A4 / PDF</button>':'';
   let cardsHtml=''; let idx=0;
-  const ids=Object.keys(groups),pages=Math.max(1,Math.ceil(ids.length/30));debtorPage[area]=Math.min(debtorPage[area],pages-1);const customerMap=new Map(DB.customers.map(c=>[c.id,c]));
-  ids.slice(debtorPage[area]*30,(debtorPage[area]+1)*30).forEach(cid=>{
+  const pageSize=window.matchMedia('(max-width:768px)').matches?10:30;
+  const ids=Object.keys(groups),pages=Math.max(1,Math.ceil(ids.length/pageSize));debtorPage[area]=Math.min(debtorPage[area],pages-1);const customerMap=new Map(DB.customers.map(c=>[c.id,c]));
+  ids.slice(debtorPage[area]*pageSize,(debtorPage[area]+1)*pageSize).forEach(cid=>{
     idx++; const list=groups[cid].sort((a,b)=>a.debtDate<b.debtDate?-1:1);
     const c=customerMap.get(cid)||{};
     const tj=list.reduce((s,d)=>s+(d.jugs||0),0), tp=list.reduce((s,d)=>s+(d.packs||0),0), tt=list.reduce((s,d)=>s+d.total,0);
     const latest=list.reduce((a,b)=>String(a.createdAt)>String(b.createdAt)?a:b);
     const creator=recorderName(latest.createdBy);
 
-    let rowsHtml='';
-    list.forEach(d=>{
-      rowsHtml+=`<tr><td>${thDate(d.debtDate)}</td><td class="num">${d.jugs||0}</td><td class="num">${d.packs||0}</td><td class="num">${fmtN(d.jugAmount)}</td><td class="num">${fmtN(d.packAmount)}</td><td class="num"><b>${fmtN(d.total)}</b></td><td class="ce">${FreshyPayments.canReceive(d,me())?`<button class="btn btn-success btn-sm payOne" data-id="${d.id}"><i data-lucide="check"></i> จ่ายแล้ว</button>`:'<span class="pill gray">ดูข้อมูล</span>'}</td></tr>`;
-    });
+    const rowPages=Math.ceil(list.length/DEBT_ROWS_PER_PAGE),rowPage=Math.min(debtorRowPages[cid]||0,rowPages-1);debtorRowPages[cid]=rowPage;
+    const rowsHtml=debtorRowsHtml(list.slice(rowPage*DEBT_ROWS_PER_PAGE,(rowPage+1)*DEBT_ROWS_PER_PAGE));
+    const rowPager=rowPages>1?`<div class="debtor-row-pager"><button class="btn btn-ghost btn-sm debtRowsPrev" data-cid="${esc(cid)}" ${rowPage===0?'disabled':''} aria-label="รายการก่อนหน้าของ ${esc(list[0].customerName)}">ก่อนหน้า</button><span class="debt-row-range">รายการ ${rowPage*DEBT_ROWS_PER_PAGE+1}–${Math.min((rowPage+1)*DEBT_ROWS_PER_PAGE,list.length)} / ${list.length}</span><button class="btn btn-ghost btn-sm debtRowsNext" data-cid="${esc(cid)}" ${rowPage===rowPages-1?'disabled':''} aria-label="รายการถัดไปของ ${esc(list[0].customerName)}">ถัดไป</button></div>`:'';
     const meta=area==='nai'?('หมู่ที่ '+(c.moo||list[0].moo||'-')):(c.village||list[0].village||'-');
-    cardsHtml+=`<div class="debtor-card" data-name="${esc(list[0].customerName)}">
+    cardsHtml+=`<div class="debtor-card" data-cid="${esc(cid)}" data-name="${esc(list[0].customerName)}">
       <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
       ${list.every(d=>FreshyPayments.canReceive(d,me()))?`<button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>`:''}
       <button class="btn btn-ghost btn-sm debtorDocument" data-cid="${cid}" aria-label="เปิดเอกสารลูกหนี้ ${esc(list[0].customerName)}"><i data-lucide="file-text"></i> เอกสารลูกหนี้</button></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
-      <div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
+      ${rowPager}<div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
   });
   if(!cardsHtml)cardsHtml='<div class="empty-state"><i data-lucide="party-popper"></i><p>ไม่มีลูกหนี้ค้างชำระในหมวดนี้</p></div>';
@@ -3920,7 +3933,7 @@ function renderDebtors(area){
   $('#pageContent').querySelectorAll('.debtorDocument').forEach(button=>button.onclick=async()=>{button.disabled=true;try{const report=buildDebtorReportHtml(area,'all','combined',button.dataset.cid);if(!authIdentity){preparePrint(report.html,report.docNo,false);return;}const url=await persistDocument(report.html,report.docNo);location.assign(url);}catch(e){toast(e.message,'error');}finally{button.disabled=false;}});
   $('#debtPrev').onclick=()=>{debtorPage[area]--;renderDebtors(area);attachCsv();};$('#debtNext').onclick=()=>{debtorPage[area]++;renderDebtors(area);attachCsv();};
   $('#addDebtorBtn').addEventListener('click',()=>openAddDebtor(area));
-  $('#pageContent').querySelectorAll('.payOne').forEach(b=>b.addEventListener('click',()=>markPaid(b.dataset.id)));
+  $('#pageContent .debtor-cards').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.classList.contains('payOne')){markPaid(b.dataset.id);return;}if(!b.matches('.debtRowsPrev,.debtRowsNext')||b.disabled)return;const cid=b.dataset.cid,list=groups[cid],card=b.closest('.debtor-card'),pages=Math.ceil(list.length/DEBT_ROWS_PER_PAGE);const page=Math.max(0,Math.min(pages-1,debtorRowPages[cid]+(b.classList.contains('debtRowsNext')?1:-1)));debtorRowPages[cid]=page;card.querySelector('tbody').innerHTML=debtorRowsHtml(list.slice(page*DEBT_ROWS_PER_PAGE,(page+1)*DEBT_ROWS_PER_PAGE));card.querySelector('.debt-row-range').textContent='รายการ '+(page*DEBT_ROWS_PER_PAGE+1)+'–'+Math.min((page+1)*DEBT_ROWS_PER_PAGE,list.length)+' / '+list.length;card.querySelector('.debtRowsPrev').disabled=page===0;card.querySelector('.debtRowsNext').disabled=page===pages-1;renderIcons();};
   $('#pageContent').querySelectorAll('.payAll').forEach(b=>b.addEventListener('click',()=>markPaid(scopeRows(DB.debtors).filter(d=>d.customerId===b.dataset.cid&&d.status==='unpaid').map(d=>d.id))));
   if(printBtn)$('#printReportBtn').addEventListener('click',()=>openPrintOptions(area));
   if(emailBtn)$('#emailReportBtn').addEventListener('click',()=>openEmailReport(area));

@@ -1,6 +1,10 @@
-# Freshy Water 8.4.2 validation
+# Freshy Water 8.4.3 validation
 
 Run `npm test` and `npm run build`.
+
+- Mobile debtor scrolling: a fixture with 40 customers and 1,800 debts now creates 10 customer cards and at most 100 debt rows per page, versus 30 cards and 1,350 rows before this change. Each customer has ten rows per table page; scoped table updates retain the other cards. All 45 debts for a customer remain reachable, pay-all includes hidden rows, subtotal includes every row, and the full report retains all 1,800 debts. Desktop customer pagination remains 30 cards.
+- Remote view replacement waits until 250 ms after scroll/touch/wheel activity ends; data synchronization still proceeds. A fixture verifies continued touch scrolling extends this delay and the updated total appears after scrolling stops. Visible debtor card position is restored after refresh when it remains in the current page. Scroll listeners do no DOM writes or layout reads.
+- Debtor cards retain measured heights instead of replacing offscreen tables with estimated heights. Debtor column headers use static positioning. Mobile debtor card and action shadows/animations are removed while preserving the existing colors and full A4 report styling. These checks bound layout work; they do not measure FPS on the user's Android device.
 
 - Print regression uses the actual report HTML and shared print CSS: 90 debts for one customer, all 90 row numbers exactly once, repeated customer/column headings, subtotal, overall total and four signatures. Saved snapshots retain exactly seven columns. Twelve customers with five debts each keep every short customer table on one page. Both A4 HTML/CSS samples and the server PDF contain five pages; Poppler renders were inspected for Thai text, numeric columns, margins and the final signature block. HTML print pagination was rendered with WeasyPrint; this is not a claim of testing every physical printer.
 - Root print containers reset viewport heights, overflow and hidden application chrome so the document can continue to subsequent A4 pages. Shared report typography, centered heading, page numbering and two-by-two signatures apply to debtor reports and saved QR documents; the server PDF also uses larger debtor text and two-by-two signatures.
@@ -8,7 +12,7 @@ Run `npm test` and `npm run build`.
 
 - Performance regression in the actual app inside JSDOM: 20 identical remote receipts with 1,000 customers retain page and navigation DOM, retain existing SVG icons, and produce zero localStorage writes. Before the fix, the small demo fixture replaced page and theme icon nodes and wrote localStorage 60 times across 20 identical receipts (905 ms in one local run, versus 65 ms after the fix). These are local JavaScript/DOM measurements, not device FPS claims.
 - Rapid Thai customer search renders once after typing settles, preserving caret selection and focus. Navigating while a search timer is pending keeps the selected page. New remote payment approvals still update history and notify the receiver; open forms keep their draft until closed. Compact cached snapshots plus separate journals restore unsent customer edits, preserve edits across remote reads, and refresh changed recorder names.
-- Fixed chrome and cards use no backdrop blur, while preserving the existing colored surfaces and shadows. Offscreen debtor/payment/review cards defer paint; print media restores normal rendering. Touch devices disable hover transforms.
+- Fixed chrome and cards use no backdrop blur, while preserving the existing colored surfaces and shadows. Offscreen payment/review cards defer paint; print media restores normal rendering. Touch devices disable hover transforms.
 
 
 - Payment workflow on isolated PostgreSQL: all members see every operational row; staff personnel/settings secrets stay private; migration preserves the complete data fingerprint; server stamps receiver/reviewer; staff receipt and approval request commit atomically; individual approval/rejection; mandatory cancellation reasons; receiver-only pending cancellation; approved-payment undo review; legacy receipts unchanged; anonymous and generic status-forging rejected.
