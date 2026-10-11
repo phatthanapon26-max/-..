@@ -595,6 +595,7 @@ body{background:radial-gradient(ellipse at 90% 0%,#ffede26b,transparent 40%),rad
 @media(max-width:600px){.payment-review-actions,.payment-review-actions .btn{width:100%}.payment-review-card .panel-body{padding:18px}.payment-card .payment-reviewer{font-size:13px}}
 
 /* Opaque surfaces avoid resampling the scrolling page behind fixed chrome. */
+@media screen{html{height:auto!important;overflow-x:clip!important;overflow-y:visible!important}body{height:auto!important;min-height:100dvh;overflow:visible!important}}
 .sidebar,.topbar,.toast{background:var(--card)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .stat-card,.modal-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 /* Debtor tables are bounded in the DOM; retain their measured heights while scrolling. */
