@@ -1,6 +1,11 @@
-# Freshy Water 8.4 validation
+# Freshy Water 8.4.1 validation
 
 Run `npm test` and `npm run build`.
+
+- Performance regression in the actual app inside JSDOM: 20 identical remote receipts with 1,000 customers retain page and navigation DOM, retain existing SVG icons, and produce zero localStorage writes. Before the fix, the small demo fixture replaced page and theme icon nodes and wrote localStorage 60 times across 20 identical receipts (905 ms in one local run, versus 65 ms after the fix). These are local JavaScript/DOM measurements, not device FPS claims.
+- Rapid Thai customer search renders once after typing settles, preserving caret selection and focus. Navigating while a search timer is pending keeps the selected page. New remote payment approvals still update history and notify the receiver; open forms keep their draft until closed. Compact cached snapshots plus separate journals restore unsent customer edits, preserve edits across remote reads, and refresh changed recorder names.
+- Fixed chrome and cards use no backdrop blur, while preserving the existing colored surfaces and shadows. Offscreen debtor/payment/review cards defer paint; print media restores normal rendering. Touch devices disable hover transforms.
+
 
 - Payment workflow on isolated PostgreSQL: all members see every operational row; staff personnel/settings secrets stay private; migration preserves the complete data fingerprint; server stamps receiver/reviewer; staff receipt and approval request commit atomically; individual approval/rejection; mandatory cancellation reasons; receiver-only pending cancellation; approved-payment undo review; legacy receipts unchanged; anonymous and generic status-forging rejected.
 - Receipt recovery uses the actual production client queue against PostgreSQL: response lost after commit, client restart, retry without a second receipt/request/audit entry; simultaneous receivers result in one success; a stale row rolls back an entire bulk operation.

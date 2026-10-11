@@ -1,0 +1,28 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const pause=()=>new Promise(resolve=>setTimeout(resolve,210));
+(async()=>{
+ const d=new JSDOM(fs.readFileSync('index.html','utf8'),{url:'https://fixture.test/design-preview',runScripts:'outside-only'}),w=d.window;
+ w.FRESHY_PREVIEW=true;w.FRESHY_CONFIG={mode:'demo'};w.structuredClone=structuredClone;w.setInterval=()=>0;w.scrollTo=()=>{};w.matchMedia=()=>({matches:false,addEventListener(){}});
+ for(const file of ['vendor/lucide.js','sync.js','features.js','payments.js','data-tools.js','vendor/qrcode.js','dashboard.js'])w.eval(fs.readFileSync(file,'utf8'));
+ let source=fs.readFileSync('app.js','utf8');const end=source.lastIndexOf('})();');
+ source=source.slice(0,end)+`window.perf={setup(p){authIdentity={id:'fixture-auth'};DB.settings.db={mode:'supabase',supabaseUrl:'https://fixture.supabase.co',supabaseKey:'fixture'};installRemote(p,[]);syncViewDirty=false;},accept:acceptRemote,db:()=>DB,cache:safeCache,draft:loadDraft,navigate,icons:renderIcons,open:()=>openModal('<input id="testForm" value="ร่าง">'),close:closeModal};`+source.slice(end);w.eval(source);
+ const data=w.FreshySync.shared(w.perf.db());
+ const staff=data.employees.find(e=>e.role==='staff');data.employees=[staff];data.customers=Array.from({length:1000},(_,i)=>({id:'c'+i,code:'C'+i,name:'ลูกค้าทดสอบ '+i,area:'other',village:'บ้านทดสอบ',createdBy:staff.id}));
+ data.debtors=[{id:'pending',customerId:'c0',customerName:'ลูกค้าทดสอบ 0',area:'other',status:'paid',paymentReviewStatus:'pending',paidBy:staff.id,paidByName:staff.name,paidAt:'2026-10-11T09:00:00Z',debtDate:'2026-10-11',total:30,jugs:2,packs:0}];
+ data.approvals=[];const payload={actor:staff,data,recorders:[{id:staff.id,name:staff.name},{id:'admin',name:'แอดมิน'}]};w.perf.setup(payload);w.perf.navigate('customersOther');
+ let writes=0;const write=w.Storage.prototype.setItem;w.Storage.prototype.setItem=function(...args){writes++;return write.apply(this,args)};
+ const first=w.document.querySelector('#pageContent').firstElementChild,nav=w.document.querySelector('#navMenu').firstElementChild,themeIcon=w.document.querySelector('#themeToggle svg');
+ const started=performance.now();for(let i=0;i<20;i++)w.perf.accept(structuredClone(payload),[]);
+ assert.equal(w.document.querySelector('#pageContent').firstElementChild,first,'Unchanged polls must retain page DOM and scroll layout');assert.equal(w.document.querySelector('#navMenu').firstElementChild,nav);assert.equal(writes,0,'Unchanged polls must not rewrite journals or snapshots');w.perf.icons();assert.equal(w.document.querySelector('#themeToggle svg'),themeIcon,'Existing icons must retain identity');
+ console.log('20 idle polls with 1,000 customers: '+Math.round(performance.now()-started)+' ms, 0 page replacements, 0 storage writes.');
+ let input=w.document.querySelector('#custSearch');input.focus();for(const value of ['ลูก','ลูกค้า','ลูกค้าทดสอบ 99']){input.value=value;input.dispatchEvent(new w.Event('input'));assert.equal(w.document.querySelector('#custSearch'),input,'Typing must not rebuild the page on every key');}input.setSelectionRange(2,4);await pause();input=w.document.querySelector('#custSearch');assert.equal(input.value,'ลูกค้าทดสอบ 99');assert.equal(w.document.activeElement,input);assert.equal(input.selectionStart,2);assert.equal(input.selectionEnd,4);assert.equal(w.document.querySelectorAll('#pageContent tbody tr').length,11);
+ input.value='กำลังพิมพ์';input.dispatchEvent(new w.Event('input'));w.perf.navigate('paymentsOther');const paymentsPage=w.document.querySelector('#pageContent').firstElementChild;await pause();assert.equal(w.document.querySelector('#pageContent').firstElementChild,paymentsPage,'Search from a discarded page must not navigate back');
+ assert.match(w.document.querySelector('#pageContent').textContent,/รอแอดมินตรวจสอบหรืออนุมัติ/);
+ const changed=structuredClone(payload);Object.assign(changed.data.debtors[0],{paymentReviewStatus:'approved',paymentApprovedBy:'admin',paymentApprovedByName:'แอดมิน',paymentApprovedAt:'2026-10-11T10:00:00Z'});
+ w.perf.open();w.perf.accept(changed,[]);assert.equal(w.document.querySelector('#testForm').value,'ร่าง');assert.equal(w.document.querySelector('#pageContent').firstElementChild,paymentsPage,'Remote changes must wait until the open form closes');w.perf.close();await pause();assert.match(w.document.querySelector('#pageContent').textContent,/ตรวจสอบและอนุมัติแล้ว/);assert.match(w.document.querySelector('#toastWrap').textContent,/ตรวจสอบและอนุมัติแล้ว/);
+ const draftRow={id:'draft-customer',name:'ข้อมูลรอส่ง',area:'other'};w.perf.db().customers.push(draftRow);w.perf.cache();assert(writes>0,'New local edits must be saved immediately');assert(w.perf.draft().data.customers.some(c=>c.id===draftRow.id),'Compact snapshot and separate journal must restore pending edits');
+ w.perf.accept(changed);assert(w.perf.db().customers.some(c=>c.id===draftRow.id),'Remote receipt must retain an unsent local edit');
+ const recorded=structuredClone(changed);recorded.recorders[1].name='แอดมินใหม่';const beforeRecorder=w.document.querySelector('#pageContent').firstElementChild;w.perf.accept(recorded);assert.notEqual(w.document.querySelector('#pageContent').firstElementChild,beforeRecorder,'Recorder name changes must refresh the page');
+ d.window.close();console.log('Passed: idle sync, icon identity, rapid Thai search/caret, navigation during debounce, live approval notification, open form preservation, journal recovery, and recorder refresh.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

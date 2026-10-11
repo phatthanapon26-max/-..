@@ -16,3 +16,11 @@ body{background:radial-gradient(ellipse at 90% 0%,#ffede26b,transparent 40%),rad
 .payment-card .pill,.payment-review-card .pill{white-space:normal;line-height:1.6}
 #undoReason,#decisionReason{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font:inherit}
 @media(max-width:600px){.payment-review-actions,.payment-review-actions .btn{width:100%}.payment-review-card .panel-body{padding:18px}.payment-card .payment-reviewer{font-size:13px}}
+
+/* Opaque surfaces avoid resampling the scrolling page behind fixed chrome. */
+.sidebar,.topbar,.toast{background:var(--card)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.stat-card,.modal-backdrop{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+/* Skip layout and paint for long card lists outside the viewport. */
+.debtor-card,.payment-card,.payment-review-card{content-visibility:auto;contain-intrinsic-size:auto 320px}
+@media(hover:none),(pointer:coarse){.nav-item:hover,.btn:hover,.stat-card:hover{transform:none!important}.btn,.nav-item,.stat-card{transition:background-color .15s!important}}
+@media print{.debtor-card,.payment-card,.payment-review-card{content-visibility:visible;contain-intrinsic-size:none}}

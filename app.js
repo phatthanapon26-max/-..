@@ -8,6 +8,25 @@
 
 /* New workflows deliberately keep the original database and pending queue. */
 let dashboardDays=7,notificationHistory=[],adminScheduleTimer=null,backupBusy=false,backupFolder=null,backupFolderLoaded=false,lastScheduledAttempt=0;
+// Lucide retains its source attribute on generated SVGs; render only new placeholders.
+function renderIcons(){
+ if(!window.lucide)return;
+ document.querySelectorAll('svg[data-lucide]').forEach(icon=>icon.removeAttribute('data-lucide'));
+ lucide.createIcons();
+}
+function bindSearch(input,onValue,render){
+ let timer;
+ input.addEventListener('input',()=>{
+  onValue(input.value.trim());clearTimeout(timer);
+  timer=setTimeout(()=>{
+   if(!input.isConnected)return;
+   const focus=document.activeElement===input,start=input.selectionStart,end=input.selectionEnd;
+   render();
+   const next=document.getElementById(input.id);
+   if(focus&&next){next.focus({preventScroll:true});if(Number.isInteger(start))next.setSelectionRange(start,end);}
+  },160);
+ });
+}
 function localQr(url){const qr=qrcode(0,'M');qr.addData(url);qr.make();return 'data:image/svg+xml;base64,'+btoa(qr.createSvgTag({cellSize:3,margin:12,scalable:true}));}
 async function apiRequest(path,options={}){
  if(!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');const {data,error}=await authFor(supaCfg()).auth.getSession();if(error||!data.session)throw Error('เซสชันหมดอายุ');
@@ -134,14 +153,14 @@ function toast(msg, type){
   t.dataset.message=String(msg);t.dataset.repeated='1';
   t.setAttribute('role',type==='error'?'alert':'status');
   t.innerHTML='<i data-lucide="'+(type==='error'?'circle-alert':type==='success'?'check-circle-2':'info')+'"></i><span>'+esc(msg)+'</span><button class="toast-dismiss" type="button" aria-label="ปิดการแจ้งเตือน">×</button>';t.querySelector('button').onclick=()=>t.remove();
-  w.appendChild(t); if(window.lucide)lucide.createIcons();
+  w.appendChild(t); renderIcons();
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},3200);
 }
 
 /* ---------- modal ---------- */
 function openModal(html){
   $('#modalBox').className='modal';$('#modalBox').onkeydown=null;$('#modalBox').removeAttribute('tabindex');$('#modalBox').innerHTML=html; $('#modalBackdrop').classList.remove('hidden');
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 function closeModal(){$('#modalBackdrop').classList.add('hidden');$('#modalBox').className='modal';$('#modalBox').onkeydown=null;$('#modalBox').removeAttribute('tabindex');$('#modalBox').innerHTML='';if(syncViewDirty)setTimeout(refreshSyncedView,0);}
 function modalIsOpen(){return !$('#modalBackdrop').classList.contains('hidden');}
@@ -246,12 +265,15 @@ function journalKey(){return journalPrefix()+syncTabId;}
 function draftKey(){return 'freshy_draft_v2_'+authIdentity.id+'_'+supaCfg().url;}
 function safeCache(){
  const config=DB.settings.db;
- try{localStorage.setItem(window.FRESHY_PREVIEW?'freshywater_demo_config_v8':'freshywater_dbconfig_v1',JSON.stringify(config));
- if(config.mode!=='supabase'){localStorage.setItem(DBKEY,JSON.stringify(DB));return true;}
+ const writeChanged=(key,value)=>{if(localStorage.getItem(key)!==value)localStorage.setItem(key,value);};
+ try{writeChanged(window.FRESHY_PREVIEW?'freshywater_demo_config_v8':'freshywater_dbconfig_v1',JSON.stringify(config));
+ if(config.mode!=='supabase'){writeChanged(DBKEY,JSON.stringify(DB));return true;}
  if(authIdentity&&remoteBase){
   // A separate small journal per tab prevents one device/tab from replacing another's unsent work.
-  localStorage.setItem(journalKey(),JSON.stringify({changes:FreshySync.diff(remoteBase,FreshySync.shared(DB)),issues:syncIssues,revision:remoteBase.settings?._resetRevision||'',updatedAt:Date.now()}));
-  try{localStorage.setItem(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,data:remoteBase,recorders:remoteRecorders}));}catch(error){console.warn('Snapshot cache is full; the pending journal remains saved.');}
+  const entry={changes:FreshySync.diff(remoteBase,FreshySync.shared(DB)),issues:syncIssues,revision:remoteBase.settings?._resetRevision||''};
+  let previous;try{previous=JSON.parse(localStorage.getItem(journalKey()));}catch{}
+  if(!previous||!FreshySync.equal(entry,{changes:previous.changes,issues:previous.issues,revision:previous.revision}))localStorage.setItem(journalKey(),JSON.stringify({...entry,updatedAt:Date.now()}));
+  try{writeChanged(draftKey(),JSON.stringify({base:remoteBase,rawSettings:remoteSettings,recorders:remoteRecorders}));}catch(error){console.warn('Snapshot cache is full; the pending journal remains saved.');}
  }
  return true;
  }catch(error){toast('พื้นที่เก็บข้อมูลในเครื่องเต็ม กรุณาส่งข้อมูลออนไลน์หรือดาวน์โหลดสำเนาก่อนปิดหน้า','error');return false;}
@@ -268,16 +290,17 @@ function archiveSyncChanges(changes,reason){
 }
 function normalizedRemote(data){const defaults=defaultSettings();delete defaults.db;const settings=Object.assign(defaults,data.settings||{});for(const key of ['business','header','email','docPrefix','backup'])settings[key]=Object.assign({},defaultSettings()[key],data.settings?.[key]||{});settings.email.alerts=Object.assign({},defaultSettings().email.alerts,data.settings?.email?.alerts||{});delete settings.db;return {...data,settings};}
 function acceptRemote(payload,changes){
- changes=changes||FreshySync.diff(remoteBase||{},FreshySync.shared(DB));
+ const before=FreshySync.shared(DB),recordersBefore=remoteRecorders,incoming=normalizedRemote(payload.data);
+ changes=changes||FreshySync.diff(remoteBase||{},before);
  if(remoteBase&&String(remoteBase.settings?._resetRevision||'')!==String(payload.data.settings?._resetRevision||'')){archiveSyncChanges(changes,'ข้อมูลก่อนแอดมินล้างระบบ');changes=[];}
- const stillUncommitted=item=>{if(/ก่อนแอดมินล้าง/.test(item.reason||''))return true;try{return FreshySync.rebase(normalizedRemote(payload.data),[item.change]).length>0;}catch{return true;}};
+ const stillUncommitted=item=>{if(/ก่อนแอดมินล้าง/.test(item.reason||''))return true;try{return FreshySync.rebase(incoming,[item.change]).length>0;}catch{return true;}};
  syncIssues=syncIssues.filter(stillUncommitted);
- const result=FreshySync.reconcile(normalizedRemote(payload.data),changes);
+ const result=FreshySync.reconcile(incoming,changes);
  for(const issue of result.conflicts)archiveSyncChanges([issue.change],'รายการถูกแก้จากเครื่องอื่น ต้องตรวจสอบก่อนส่ง');
  installRemote(payload,result.pending);lastSyncAt=Date.now();
  // Prune only exact operations already committed, with a storage compare to protect concurrent tab edits.
- for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key.startsWith(journalPrefix())||key===journalKey())continue;try{const raw=localStorage.getItem(key),entry=JSON.parse(raw);entry.issues=(entry.issues||[]).filter(stillUncommitted);entry.changes=(entry.changes||[]).filter(change=>{try{return FreshySync.rebase(normalizedRemote(payload.data),[change]).length>0;}catch{return true;}});if(raw===localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(entry));}catch{}}
- syncViewDirty=true;updateSyncNotice();refreshSyncedView();
+ for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key.startsWith(journalPrefix())||key===journalKey())continue;try{const raw=localStorage.getItem(key),entry=JSON.parse(raw);entry.issues=(entry.issues||[]).filter(stillUncommitted);entry.changes=(entry.changes||[]).filter(change=>{try{return FreshySync.rebase(incoming,[change]).length>0;}catch{return true;}});const next=JSON.stringify(entry);if(next!==raw&&raw===localStorage.getItem(key))localStorage.setItem(key,next);}catch{}}
+ syncViewDirty=syncViewDirty||!FreshySync.equal(before,FreshySync.shared(DB))||!FreshySync.equal(recordersBefore,remoteRecorders);updateSyncNotice();refreshSyncedView();
 }
 function updateSyncNotice(){const button=document.querySelector('.pending-btn');if(button&&authIdentity){const commands=typeof paymentQueue==='function'?paymentQueue():[];const count=(remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)).length:0)+commands.length;button.textContent=syncIssues.length?'ตรวจสอบ '+syncIssues.length+' รายการ':count?'รอส่ง '+count+' รายการ':'ข้อมูลบันทึกแล้ว';button.dataset.state=syncIssues.length?'review':count?'sending':'saved';}const time=$('#syncLastUpdated');if(time)time.textContent=lastSyncAt?'อัปเดต '+new Date(lastSyncAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):authIdentity?'กำลังตรวจข้อมูล':'ข้อมูลสาธิต';}
 function refreshSyncedView(){
@@ -330,11 +353,10 @@ async function supabaseFetch(){
  if(remoteBase&&!syncBlocked&&FreshySync.diff(remoteBase,FreshySync.shared(DB)).length)await flushOnline();
  syncBusy=true;
  syncReadPromise=(async()=>{try{
-  const snapshot=FreshySync.shared(DB),payload=await rpc('freshy_read');
+  const payload=await rpc('freshy_read');
   acceptRemote(payload,remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)):[]);
-  const changed=!FreshySync.equal(snapshot,FreshySync.shared(DB));
   setStatus(syncIssues.length?'ข้อมูลอัปเดตแล้ว · '+syncIssues.length+' รายการต้องตรวจสอบ':'ข้อมูลตรงกับฐานข้อมูลแล้ว','ok');
-  if(changed)refreshSyncedView();return true;
+  return true;
  }catch(error){setStatus('เก็บข้อมูลในเครื่อง · กำลังเชื่อมต่อใหม่','warn');return false;}
  finally{syncBusy=false;syncReadPromise=null;updateSyncNotice();}})();return syncReadPromise;
 }
@@ -572,7 +594,7 @@ function renderNav(){
   });
   nav.innerHTML=html;
   nav.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 function navigate(page){
   const p=PAGES.find(x=>x.id===page);if(!p)return;
@@ -582,7 +604,7 @@ function navigate(page){
   $('#pageTitle').innerHTML='<i data-lucide="'+p.icon+'"></i> '+esc(p.label);
   renderNav(); renderPage();
   $('#sidebar').classList.remove('open');
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
   window.scrollTo(0,0);
 }
 
@@ -597,7 +619,7 @@ function renderPage(){
     cashsales:renderCashsales,approvals:renderApprovals,employees:renderEmployees,audit:renderAudit,settings:renderSettings};
   (fn[currentPage]||renderDashboard)();
   attachCsv();updateSyncNotice();
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 
 /* ---------- DASHBOARD ---------- */
@@ -620,7 +642,7 @@ function renderDashboard(){
  const debtArea=canSee('debtorsNai')?'nai':canSee('debtorsOther')?'other':null,customerArea=canSee('customersNai')?'nai':canSee('customersOther')?'other':null;
  $('#quickDebt').hidden=!debtArea;$('#quickCash').hidden=!canSee('cashsales');$('#quickCustomer').hidden=!customerArea;
  $('#quickDebt').onclick=()=>{navigate(debtArea==='nai'?'debtorsNai':'debtorsOther');openAddDebtor(debtArea);};$('#quickCash').onclick=()=>{navigate('cashsales');openAddCash();};$('#quickCustomer').onclick=()=>{navigate(customerArea==='nai'?'customersNai':'customersOther');openAddCustomer(customerArea);};
- document.querySelectorAll('[data-chart-days]').forEach(button=>button.onclick=()=>{dashboardDays=+button.dataset.chartDays;renderDashboard();updateSyncNotice();if(window.lucide)lucide.createIcons();});
+ document.querySelectorAll('[data-chart-days]').forEach(button=>button.onclick=()=>{dashboardDays=+button.dataset.chartDays;renderDashboard();updateSyncNotice();renderIcons();});
  document.querySelectorAll('[data-day]').forEach(point=>{const show=()=>{const day=days[+point.dataset.day];$('#chartReadout').textContent=thDate(day.date)+' · เงินสด '+fmtN(day.cash)+' บาท · ลูกหนี้ '+fmtN(day.debt)+' บาท · '+fmtN(day.jugs)+' ถัง';};point.addEventListener('mouseenter',show);point.addEventListener('focus',show);point.addEventListener('click',show);});updateSyncNotice();
 }
 function showNotifications(){const bell=$('#notificationsBtn');if(bell)bell.dataset.unread='false';openModal('<div class="modal-head"><h3>การแจ้งเตือนล่าสุด</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body">'+(notificationHistory.map(item=>'<div class="notification-entry"><i data-lucide="'+(item.type==='error'?'circle-alert':item.type==='success'?'check-circle-2':'info')+'"></i><div><p>'+esc(item.message)+'</p><time>'+new Date(item.at).toLocaleTimeString('th-TH')+'</time></div></div>').join('')||'<div class="sync-empty"><i data-lucide="bell"></i><b>ยังไม่มีการแจ้งเตือน</b></div>')+'</div>');}
@@ -681,7 +703,7 @@ function renderDebtors(area){
   // events
   $('#pageContent').querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{debtorFilter[area]=b.dataset.f;debtorPage[area]=0;renderDebtors(area);}));
   const si=$('#debtorSearch'); const sug=$('#searchSuggest');
-  let searchTimer;si.addEventListener('input',()=>{debtorSearch=si.value.trim();debtorPage[area]=0;clearTimeout(searchTimer);searchTimer=setTimeout(()=>{renderDebtors(area);const input=$('#debtorSearch');input.focus();input.setSelectionRange(input.value.length,input.value.length);attachCsv();},200);});
+  bindSearch(si,value=>{debtorSearch=value;debtorPage[area]=0;},()=>renderDebtors(area));
   $('#pageContent').querySelectorAll('.debtorDocument').forEach(button=>button.onclick=async()=>{button.disabled=true;try{const report=buildDebtorReportHtml(area,'all','combined',button.dataset.cid);if(!authIdentity){preparePrint(report.html,report.docNo,false);return;}const url=await persistDocument(report.html,report.docNo);location.assign(url);}catch(e){toast(e.message,'error');}finally{button.disabled=false;}});
   $('#debtPrev').onclick=()=>{debtorPage[area]--;renderDebtors(area);attachCsv();};$('#debtNext').onclick=()=>{debtorPage[area]++;renderDebtors(area);attachCsv();};
   $('#addDebtorBtn').addEventListener('click',()=>openAddDebtor(area));
@@ -690,7 +712,7 @@ function renderDebtors(area){
   if(printBtn)$('#printReportBtn').addEventListener('click',()=>openPrintOptions(area));
   if(emailBtn)$('#emailReportBtn').addEventListener('click',()=>openEmailReport(area));
   attachCsv();updateSyncNotice();
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 async function markPaid(value){
  const ids=Array.isArray(value)?value:[value];if(!ids.length)return;
@@ -873,8 +895,8 @@ function renderPayments(area){
  });
  html+='</tbody></table></div>';mobile+='</div>';html+=mobile;if(!rows.length)html='<div class="empty-state"><i data-lucide="inbox"></i><p>ยังไม่มีประวัติรับชำระ'+(isAdmin()?'ที่อนุมัติแล้ว':'')+'</p></div>';
  $('#pageContent').innerHTML=`<div class="page-head"><h2>ประวัติรับชำระ ${area==='nai'?'บ้านนาไฮ':'บ้านอื่น ๆ'}</h2><span class="desc">${isAdmin()?'รายการที่ตรวจสอบและอนุมัติแล้ว · รายการรอตรวจอยู่ในเมนูตรวจสอบการรับชำระ':'แสดงประวัติทันทีหลังรับชำระ พร้อมสถานะการตรวจสอบจากแอดมิน'}</span></div><div class="toolbar"><div class="search-box"><i data-lucide="search"></i><input id="paySearch" placeholder="ค้นหาชื่อผู้ชำระ..." value="${esc(paySearch)}"></div><button class="btn btn-gold" id="openPaymentReviews">รอแอดมินตรวจสอบ ${DB.debtors.filter(d=>d.area===area&&FreshyPayments.review(d)==='pending').length} รายการ</button></div><div class="panel"><div class="panel-body">${html}</div></div>`;
- $('#paySearch').oninput=e=>{paySearch=e.target.value.trim();renderPayments(area);const input=$('#paySearch');input.focus();input.setSelectionRange(input.value.length,input.value.length);};
- $('#openPaymentReviews').onclick=()=>navigate('approvals');$('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.onclick=()=>requestUndo(b.dataset.id,area));attachCsv();updateSyncNotice();if(window.lucide)lucide.createIcons();
+ bindSearch($('#paySearch'),value=>{paySearch=value;},()=>renderPayments(area));
+ $('#openPaymentReviews').onclick=()=>navigate('approvals');$('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.onclick=()=>requestUndo(b.dataset.id,area));attachCsv();updateSyncNotice();renderIcons();
 }
 function requestUndo(id,area){
  const d=DB.debtors.find(x=>x.id===id&&x.status==='paid');if(!d)return;
@@ -906,7 +928,7 @@ function renderApprovals(){
  $('#pageContent').querySelectorAll('.reviewReject').forEach(b=>b.onclick=()=>rejectPayment(b.dataset.id));
  $('#pageContent').querySelectorAll('.undoBtn').forEach(b=>b.onclick=()=>requestUndo(b.dataset.id,DB.debtors.find(d=>d.id===b.dataset.id)?.area));
  $('#pageContent').querySelectorAll('.appr').forEach(b=>b.onclick=async()=>{b.disabled=true;const a=DB.approvals.find(x=>x.id===b.dataset.id);try{await paymentAction(b.dataset.v,[a.debtorId]);toast(b.dataset.v==='approve_undo'?'อนุมัติยกเลิกแล้ว รายการกลับไปค้างชำระ':'บันทึกการไม่อนุมัติยกเลิกแล้ว','success');renderNav();renderPage();}catch(e){toast(e.message,'error');b.disabled=false;}});
- if(window.lucide)lucide.createIcons();updateSyncNotice();
+ renderIcons();updateSyncNotice();
 }
 
 /* ---------- CUSTOMERS ---------- */
@@ -944,13 +966,13 @@ function renderCustomers(area){
     <div class="filter-chips">${chips}</div>
   </div>
   <div class="panel"><div class="panel-body">${html}</div></div>`;
-  $('#custSearch').addEventListener('input',e=>{custSearch[area]=e.target.value.trim();renderCustomers(area);const i=$('#custSearch');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}});
+  bindSearch($('#custSearch'),value=>{custSearch[area]=value;},()=>renderCustomers(area));
   $('#pageContent').querySelectorAll('[data-cr]').forEach(b=>b.addEventListener('click',()=>{custCredit[area]=b.dataset.cr;renderCustomers(area);}));
   $('#addCustBtn').addEventListener('click',()=>openAddCustomer(area));
   attachCsv();
   if(printBtn)$('#custPrintBtn').addEventListener('click',()=>printCustomers(area));
   if(emailBtn)$('#custEmailBtn').addEventListener('click',()=>openEmailReport('customers-'+area));
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 function printCustomers(area){
   const rows=DB.customers.filter(c=>c.area===area);
@@ -1020,7 +1042,7 @@ function renderCashsales(){
   if(printBtn)$('#cashPrintBtn').addEventListener('click',()=>printCashReport(cashDateFilter));
   if(emailBtn)$('#cashEmailBtn').addEventListener('click',()=>openEmailReport('cash'));
   attachCsv();updateSyncNotice();
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 function openAddCash(){
   const custOpts=DB.customers.map(c=>'<option value="'+c.id+'">'+esc(c.name)+' ('+esc(c.code)+')</option>').join('');
@@ -1076,7 +1098,7 @@ function renderEmployees(){
   $('#addEmpBtn').addEventListener('click',()=>openEditEmp(null));
   $('#pageContent').querySelectorAll('.editEmp').forEach(b=>b.addEventListener('click',()=>openEditEmp(b.dataset.id)));
   $('#pageContent').querySelectorAll('.printEmp').forEach(b=>b.addEventListener('click',()=>printEmployeeReport(b.dataset.id)));
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 function openEditEmp(id){
   if(!isAdmin())return;const draftEmployeeId=id||uid();
@@ -1337,7 +1359,7 @@ function renderSettings(){
   if($('#settingsCsvFile'))$('#settingsCsvFile').onchange=e=>{previewCsvImport(e.target.files[0]);e.target.value='';};
   bind('#csvTemplate',()=>{const url=URL.createObjectURL(new Blob([FreshyFeatures.csv(FreshyData.headers,[['customers','customer-001','','C001','ลูกค้าตัวอย่าง','other','','บ้านตัวอย่าง','','','','','','','','',''],['debtors','debt-001','customer-001','','ลูกค้าตัวอย่าง','other','','บ้านตัวอย่าง','','',todayStr(),1,0,20,0,20,'ตัวอย่าง']])],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='freshy-import-template.csv';a.click();URL.revokeObjectURL(url);});
   attachSettingsFeatures();
-  if(window.lucide)lucide.createIcons();
+  renderIcons();
 }
 function refreshUserChip(){const u=me();if(!u)return;$('#userName').textContent=u.name;$('#userRole').textContent=u.role==='admin'?'แอดมินระบบ':'พนักงาน';$('#userAvatar').replaceChildren();if(u.avatarUrl){const img=document.createElement('img');img.src=u.avatarUrl;img.alt='รูปโปรไฟล์';$('#userAvatar').append(img);}else $('#userAvatar').textContent=u.name.charAt(0);}
 
@@ -1424,7 +1446,7 @@ function openEmailReport(kind){
     const format=$('#er_fmt').value,snapshot=format==='formal'?FreshyFeatures.documentSnapshot(r.html,r.docNo,DB.settings.business,me(),document):undefined;
     const sent=await sendAlert('report','[แจ้งนำส่งรายงาน] '+(snapshot?.title||(kind==='cash'?'รายงานลูกค้าจ่ายสด':'รายงานลูกหนี้'))+' · '+r.docNo,r.html,to,{format,snapshot});
     if(sent){closeModal();toast('ผู้ให้บริการรับรายงานแล้ว','success');}else if(status.isConnected){status.textContent=DB.sentEmails[0]?.status||'ยังไม่ส่งรายงาน กรุณาตรวจบัญชีผู้ส่งในหน้าตั้งค่าอีเมล';}
-    }catch(e){if(status.isConnected)status.textContent=e.message;toast(e.message,'error');}finally{if(button.isConnected){button.disabled=false;button.innerHTML='<i data-lucide="send"></i> ส่งรายงาน';if(window.lucide)lucide.createIcons();}}
+    }catch(e){if(status.isConnected)status.textContent=e.message;toast(e.message,'error');}finally{if(button.isConnected){button.disabled=false;button.innerHTML='<i data-lucide="send"></i> ส่งรายงาน';renderIcons();}}
   });
 }
 
@@ -1441,7 +1463,7 @@ $('#loginCode').addEventListener('input',()=>{
   const v=$('#loginCode').value.trim(); const pv=$('#loginNamePreview'); if(!pv)return;
   if(!v){pv.classList.add('hidden');return;}
   const u=DB.employees.find(e=>e.code===v);
-  if(u){pv.classList.remove('hidden');pv.classList.remove('err');pv.innerHTML='<i data-lucide="user-check" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"></i>ยินดีต้อนรับ คุณ'+esc(u.name)+' · '+(u.role==='admin'?'แอดมินระบบ':'พนักงาน');if(window.lucide)lucide.createIcons();}
+  if(u){pv.classList.remove('hidden');pv.classList.remove('err');pv.innerHTML='<i data-lucide="user-check" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"></i>ยินดีต้อนรับ คุณ'+esc(u.name)+' · '+(u.role==='admin'?'แอดมินระบบ':'พนักงาน');renderIcons();}
   else{pv.classList.remove('hidden');pv.classList.add('err');pv.textContent='รหัสนี้ยังไม่ตรงกับผู้ใช้ใด ๆ';}
 });
 async function doLogin(){
@@ -1495,7 +1517,7 @@ setInterval(()=>{
   if(DB.settings.db.mode==='supabase')return;
   dbLoad();
   const h=dataHash();
-  if(h!==lastDataHash){lastDataHash=h;renderPage();if(window.lucide)lucide.createIcons();}
+  if(h!==lastDataHash){lastDataHash=h;renderPage();renderIcons();}
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
 },15000);
 // Broadcast refreshes immediately; a visible-tab poll recovers missed events.
@@ -1511,7 +1533,7 @@ function applyTheme(){
   let pref=localStorage.getItem(THEMEKEY)||'auto';
   let t=pref==='auto'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):pref;
   document.documentElement.setAttribute('data-theme',t);
-  const btn=$('#themeToggle');if(btn){btn.innerHTML='<i data-lucide="'+(t==='dark'?'sun':'moon')+'"></i><span id="themeLabel" style="font-size:11px;margin-left:2px">'+(pref==='auto'?'อัตโนมัติ':t==='dark'?'มืด':'สว่าง')+'</span>';if(window.lucide)lucide.createIcons();}
+  const btn=$('#themeToggle');if(btn){btn.innerHTML='<i data-lucide="'+(t==='dark'?'sun':'moon')+'"></i><span id="themeLabel" style="font-size:11px;margin-left:2px">'+(pref==='auto'?'อัตโนมัติ':t==='dark'?'มืด':'สว่าง')+'</span>';renderIcons();}
 }
 function cycleTheme(){localStorage.setItem(THEMEKEY,document.documentElement.dataset.theme==='dark'?'light':'dark');applyTheme();}
 applyTheme();
@@ -1543,7 +1565,7 @@ if(_qr){openPublicQrReport(_qr);return;}
 try{session=JSON.parse(localStorage.getItem(SESSKEY));}catch(e){session=null;}
 if(window.FRESHY_PREVIEW)session={empId:'emp_admin',loginAt:new Date().toISOString()};
 if(DB.settings.db.mode==='supabase'){session=null;configureLogin();resumeOnline();}else{configureLogin();if(session&&DB.employees.find(e=>e.id===session.empId))enterApp();}
-if(window.lucide)lucide.createIcons();
+renderIcons();
 lastDataHash=dataHash();
 bindCodeLogin();
 
