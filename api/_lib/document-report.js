@@ -24,7 +24,7 @@ function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
  paragraph('เลขที่เอกสาร '+snapshot.docNo+'    วันที่ออก '+date(snapshot.issuedAt)+' น.',10);
  if(snapshot.metadata)paragraph(snapshot.metadata,10);y+=6;
  for(const table of snapshot.tables){
-  const count=Math.max(1,table.headers.length),size=count>9?9:count>6?10:11;
+  const count=Math.max(1,table.headers.length),size=count>9?9:11;
   let weights=table.widths?.length===count?table.widths:table.headers.map((h,i)=>{const cells=table.rows.slice(0,100).map(r=>r[i]||'');return Math.max(5,Math.min(24,Math.max(String(h).length,...cells.map(s=>s.length))));});
   const sum=weights.reduce((a,b)=>a+b,0),widths=weights.map(n=>width*n/sum);
   const alignments=table.alignments||[],caption=table.title||'';
@@ -33,7 +33,8 @@ function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
   const drawRow=(cells,bold,isHeader=false)=>{const h=rowHeight(cells,bold);let x=left;doc.strokeColor('#333').lineWidth(.5);for(const c of layout(cells)){doc.rect(x,y,c.width,h).stroke();text(c.value,x+5,y+5,c.width-10,size,bold,isHeader?'center':c.index===0&&/^รวม/.test(c.value)?'left':alignments[c.index]||'left');x+=c.width;}y+=h;};
   const header=()=>{if(caption){const h=height(caption,width,11,true);text(caption,left,y,width,11,true);y+=h+6;}drawRow(table.headers,true,true);};
   const headHeight=(caption?height(caption,width,11,true)+6:0)+rowHeight(table.headers,true);
-  ensure(headHeight+(table.rows.length?rowHeight(table.rows[0],false):0));header();
+  const tableHeight=headHeight+table.rows.reduce((sum,cells)=>sum+rowHeight(cells,/^รวม/.test(cells[0]||'')),0);
+  if(tableHeight<=bottom-90)ensure(tableHeight+12);else ensure(headHeight+(table.rows.length?rowHeight(table.rows[0],false):0));header();
   for(const cells of table.rows){const h=rowHeight(cells,false);if(y+h>bottom){nextPage();header();}
    // Long notes can span pages; never truncate customer data to fit a cell.
    if(h>bottom-y){const top=y;let end=top;for(let i=0,x=left;i<count;x+=widths[i++]){text(cells[i]||'',x+5,top+5,widths[i]-10,size,false,alignments[i]||'left');end=Math.max(end,doc.y);}y=end+10;}else drawRow(cells,/^รวม/.test(cells[0]||''));
@@ -41,8 +42,8 @@ function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
  }
  for(const summary of snapshot.summaries)paragraph(summary,12,true);
  const signatures=snapshot.signatures?.length?snapshot.signatures:[{name:snapshot.author.name,role:'ผู้จัดทำข้อมูล'},{name:'',role:'พนักงานส่งน้ำ'},{name:'',role:'ผู้ตรวจสอบ'},{name:'',role:'ผู้อนุมัติ'}];
- ensure(112);y+=36;const sw=width/signatures.length;
- signatures.forEach((s,i)=>{const x=left+i*sw;doc.moveTo(x+8,y).lineTo(x+sw-8,y).stroke();text(s.name?'('+s.name+')':'(........................................)',x+3,y+7,sw-6,10,false,'center');text(s.role,x+3,y+28,sw-6,10,false,'center');text('วันที่ .... / .... / ........',x+3,y+49,sw-6,9,false,'center');});
+ const columns=Math.min(2,signatures.length),signRows=Math.ceil(signatures.length/columns),sw=width/columns;ensure(30+signRows*80);y+=30;
+ signatures.forEach((s,i)=>{const x=left+(i%columns)*sw,top=y+Math.floor(i/columns)*80;doc.moveTo(x+20,top).lineTo(x+sw-20,top).stroke();text(s.name?'('+s.name+')':'(........................................)',x+8,top+7,sw-16,11,false,'center');text(s.role,x+8,top+28,sw-16,11,false,'center');text('วันที่ .... / .... / ........',x+8,top+49,sw-16,10,false,'center');});
  const range=doc.bufferedPageRange();for(let i=range.start;i<range.start+range.count;i++){doc.switchToPage(i);const fy=doc.page.height-44;line(fy-7);text('เลขที่เอกสาร '+snapshot.docNo+' · '+snapshot.business.name,left,fy,width-70,8);text('หน้า '+(i+1)+' / '+range.count,left+width-65,fy,65,8,false,'right');}
  doc.end();
  }catch(e){reject(e);doc.destroy();}

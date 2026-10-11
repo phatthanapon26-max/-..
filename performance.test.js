@@ -1,5 +1,5 @@
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),{JSDOM}=require('jsdom');
 const pause=()=>new Promise(resolve=>setTimeout(resolve,210));
 (async()=>{
  const d=new JSDOM(fs.readFileSync('index.html','utf8'),{url:'https://fixture.test/design-preview',runScripts:'outside-only'}),w=d.window;
@@ -24,5 +24,12 @@ const pause=()=>new Promise(resolve=>setTimeout(resolve,210));
  const draftRow={id:'draft-customer',name:'ข้อมูลรอส่ง',area:'other'};w.perf.db().customers.push(draftRow);w.perf.cache();assert(writes>0,'New local edits must be saved immediately');assert(w.perf.draft().data.customers.some(c=>c.id===draftRow.id),'Compact snapshot and separate journal must restore pending edits');
  w.perf.accept(changed);assert(w.perf.db().customers.some(c=>c.id===draftRow.id),'Remote receipt must retain an unsent local edit');
  const recorded=structuredClone(changed);recorded.recorders[1].name='แอดมินใหม่';const beforeRecorder=w.document.querySelector('#pageContent').firstElementChild;w.perf.accept(recorded);assert.notEqual(w.document.querySelector('#pageContent').firstElementChild,beforeRecorder,'Recorder name changes must refresh the page');
- d.window.close();console.log('Passed: idle sync, icon identity, rapid Thai search/caret, navigation during debounce, live approval notification, open form preservation, journal recovery, and recorder refresh.');
+ d.window.close();
+ // Hold the pre-read payment retry to reproduce simultaneous polling/broadcast reads.
+ const base=require('./sync').shared({settings:{}});let release,reads=0;const gate=new Promise(r=>{release=r});
+ const env={FreshySync:require('./sync'),DB:base,remoteBase:base,authIdentity:{id:'fixture'},syncReadPromise:null,syncPromise:null,syncBlocked:false,syncIssues:[],syncBusy:false,supaCfg:()=>({}),retryPaymentCommands:()=>gate,rpc:async()=>{reads++;return {}},acceptRemote:()=>{},updateSyncNotice:()=>{},setStatus:()=>{}};
+ vm.createContext(env);const original=fs.readFileSync('app.js','utf8');vm.runInContext(original.slice(original.indexOf('async function supabaseFetch(){'),original.indexOf('async function flushOnline(){')),env);
+ const calls=Array.from({length:20},()=>env.supabaseFetch());release();await Promise.all(calls);assert.equal(reads,1,'Overlapping broadcasts/polls during preflight must share one read');await env.supabaseFetch();assert.equal(reads,2,'Single-flight must release after completion');
+ console.log('Passed: single-flight through payment preflight and release after completion.');
+ console.log('Passed: idle sync, icon identity, rapid Thai search/caret, navigation during debounce, live approval notification, open form preservation, journal recovery, and recorder refresh.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

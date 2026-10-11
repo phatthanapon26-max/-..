@@ -421,9 +421,9 @@ table.tbl tr:hover td{background:#fafbfd}
 .print-area{display:none}
 @media print{
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  body *{visibility:hidden}
+  body>*:not(#printArea){display:none!important}
   .print-area,.print-area *{visibility:visible}
-  .print-area{display:block;position:absolute;left:0;top:0;width:100%;padding:0}
+  .print-area{display:block;position:static;width:100%;height:auto;overflow:visible;padding:0}
   @page{size:A4;margin:14mm 12mm}
 }
 .doc-page{width:100%;max-width:760px;margin:0 auto;font-family:'Sarabun',sans-serif;color:#111;font-size:12.5px}
@@ -523,7 +523,7 @@ table.tbl tr:hover td{background:#fafbfd}
 
 </style>
 <link rel="stylesheet" href="ui.css?v=8.0.0"><link rel="stylesheet" href="modern.css?v=8.4.1">
-<link rel="stylesheet" href="report.css?v=8.1.0"></head>
+<link rel="stylesheet" href="report.css?v=8.4.2"></head>
 <body>
 
 <!-- ============ LOGIN SCREEN ============ -->
@@ -554,7 +554,7 @@ table.tbl tr:hover td{background:#fafbfd}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo"><i data-lucide="droplets"></i></div>
-      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.4.1</small></div>
+      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.4.2</small></div>
     </div>
     <nav class="nav" id="navMenu"></nav>
     <div class="sidebar-foot">
@@ -605,7 +605,7 @@ table.tbl tr:hover td{background:#fafbfd}
 <script src="deploy-config.js"></script>
 <script src="database-config.js?v=8.4.0"></script>
 <script src="sync.js?v=8.4.0"></script>
-<script src="data-tools.js?v=8.1.0"></script><script src="features.js?v=8.0.0"></script><script src="payments.js?v=8.4.0"></script><script src="vendor/qrcode.js"></script><script src="dashboard.js?v=8.4.0"></script><script src="app.js?v=8.4.1"></script>
+<script src="data-tools.js?v=8.1.0"></script><script src="features.js?v=8.4.2"></script><script src="payments.js?v=8.4.0"></script><script src="vendor/qrcode.js"></script><script src="dashboard.js?v=8.4.0"></script><script src="app.js?v=8.4.2"></script>
 </body>
 </html>
 

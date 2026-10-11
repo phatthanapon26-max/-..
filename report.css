@@ -1,3 +1,6 @@
+@font-face{font-family:FreshyReport;src:url(vendor/fonts/Sarabun-Regular.ttf) format('truetype');font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:FreshyReport;src:url(vendor/fonts/Sarabun-Bold.ttf) format('truetype');font-style:normal;font-weight:700;font-display:swap}
+.doc-page,.doc-page *{font-family:FreshyReport,Sarabun,sans-serif!important}
 /* Shared white-paper report layout: print, PDF preview and QR document. */
 .doc-page{font-family:Sarabun,sans-serif!important;font-size:14px!important;line-height:1.55!important;background:#fff!important;color:#111!important}
 .doc-page .doc-head{display:grid!important;grid-template-columns:48px minmax(0,1fr) 150px!important;gap:12px!important;align-items:start!important;border:0!important;border-bottom:1.5px solid #111!important;padding:0 0 14px!important;background:#fff!important}
@@ -11,7 +14,7 @@
 .doc-page .sign-row{display:flex!important;gap:20px!important;margin-top:48px!important;break-inside:avoid}.doc-page .sign-box{flex:1;text-align:center;font-size:12px!important;min-width:0}.doc-page .sign-box .line{min-height:24px!important;margin-top:0!important;padding:6px 0 0!important;border:0!important;border-top:1px solid #333!important}.doc-page .sign-box .role{padding-top:3px}.doc-page .sign-date{padding-top:10px!important;font-size:11px!important}.doc-page .doc-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-top:26px!important;padding-top:8px!important;border-top:.7px solid #333!important;font-size:10px!important;line-height:1.5!important}
 .document-toolbar{max-width:900px;margin:0 auto;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-family:Sarabun,sans-serif}.document-toolbar button{border:1px solid #193c5c;background:#193c5c;color:#fff;padding:10px 18px;font:700 14px Sarabun,sans-serif;border-radius:6px;cursor:pointer}.document-toolbar p{font-size:13px;margin:0;color:#41556a}.document-screen{max-width:900px;margin:0 auto 24px;padding:28px;background:#fff;border:1px solid #c5cdd6}.document-screen#printArea{display:block!important}
 .audit-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:16px 0}.audit-filters .field{min-width:240px}.audit-table td{white-space:normal!important;vertical-align:top}.audit-table .audit-time{white-space:nowrap!important;font-variant-numeric:tabular-nums}
-@media(max-width:600px){.document-screen{margin:0;padding:16px 10px;border:0;overflow:auto}.document-toolbar{padding:12px 10px;flex-wrap:wrap}.doc-page .doc-head{grid-template-columns:30px minmax(0,1fr) 110px!important;gap:6px!important}.doc-page .doc-title .factory{font-size:19px!important}.doc-page .doc-title .report-name{font-size:16px!important}.doc-page .doc-logo img,.doc-page .doc-logo svg{max-width:30px}.doc-page .factory-sub,.doc-page .doc-control{font-size:11px!important}.doc-page .doc-control strong{font-size:9px!important}.doc-page .doc-table{font-size:12px!important}.doc-page .doc-table th,.doc-page .doc-table td{font-size:12px!important;padding:5px 3px!important}.doc-page .sign-row{gap:10px!important}.doc-page .sign-box{font-size:10px!important}.doc-page .sign-date{font-size:9px!important}.audit-filters .field{width:100%;min-width:0}}
+@media screen and (max-width:600px){.document-screen{margin:0;padding:16px 10px;border:0;overflow:auto}.document-toolbar{padding:12px 10px;flex-wrap:wrap}.doc-page .doc-head{grid-template-columns:30px minmax(0,1fr) 110px!important;gap:6px!important}.doc-page .doc-title .factory{font-size:19px!important}.doc-page .doc-title .report-name{font-size:16px!important}.doc-page .doc-logo img,.doc-page .doc-logo svg{max-width:30px}.doc-page .factory-sub,.doc-page .doc-control{font-size:11px!important}.doc-page .doc-control strong{font-size:9px!important}.doc-page .doc-table{font-size:12px!important}.doc-page .doc-table th,.doc-page .doc-table td{font-size:12px!important;padding:5px 3px!important}.doc-page .sign-row{gap:10px!important}.doc-page .sign-box{font-size:10px!important}.doc-page .sign-date{font-size:9px!important}.audit-filters .field{width:100%;min-width:0}}
 @media print{
  @page{size:A4;margin:15mm 12mm 14mm}
  .document-toolbar{display:none!important}.document-screen{max-width:none!important;margin:0!important;padding:0!important;border:0!important;overflow:visible!important}
@@ -20,3 +23,33 @@
  .doc-page .doc-title .factory{font-size:19pt!important}.doc-page .doc-title .report-name{font-size:14pt!important;margin-top:3mm!important}.doc-page .factory-sub{font-size:10pt!important}.doc-page .doc-control{font-size:9pt!important}.doc-page .doc-control strong{font-size:8.5pt!important}.doc-page .doc-meta{font-size:10pt!important;padding:3mm 0!important}
  .doc-page .doc-table th,.doc-page .doc-table td{font-size:10.5pt!important;padding:1.4mm 1.5mm!important;line-height:1.45!important}.doc-page .doc-table caption{font-size:11pt!important;break-after:avoid}.doc-page .doc-table thead{display:table-header-group;break-after:avoid}.doc-page .doc-table tr{break-inside:avoid}.doc-page .doc-customer-block{margin:3mm 0!important;break-inside:auto}.doc-page .doc-summary{font-size:11pt!important;break-inside:avoid}.doc-page .doc-section-title{break-after:avoid}.doc-page .sign-row{margin-top:12mm!important;gap:5mm!important}.doc-page .sign-box{font-size:10pt!important}.doc-page .sign-date{font-size:9pt!important}.doc-page .doc-foot{font-size:8pt!important;margin-top:6mm!important}
 }
+
+/* Formal paper layout shared by every report and saved QR document. */
+.doc-page .doc-head{grid-template-columns:130px minmax(0,1fr) 130px!important;gap:12px!important;padding-bottom:18px!important;border-bottom:1.4px solid #111!important}
+.doc-page .doc-title .factory{font-size:24px!important;letter-spacing:0!important}.doc-page .factory-sub{font-size:13px!important;line-height:1.7!important}.doc-page .doc-title .report-name{font-size:19px!important;margin-top:14px!important}
+.doc-page .doc-control strong{white-space:normal!important;overflow-wrap:anywhere}
+.doc-page .doc-meta{border-bottom:.7px solid #777!important;margin-bottom:16px!important;padding:12px 0!important;gap:8px 20px!important}
+.doc-page .doc-table:has(.doc-customer-heading) caption{display:none}
+.doc-page .doc-table .doc-customer-heading th{text-align:left!important;font-size:15px!important;padding:9px 10px!important;border-bottom:1px solid #111!important}
+.doc-page .doc-table th,.doc-page .doc-table td{font-size:14px!important;line-height:1.6!important;padding:8px 9px!important}
+.doc-page .doc-customer-total td{border-top:1.3px solid #111!important}.doc-page .doc-summary{padding:12px!important;text-align:right!important}
+.doc-page .sign-row{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:70px!important;row-gap:40px!important;margin-top:45px!important}.doc-page .sign-box{font-size:13px!important}.doc-page .doc-foot{font-size:11px!important}
+@media print{
+ html,body{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;position:static!important;margin:0!important;padding:0!important;background:#fff!important}
+ body>*:not(#printArea):not(#document){display:none!important}
+ #printArea,#document,.print-area,.document-screen{display:block!important;position:static!important;height:auto!important;max-height:none!important;overflow:visible!important;contain:none!important;margin:0!important;padding:0!important;width:auto!important;max-width:none!important;visibility:visible!important}
+ .doc-page{width:auto!important;max-width:none!important;height:auto!important;overflow:visible!important;contain:none!important;margin:0!important}
+ .doc-page,.doc-page *{visibility:visible!important;content-visibility:visible!important;transform:none!important;filter:none!important;contain:none!important}
+ @page{size:A4 portrait;margin:14mm 12mm 16mm;@bottom-right{content:'หน้า ' counter(page) ' / ' counter(pages);font:9pt FreshyReport,Sarabun,sans-serif;color:#000}}
+ .doc-page .doc-head{grid-template-columns:34mm minmax(0,1fr) 34mm!important;gap:3mm!important;padding-bottom:4mm!important}
+ .doc-page .doc-title .factory{font-size:19pt!important}.doc-page .doc-title .report-name{font-size:14pt!important;margin-top:3mm!important}.doc-page .factory-sub{font-size:10pt!important}
+ .doc-page .doc-table th,.doc-page .doc-table td{font-size:11pt!important;padding:1.7mm 1.8mm!important;line-height:1.5!important}
+ .doc-page .doc-table .doc-customer-heading th{font-size:11pt!important;padding:2mm!important}
+ .doc-page .doc-table{break-inside:auto!important}.doc-page .doc-table thead{display:table-header-group!important;break-inside:avoid}.doc-page .doc-table tbody{break-inside:auto!important}.doc-page .doc-table tr{break-inside:avoid!important}
+ .doc-page .doc-customer-block{break-inside:auto!important;margin:4mm 0!important}.doc-page .doc-summary{font-size:11pt!important}
+ .doc-page .sign-row{grid-template-columns:45% 45%;justify-content:space-between;column-gap:0!important;row-gap:11mm!important;margin-top:11mm!important;break-inside:avoid!important}
+ .doc-page .sign-box{font-size:11pt!important}.doc-page .doc-foot{font-size:8pt!important;break-inside:avoid}
+}
+@media screen and (max-width:600px){.doc-page .doc-head{grid-template-columns:45px minmax(0,1fr) 90px!important;gap:8px!important}.doc-page .doc-title .factory{font-size:19px!important}.doc-page .doc-title .report-name{font-size:16px!important}.doc-page .sign-row{column-gap:20px!important}}
+
+@media print{.doc-page .doc-customer-compact{break-inside:avoid!important}}

@@ -10,7 +10,7 @@
 let dashboardDays=7,notificationHistory=[],adminScheduleTimer=null,backupBusy=false,backupFolder=null,backupFolderLoaded=false,lastScheduledAttempt=0;
 // Lucide retains its source attribute on generated SVGs; render only new placeholders.
 function renderIcons(){
- if(!window.lucide)return;
+ if(!window.lucide||!document.querySelector('i[data-lucide]'))return;
  document.querySelectorAll('svg[data-lucide]').forEach(icon=>icon.removeAttribute('data-lucide'));
  lucide.createIcons();
 }
@@ -103,10 +103,11 @@ function startAdminSchedule(){
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const fmtN = n => Number(n||0).toLocaleString('th-TH');
+const numberFormatter=new Intl.NumberFormat('th-TH');
+const fmtN = n => numberFormatter.format(Number(n||0));
 const uid = () => Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 const pad2 = n => String(n).padStart(2,'0');
-function todayStr(){return FreshyFeatures.bangkokParts().date;}
+function todayStr(){const second=Math.floor(Date.now()/1000);if(todayStr.second!==second){todayStr.second=second;todayStr.value=FreshyFeatures.bangkokParts().date;}return todayStr.value;}
 function fmtDate(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return fmtDate(d);}
 function thDate(iso){if(!iso)return'-';const p=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);if(!p)return String(iso);const year=Number(p[1]);return p[3]+'/'+p[2]+'/'+(year<2400?year+543:year);}
@@ -290,6 +291,10 @@ function archiveSyncChanges(changes,reason){
 }
 function normalizedRemote(data){const defaults=defaultSettings();delete defaults.db;const settings=Object.assign(defaults,data.settings||{});for(const key of ['business','header','email','docPrefix','backup'])settings[key]=Object.assign({},defaultSettings()[key],data.settings?.[key]||{});settings.email.alerts=Object.assign({},defaultSettings().email.alerts,data.settings?.email?.alerts||{});delete settings.db;return {...data,settings};}
 function acceptRemote(payload,changes){
+ const signature=JSON.stringify(payload);
+ // Skip cloning/reconciling the entire database for identical reads with no local edits.
+ const siblingJournal=authIdentity&&Array.from({length:localStorage.length},(_,i)=>localStorage.key(i)).some(key=>key.startsWith(journalPrefix())&&key!==journalKey());
+ if(signature===acceptRemote.signature&&Array.isArray(changes)&&!changes.length&&!syncIssues.length&&!siblingJournal){lastSyncAt=Date.now();updateSyncNotice();refreshSyncedView();return;}
  const before=FreshySync.shared(DB),recordersBefore=remoteRecorders,incoming=normalizedRemote(payload.data);
  changes=changes||FreshySync.diff(remoteBase||{},before);
  if(remoteBase&&String(remoteBase.settings?._resetRevision||'')!==String(payload.data.settings?._resetRevision||'')){archiveSyncChanges(changes,'ข้อมูลก่อนแอดมินล้างระบบ');changes=[];}
@@ -300,6 +305,7 @@ function acceptRemote(payload,changes){
  installRemote(payload,result.pending);lastSyncAt=Date.now();
  // Prune only exact operations already committed, with a storage compare to protect concurrent tab edits.
  for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key.startsWith(journalPrefix())||key===journalKey())continue;try{const raw=localStorage.getItem(key),entry=JSON.parse(raw);entry.issues=(entry.issues||[]).filter(stillUncommitted);entry.changes=(entry.changes||[]).filter(change=>{try{return FreshySync.rebase(incoming,[change]).length>0;}catch{return true;}});const next=JSON.stringify(entry);if(next!==raw&&raw===localStorage.getItem(key))localStorage.setItem(key,next);}catch{}}
+ acceptRemote.signature=signature;
  syncViewDirty=syncViewDirty||!FreshySync.equal(before,FreshySync.shared(DB))||!FreshySync.equal(recordersBefore,remoteRecorders);updateSyncNotice();refreshSyncedView();
 }
 function updateSyncNotice(){const button=document.querySelector('.pending-btn');if(button&&authIdentity){const commands=typeof paymentQueue==='function'?paymentQueue():[];const count=(remoteBase?FreshySync.diff(remoteBase,FreshySync.shared(DB)).length:0)+commands.length;button.textContent=syncIssues.length?'ตรวจสอบ '+syncIssues.length+' รายการ':count?'รอส่ง '+count+' รายการ':'ข้อมูลบันทึกแล้ว';button.dataset.state=syncIssues.length?'review':count?'sending':'saved';}const time=$('#syncLastUpdated');if(time)time.textContent=lastSyncAt?'อัปเดต '+new Date(lastSyncAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):authIdentity?'กำลังตรวจข้อมูล':'ข้อมูลสาธิต';}
@@ -319,6 +325,7 @@ function quarantineSyncChange(change,message){
  const actor=FreshySync.clone(me());installRemote({actor,data:{...remoteBase,settings:remoteSettings||remoteBase.settings}},pending.filter(c=>!ids.has(c.collection+':'+c.id)));updateSyncNotice();
 }
 function installRemote(payload,preserve){
+ if(typeof acceptRemote==='function')acceptRemote.signature=null;
  if(!payload||!payload.actor||!payload.data)throw Error('รูปแบบข้อมูลออนไลน์ไม่ถูกต้อง');
  const cfg=DB.settings.db;
  const approvedNotices=(payload.data.debtors||[]).filter(row=>row.paymentReviewStatus==='approved'&&row.paidBy===payload.actor.id&&remoteBase?.debtors?.some(old=>old.id===row.id&&old.paymentReviewStatus==='pending'));
@@ -346,6 +353,8 @@ async function rpc(name,body){
  return data;
 }
 async function supabaseFetch(){
+ if(supabaseFetch.pending)return supabaseFetch.pending;
+ const run=(async()=>{
  if(!supaCfg()||!authIdentity)return false;
  if(syncReadPromise)return syncReadPromise;
  if(typeof retryPaymentCommands==='function')await retryPaymentCommands();
@@ -359,6 +368,9 @@ async function supabaseFetch(){
   return true;
  }catch(error){setStatus('เก็บข้อมูลในเครื่อง · กำลังเชื่อมต่อใหม่','warn');return false;}
  finally{syncBusy=false;syncReadPromise=null;updateSyncNotice();}})();return syncReadPromise;
+
+ })();supabaseFetch.pending=run;
+ try{return await run;}finally{supabaseFetch.pending=null;}
 }
 async function flushOnline(){
  if(syncPromise)return syncPromise;
@@ -1388,7 +1400,7 @@ function buildDebtorReportHtml(area,filter,mode,customerId){
     for(const cid of customerIds){
       const dl=[...list[cid]].sort((a,b)=>a.debtDate.localeCompare(b.debtDate));
       const customer=DB.customers.find(c=>c.id===cid)||{},first=dl[0],village=area==='nai'?'บ้านนาไฮ · หมู่ที่ '+first.moo:(first.village||'-');
-      h+=`<section class="doc-customer-block"><table class="doc-table debtor-report-table"><caption>ลูกหนี้: ${esc(first.customerName)}${customer.code?' · รหัส '+esc(customer.code):''} · ${esc(village)}</caption><colgroup><col style="width:7%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:20%"></colgroup><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>`;
+      h+=`<section class="doc-customer-block${dl.length<=12?' doc-customer-compact':''}"><table class="doc-table debtor-report-table"><caption>ลูกหนี้: ${esc(first.customerName)}${customer.code?' · รหัส '+esc(customer.code):''} · ${esc(village)}</caption><colgroup><col style="width:7%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:20%"></colgroup><thead><tr class="doc-customer-heading"><th colspan="7">ลูกหนี้: ${esc(first.customerName)}${customer.code?' · รหัส '+esc(customer.code):''} · ${esc(village)}</th></tr><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>`;
       dl.forEach((d,i)=>{h+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td>${d.jugs||0}</td><td>${d.packs||0}</td><td class="r">${fmtN(d.jugAmount)}</td><td class="r">${fmtN(d.packAmount)}</td><td class="r">${fmtN(d.total)}</td></tr>`;});
       const sum=key=>dl.reduce((n,d)=>n+Number(d[key]||0),0);h+=`<tr class="doc-customer-total"><td colspan="2" class="l">รวม ${esc(first.customerName)}</td><td>${sum('jugs')}</td><td>${sum('packs')}</td><td class="r">${fmtN(sum('jugAmount'))}</td><td class="r">${fmtN(sum('packAmount'))}</td><td class="r">${fmtN(sum('total'))}</td></tr></tbody></table></section>`;
     }
@@ -1508,7 +1520,7 @@ const mobileNavScrim=$('#mobileNavScrim');
 if(mobileNavScrim)mobileNavScrim.addEventListener('click',()=>$('#sidebar').classList.remove('open'));
 
 /* ============================================================
-   REAL TIME SYNC (polling ทุก 5 วินาที)
+   REAL TIME SYNC (broadcast ทันที, polling สำรองทุก 15 วินาที)
    ============================================================ */
 let lastDataHash='';
 function dataHash(){return [DB.debtors.length,DB.cashsales.length,DB.audit.length,DB.customers.length].join('_');}
@@ -1521,7 +1533,7 @@ setInterval(()=>{
   // ถ้าโหมด Sheets จะดึงจาก /api/sheets ทุก 15 วินาที
 },15000);
 // Broadcast refreshes immediately; a visible-tab poll recovers missed events.
-setInterval(()=>{if(authIdentity&&document.visibilityState==='visible')supabaseFetch();},5000);
+setInterval(()=>{if(authIdentity&&document.visibilityState==='visible')supabaseFetch();},15000);
 
 /* ============================================================
    INIT

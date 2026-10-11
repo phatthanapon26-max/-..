@@ -7,7 +7,7 @@ fs.writeFileSync(path.join(root,'database-config.js'),'window.FRESHY_SQL='+JSON.
 let html=read('index.html');
 html=html.replace(/<link\s+rel="stylesheet"\s+href="([^\"]+)"\s*>/g,(_,src)=>'<style>'+read(src.split('?')[0])+'</style>');
 html=html.replace(/<script\s+src="([^"]+)"\s*><\/script>/g,(_,src)=>'<script>\n'+read(src.split('?')[0]).replace(/<\/script/gi,'<\\/script')+'\n</script>');
-html=html.replace(/url\(['"]?(vendor\/fonts\/[^)'"\s]+)['"]?\)/g,(_,src)=>'url(data:font/woff2;base64,'+fs.readFileSync(path.join(root,src)).toString('base64')+')');
+html=html.replace(/url\(['"]?(vendor\/fonts\/[^)'"\s]+)['"]?\)/g,(_,src)=>'url(data:font/'+(src.endsWith('.ttf')?'ttf':'woff2')+';base64,'+fs.readFileSync(path.join(root,src)).toString('base64')+')');
 fs.writeFileSync(path.join(root,'freshy-water-standalone.html'),html.trimEnd()+'\n');
 const output=path.join(root,'dist');
 fs.mkdirSync(output,{recursive:true});
