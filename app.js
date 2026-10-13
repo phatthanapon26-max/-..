@@ -181,7 +181,7 @@ function defaultSettings(){
     db:Object.assign({mode:'demo',sheetUrl:'',sheetId:'',apiKey:'',serviceEmail:'',serviceKey:'',supabaseUrl:'',supabaseKey:'',adminEmail:''},window.FRESHY_CONFIG||{}),
     email:{enabled:false,adminEmail:'',provider:'gmail',apiKey:'',smtpHost:'',smtpPort:'587',smtpUser:'',smtpPass:'',reportTimes:['08:00','18:00'],reportsEnabled:false,alerts:{login:true,logout:true,addDebtor:true,undoRequest:true,newcustomer:true,profile:true,payment:true,cash:true}},
     docPrefix:{debtor:'FWD',cash:'CSH',customer:'CUS'},
-    doccounters:{},backup:{enabled:true,days:[1,15,31]}
+    doccounters:{},backup:{enabled:true,days:[1,15,31]},accessHours:{enabled:false,start:'06:30',end:'19:00',timeZone:'Asia/Bangkok'}
   };
 }
 function seed(){
@@ -247,6 +247,40 @@ function dbLoad(){
 const SUPA_COLS=FreshySync.collections;
 const SUPA_SQL=window.FRESHY_SQL||'ดูไฟล์ database.sql ในชุดติดตั้ง';
 let authClient=null,authIdentity=null,remoteBase=null,remoteSettings=null,syncBusy=false,syncTimer=null,syncRetryTimer=null,syncPromise=null,syncBlocked=false,syncRetryCount=0,realtimeChannel=null,realtimeRefreshTimer=null,syncReadPromise=null,syncIssues=[],syncViewDirty=false,lastSyncAt=0,remoteRecorders=[];
+let operatingLocked=false,operatingTimer=null,operatingClockOffset=0,operatingPolicy=null;
+function updateOperatingClock(value){const time=Date.parse(value);if(Number.isFinite(time))operatingClockOffset=time-Date.now();}
+function lockOperatingHours(policy){
+ if(policy)operatingPolicy=policy;
+ operatingLocked=true;
+ if(authIdentity&&remoteBase)safeCache();
+ $('#appShell')?.classList.add('hidden');$('#loginScreen')?.classList.add('hidden');$('#accessHoursLock')?.classList.remove('hidden');
+ const p=operatingPolicy||DB.settings.accessHours;
+ if($('#accessHoursMessage'))$('#accessHoursMessage').textContent=p?.enabled?'เข้าใช้งานได้ทุกวัน เวลา '+p.start+'–'+p.end+' น. (เวลาไทย)'+(p.start>p.end?' · สิ้นสุดในวันถัดไป':''):'กรุณาตรวจสอบช่วงเวลาเข้าใช้งานกับแอดมิน';
+}
+function enforceOperatingHours(){
+ clearTimeout(operatingTimer);operatingTimer=null;
+ if(!session)return !operatingLocked;
+ const state=FreshyFeatures.accessWindow(operatingPolicy||DB.settings.accessHours,me()?.role,new Date(Date.now()+operatingClockOffset));
+ if(!state.allowed)lockOperatingHours(state.policy);
+ if(state.nextChangeMs!=null)operatingTimer=setTimeout(()=>{if(operatingLocked&&document.visibilityState==='visible')verifyOperatingAccess();else enforceOperatingHours();},Math.max(20,Math.min(60000,state.nextChangeMs+20)));
+ return state.allowed&&!operatingLocked;
+}
+async function authorizeCachedOperatingSession(){
+ if(isAdmin())return true;
+ const status=await rpc('freshy_access_status');updateOperatingClock(status.serverTime);operatingPolicy=FreshyFeatures.accessHours(status.accessHours);
+ if(!status.allowed){lockOperatingHours(operatingPolicy);return false;}
+ return true;
+}
+async function verifyOperatingAccess(){
+ if(!authIdentity){const allowed=FreshyFeatures.accessWindow(DB.settings.accessHours,me()?.role).allowed;if(allowed){operatingLocked=false;operatingPolicy=null;enterApp();}return allowed;}
+ try{const status=await rpc('freshy_access_status');if(!status.allowed){lockOperatingHours(status.accessHours);return false;}operatingPolicy=status.accessHours;operatingLocked=false;await hydrateOnline();return true;}catch(e){lockOperatingHours(operatingPolicy);if($('#accessHoursStatus'))$('#accessHoursStatus').textContent=e.message;return false;}
+}
+async function switchOperatingAccount(){
+ if(authIdentity&&remoteBase&&!safeCache())return;
+ if(authIdentity){if(realtimeChannel){try{await authFor(supaCfg()).removeChannel(realtimeChannel);}catch{}realtimeChannel=null;}await authFor(supaCfg()).auth.signOut({scope:'local'});}
+ clearTimeout(operatingTimer);operatingTimer=null;operatingLocked=false;operatingPolicy=null;operatingClockOffset=0;authIdentity=null;remoteBase=null;remoteSettings=null;remoteRecorders=[];session=null;syncBlocked=false;localStorage.removeItem(SESSKEY);
+ closeModal();$('#accessHoursLock')?.classList.add('hidden');$('#appShell').classList.add('hidden');$('#loginScreen').classList.remove('hidden');configureLogin();
+}
 const syncTabId=uid();
 function supaCfg(){const d=DB.settings.db;return d.mode==='supabase'&&d.supabaseUrl&&d.supabaseKey?{url:String(d.supabaseUrl).trim().replace(/\/$/,''),key:d.supabaseKey.trim()}:null;}
 function authFor(cfg){
@@ -291,7 +325,7 @@ function archiveSyncChanges(changes,reason){
 }
 function normalizedRemote(data){const defaults=defaultSettings();delete defaults.db;const settings=Object.assign(defaults,data.settings||{});for(const key of ['business','header','email','docPrefix','backup'])settings[key]=Object.assign({},defaultSettings()[key],data.settings?.[key]||{});settings.email.alerts=Object.assign({},defaultSettings().email.alerts,data.settings?.email?.alerts||{});delete settings.db;return {...data,settings};}
 function acceptRemote(payload,changes){
- const signature=JSON.stringify(payload);
+ const signature=JSON.stringify({actor:payload.actor,data:payload.data,recorders:payload.recorders});
  // Skip cloning/reconciling the entire database for identical reads with no local edits.
  const siblingJournal=authIdentity&&Array.from({length:localStorage.length},(_,i)=>localStorage.key(i)).some(key=>key.startsWith(journalPrefix())&&key!==journalKey());
  if(signature===acceptRemote.signature&&Array.isArray(changes)&&!changes.length&&!syncIssues.length&&!siblingJournal){lastSyncAt=Date.now();updateSyncNotice();refreshSyncedView();return;}
@@ -313,6 +347,7 @@ let lastScrollActivity=0,scrollRefreshTimer=null;
 // Scroll listeners record time only: no DOM work or layout reads per frame.
 for(const type of ['scroll','touchmove','wheel'])document.addEventListener(type,()=>{lastScrollActivity=Date.now();},{passive:true,capture:true});
 function refreshSyncedView(){
+ if(typeof operatingLocked!=='undefined'&&operatingLocked)return;
  if(!session||!syncViewDirty||modalIsOpen()||currentPage==='settings')return;
  if(lastScrollActivity&&Date.now()-lastScrollActivity<250){if(!scrollRefreshTimer)scrollRefreshTimer=setTimeout(()=>{scrollRefreshTimer=null;refreshSyncedView();},250);return;}
  const active=document.activeElement,filterIds=['debtorSearch','paySearch','custSearch','cashDate','auditEmployeeFilter'];
@@ -348,7 +383,7 @@ function installRemote(payload,preserve){
  DB.settings.db=cfg;
  if(!DB.employees.some(e=>e.id===payload.actor.id))DB.employees.push(payload.actor);
  session={empId:payload.actor.id,loginAt:new Date().toISOString(),online:true};
- safeCache();for(const row of approvedNotices)toast('รายการของ '+row.customerName+' ตรวจสอบและอนุมัติแล้ว','success');
+ safeCache();if(typeof updateOperatingClock==='function'){updateOperatingClock(payload.serverTime);operatingPolicy=DB.settings.accessHours;enforceOperatingHours();}for(const row of approvedNotices)toast('รายการของ '+row.customerName+' ตรวจสอบและอนุมัติแล้ว','success');
 }
 async function rpc(name,body){
  const cfg=supaCfg();if(!cfg||!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');
@@ -356,13 +391,15 @@ async function rpc(name,body){
  const request=FreshySync.clone(body||{});
  if(name==='freshy_apply')for(const c of request.changes||[])if(c.collection==='settings')c.expected=FreshySync.clone(remoteSettings||c.expected||{});
  const {data,error}=await client.rpc(name,request);
- if(error){const failure=Error(error.message||'คำขอฐานข้อมูลล้มเหลว');failure.code=error.code;throw failure;}
+ if(error){const failure=Error(error.message||'คำขอฐานข้อมูลล้มเหลว');failure.code=error.code;if(/ACCESS_HOURS_CLOSED/.test(error.message||'')){let detail;try{detail=JSON.parse(error.details);}catch{}if(typeof lockOperatingHours==='function'){updateOperatingClock(detail?.serverTime);lockOperatingHours(detail?.accessHours);}failure.code='ACCESS_HOURS_CLOSED';failure.message='อยู่นอกเวลาเข้าใช้งานที่แอดมินกำหนด';}throw failure;}
+ if(typeof updateOperatingClock==='function')updateOperatingClock(data?.serverTime);
  return data;
 }
 async function supabaseFetch(){
  if(supabaseFetch.pending)return supabaseFetch.pending;
  const run=(async()=>{
  if(!supaCfg()||!authIdentity)return false;
+ if(typeof operatingLocked!=='undefined'&&operatingLocked)return verifyOperatingAccess();
  if(syncReadPromise)return syncReadPromise;
  if(typeof retryPaymentCommands==='function')await retryPaymentCommands();
  if(syncPromise){await syncPromise;if(!authIdentity)return false;}
@@ -380,6 +417,7 @@ async function supabaseFetch(){
  try{return await run;}finally{supabaseFetch.pending=null;}
 }
 async function flushOnline(){
+ if(typeof operatingLocked!=='undefined'&&operatingLocked)return false;
  if(syncPromise)return syncPromise;
  if(syncReadPromise){await syncReadPromise;return flushOnline();}
  if(!authIdentity||!remoteBase||syncBlocked)return false;
@@ -507,9 +545,9 @@ async function startOnline(email,password){
  const {data,error}=await client.auth.signInWithPassword({email,password});
  if(error)throw error;
  authIdentity=data.user;
- // Returning users must never wait for a slow database pool before the UI opens.
- // The cached snapshot is a copy of the last successful real Supabase response.
+ // Staff verify the current hours with a small server response before cached UI opens.
  if(resumeCachedOnline(data.user)){
+  if(!(await authorizeCachedOperatingSession()))return;
   enterApp();setStatus('เข้าสู่ระบบแล้ว · กำลังซิงก์ฐานข้อมูลเบื้องหลัง','warn');
   hydrateOnline().catch(()=>{setStatus('ใช้งานข้อมูลล่าสุด · รายการใหม่จะรอส่งอัตโนมัติ','warn');});
   return;
@@ -517,7 +555,8 @@ async function startOnline(email,password){
  try{await hydrateOnline();}catch(e){
   // Authentication succeeded. Never destroy a valid session merely because the
   // database connection pool is temporarily busy; restore the last real snapshot.
-  if(resumeCachedOnline(data.user)){enterApp();setStatus('เข้าสู่ระบบแล้ว · ฐานข้อมูลกำลังเชื่อมต่อใหม่','warn');toast('ยืนยันบัญชีสำเร็จ ใช้ข้อมูลล่าสุดในเครื่องชั่วคราว','info');setTimeout(()=>supabaseFetch(),2500);return;}
+  if(e.code==='ACCESS_HOURS_CLOSED')throw e;
+  if(resumeCachedOnline(data.user)&&isAdmin()){enterApp();setStatus('เข้าสู่ระบบแล้ว · ฐานข้อมูลกำลังเชื่อมต่อใหม่','warn');toast('ยืนยันบัญชีสำเร็จ ใช้ข้อมูลล่าสุดในเครื่องชั่วคราว','info');setTimeout(()=>supabaseFetch(),2500);return;}
   throw Error('ยืนยันบัญชีสำเร็จ แต่ฐานข้อมูลยังไม่ตอบสนอง กรุณากดเข้าสู่ระบบอีกครั้งในอีกสักครู่ ('+(e.message||'connection timeout')+')');
  }
 }
@@ -542,13 +581,15 @@ async function resumeOnline(){
  // Do not block the first screen on an additional network getUser request.
  authIdentity=data.session.user;
  if(resumeCachedOnline(authIdentity)){
+  if(!(await authorizeCachedOperatingSession()))return;
   enterApp();setStatus('เปิดระบบจากข้อมูลจริงล่าสุด · กำลังซิงก์เบื้องหลัง','warn');
   client.auth.getUser().then(v=>{if(v.error)throw v.error;return hydrateOnline();}).catch(()=>setStatus('ใช้งานข้อมูลล่าสุด · ฐานข้อมูลจะเชื่อมต่อซ้ำอัตโนมัติ','warn'));
   return;
  }
  const verified=await client.auth.getUser();if(verified.error)throw verified.error;authIdentity=verified.data.user;await hydrateOnline();
  }catch(e){
-  if(authIdentity&&resumeCachedOnline(authIdentity)){enterApp();setStatus('ฐานข้อมูลกำลังเชื่อมต่อใหม่ · ใช้ข้อมูลล่าสุดในเครื่อง','warn');setTimeout(()=>supabaseFetch(),2500);return;}
+  if(e.code==='ACCESS_HOURS_CLOSED'||operatingLocked)return;
+  if(authIdentity&&resumeCachedOnline(authIdentity)&&isAdmin()){enterApp();setStatus('ฐานข้อมูลกำลังเชื่อมต่อใหม่ · ใช้ข้อมูลล่าสุดในเครื่อง','warn');setTimeout(()=>supabaseFetch(),2500);return;}
   session=null;$('#loginScreen').classList.remove('hidden');$('#appShell').classList.add('hidden');toast('ยืนยันบัญชีแล้ว แต่ฐานข้อมูลยังไม่พร้อม กรุณาลองอีกครั้ง','error');
  }
 }
@@ -844,6 +885,7 @@ function paymentError(error){
  return 'ยังยืนยันการบันทึกไม่ได้ ระบบเก็บรายการไว้และจะตรวจสอบซ้ำเมื่อเชื่อมต่อได้';
 }
 async function retryPaymentCommands(){
+ if(typeof operatingLocked!=='undefined'&&operatingLocked)return;
  if(!authIdentity||!remoteBase)return;
  if(paymentReplayPromise)return paymentReplayPromise;
  paymentReplayPromise=(async()=>{
@@ -1218,7 +1260,8 @@ function renderAudit(){
 let settingTab='profile';
 function renderSettings(){
   const s=DB.settings; const u=me();
-  const tabs=[['profile','ข้อมูลผู้ใช้'],['business','สถานประกอบการ'],['header','โลโก้/หัวกระดาษ'],['db','ฐานข้อมูล'],['products','สินค้า'],['villages','หมู่บ้าน'],['email','อีเมลแจ้งเตือน'],['system','ระบบ/ข้อมูล']];
+  if(!isAdmin()&&settingTab!=='profile')settingTab='profile';
+  const tabs=isAdmin()?[['profile','ข้อมูลผู้ใช้'],['business','สถานประกอบการ'],['header','โลโก้/หัวกระดาษ'],['db','ฐานข้อมูล'],['products','สินค้า'],['villages','หมู่บ้าน'],['email','อีเมลแจ้งเตือน'],['accessHours','เวลาเข้าใช้งาน'],['system','ระบบ/ข้อมูล']]:[['profile','ข้อมูลผู้ใช้']];
   const tabsHtml=tabs.map(t=>'<button class="tab'+(settingTab===t[0]?' active':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>').join('');
   let body='';
   if(settingTab==='profile')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="user"></i> ข้อมูลผู้ใช้และโปรไฟล์</h3></div><div class="panel-body"><div class="form-grid">
@@ -1286,6 +1329,7 @@ function renderSettings(){
       <label class="perm-item"><input type="checkbox" id="al_undo" ${s.email.alerts.undoRequest?'checked':''}> แจ้งคำขอกลับไปค้าง</label>
       <label class="perm-item"><input type="checkbox" id="al_new" ${s.email.alerts.newcustomer!==false?'checked':''}> แจ้งเพิ่มลูกค้าใหม่</label><label class="perm-item"><input type="checkbox" id="al_profile" ${s.email.alerts.profile!==false?'checked':''}> แจ้งแก้ไขโปรไฟล์</label><label class="perm-item"><input type="checkbox" id="al_payment" ${s.email.alerts.payment!==false?'checked':''}> แจ้งรับชำระ</label><label class="perm-item"><input type="checkbox" id="al_cash" ${s.email.alerts.cash!==false?'checked':''}> แจ้งรายการเงินสด</label></div>
   </div><button class="btn btn-primary" id="saveEmail" style="margin-top:6px"><i data-lucide="save"></i> บันทึก</button></div></div>`;
+  else if(settingTab==='accessHours'){const h=FreshyFeatures.accessHours(s.accessHours);body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="clock-3"></i> เวลาเข้าใช้งานของพนักงาน</h3></div><div class="panel-body"><p class="help-text">แอดมินกำหนดช่วงเวลาสำหรับพนักงานทุกคนได้ ใช้เวลาไทย (Asia/Bangkok) แอดมินเข้าใช้งานได้ตลอดเวลา</p><label class="perm-item"><input id="accessHoursEnabled" type="checkbox" ${h.enabled?'checked':''}> จำกัดเวลาเข้าใช้งานของพนักงาน</label><div class="form-grid access-hours-fields"><div class="field"><label for="accessHoursStart">เวลาเริ่มเข้าใช้งาน</label><input id="accessHoursStart" type="time" value="${h.start}" required></div><div class="field"><label for="accessHoursEnd">เวลาสิ้นสุดการใช้งาน</label><input id="accessHoursEnd" type="time" value="${h.end}" required></div></div><p class="help-text">มีผลทุกวัน เวลาเริ่มรวมในช่วงใช้งาน เวลาสิ้นสุดจะล็อกทันที หากเวลาสิ้นสุดน้อยกว่าเวลาเริ่ม หมายถึงสิ้นสุดในวันถัดไป เมื่อปิดข้อจำกัด พนักงานเข้าได้ตลอดเวลา</p><p class="help-text">รายการที่บันทึกแล้วและรายการรอส่งยังเก็บอยู่ เมื่อเข้าใช้งานได้อีกครั้งระบบจะตรวจสอบและส่งต่อ</p><button class="btn btn-primary" id="saveAccessHours"><i data-lucide="save"></i> บันทึกเวลาเข้าใช้งาน</button><p id="accessHoursSaveStatus" class="help-text" role="status"></p></div></div>`;}
   else if(settingTab==='system')body=`<div class="panel"><div class="panel-head"><h3><i data-lucide="settings-2"></i> ระบบและข้อมูล</h3></div><div class="panel-body">
     <p style="font-size:13px;color:var(--muted);margin-bottom:10px">เลือกหมวดข้อมูลที่ต้องการสำรอง หรือเลือกทั้งหมด (แอดมินเท่านั้น)</p>
     <div class="perm-grid" style="margin-bottom:12px">
@@ -1313,6 +1357,12 @@ function renderSettings(){
   $('#pageContent').querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{settingTab=t.dataset.t;renderSettings();}));
   // save handlers
   const bind=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
+  bind('#saveAccessHours',async()=>{
+   if(!isAdmin())return;const button=$('#saveAccessHours'),status=$('#accessHoursSaveStatus');let value;
+   try{value=FreshyFeatures.accessHours({enabled:$('#accessHoursEnabled').checked,start:$('#accessHoursStart').value,end:$('#accessHoursEnd').value,timeZone:'Asia/Bangkok'});}catch(e){status.textContent=e.message;toast(e.message,'error');return;}
+   button.disabled=true;status.textContent='กำลังบันทึก…';
+   try{if(authIdentity){await rpc('freshy_access_status');if(!(await flushOnline()))throw Error('กรุณาส่งข้อมูลรอส่งให้สำเร็จก่อนเปลี่ยนเวลา');const latest=await rpc('freshy_read');acceptRemote(latest,[]);const expected=FreshySync.clone(remoteSettings),next={...expected,accessHours:value},before=FreshySync.shared(DB);const saved=await rpc('freshy_apply',{changes:[{collection:'settings',id:'settings',expected,value:next}]});acceptRemote(saved,FreshySync.diff(before,FreshySync.shared(DB)));broadcastOnlineChange();}else{DB.settings.accessHours=value;dbSave();}operatingPolicy=DB.settings.accessHours;status.textContent='บันทึกเวลาเข้าใช้งานแล้ว'+(value.enabled?' · '+value.start+'–'+value.end+' น. (เวลาไทย)':' · พนักงานเข้าใช้งานได้ตลอดเวลา');toast('บันทึกเวลาเข้าใช้งานแล้ว','success');}catch(e){status.textContent=e.message;toast(e.message,'error');}finally{if(button.isConnected)button.disabled=false;}
+  });
   bind('#saveProfile',()=>{const oldName=u.name;const newName=$('#s_name').value.trim();if(!newName||!$('#s_code').value.trim()){toast('กรุณากรอกชื่อและรหัส','error');return;}if(DB.employees.some(e=>e.id!==u.id&&e.code===$('#s_code').value.trim())){toast('รหัสพนักงานซ้ำ','error');return;}dbUpdate('employees',u.id,{name:newName,code:$('#s_code').value.trim(),email:$('#s_email').value.trim(),avatarUrl:$('#s_avatar').value.trim()});if(newName&&newName!==oldName)sendAlert('profile','[แจ้งเตือน] ผู้ใช้เปลี่ยนชื่อโปรไฟล์','<p>ผู้ใช้รหัส '+esc(u.code)+' ได้เปลี่ยนชื่อจาก <b>'+esc(oldName)+'</b> เป็น <b>'+esc(newName)+'</b></p>');toast('บันทึกโปรไฟล์แล้ว'+(newName!==oldName?' · ตรวจผลอีเมลในประวัติ':''),'success');refreshUserChip();});
   bind('#saveBiz',()=>{Object.assign(s.business,{name:$('#b_name').value,address:$('#b_addr').value,taxId:$('#b_tax').value,commercialId:$('#b_com').value,phone:$('#b_phone').value,email:$('#b_email').value,menuName:$('#b_menu').value});dbSave();toast('บันทึกข้อมูลสถานประกอบการแล้ว','success');});
   bind('#resetBiz',()=>{s.business=defaultSettings().business;dbSave();renderSettings();toast('รีเซ็ตแล้ว','success');});
@@ -1498,6 +1548,8 @@ async function doLogin(){
   enterApp();
 }
 function enterApp(){
+  if(!enforceOperatingHours())return;
+  $('#accessHoursLock')?.classList.add('hidden');
   const qrCustomer=new URLSearchParams(location.search).get('qr');
   if(qrCustomer){renderPublicQrReport(qrCustomer);return;}
   const documentId=new URLSearchParams(location.search).get('document');if(/^[a-f0-9]{64}$/.test(documentId||'')){location.replace('/document?id='+documentId+'&access=private');return;}
@@ -1525,6 +1577,8 @@ $('#logoutBtn').addEventListener('click',()=>{
   });
 });
 $('#menuToggle').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
+$('#accessHoursRetry')?.addEventListener('click',async()=>{const b=$('#accessHoursRetry');b.disabled=true;try{await verifyOperatingAccess();}finally{b.disabled=false;}});
+$('#accessHoursSwitch')?.addEventListener('click',()=>switchOperatingAccount().catch(e=>toast(e.message,'error')));
 const mobileNavScrim=$('#mobileNavScrim');
 if(mobileNavScrim)mobileNavScrim.addEventListener('click',()=>$('#sidebar').classList.remove('open'));
 
@@ -1562,7 +1616,7 @@ if(window.matchMedia)window.matchMedia('(prefers-color-scheme: dark)').addEventL
 function setStatus(text,cls){const el=$('#modeTag');if(!el)return;el.className='status-tag '+(cls||'info');const t=$('#modeTagText');if(t)t.textContent=text;}
 window.addEventListener('online',()=>{if(authIdentity)supabaseFetch();else setStatus(DB.settings.db.mode==='supabase'?'ออนไลน์ · กรุณาเข้าสู่ระบบ':'โหมดสาธิต','info');});
 window.addEventListener('offline',()=>{safeCache();setStatus('ออฟไลน์ · เก็บรายการในเครื่องและส่งเมื่อเชื่อมต่อ','warn');});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authIdentity)supabaseFetch();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){enforceOperatingHours();if(authIdentity)supabaseFetch();}});
 window.addEventListener('pagehide',()=>{if(authIdentity)safeCache();});
 if(!navigator.onLine)setStatus('ไม่มีการเชื่อมต่ออินเทอร์เน็ต','err');
 if(DB.settings.db.mode==='supabase')setStatus('ออนไลน์ · กรุณาเข้าสู่ระบบ','info');

@@ -82,7 +82,7 @@ end $$;
 
 insert into public.freshy_store(key,value) values('settings','{"business": {"name": "โรงน้ำดื่ม เฟรชชี่ วอเตอร์", "address": "", "taxId": "", "commercialId": "", "phone": "", "email": "", "menuName": "ระบบจัดการลูกหนี้"}, "header": {"showLogo": true, "showName": true, "logoDataUrl": ""}, "email": {"enabled": false, "adminEmail": "", "provider": "resend", "fromEmail": "", "apiKey": "", "smtpHost": "", "smtpPort": "587", "smtpUser": "", "smtpPass": "", "alerts": {"login": true, "logout": true, "addDebtor": true, "undoRequest": true}}, "docPrefix": {"debtor": "FWD", "cash": "CSH", "customer": "CUS"}, "doccounters": {}}'::jsonb) on conflict do nothing;
 
-create or replace function public.freshy_actor() returns jsonb
+create or replace function public.freshy_member() returns jsonb
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
 declare actor jsonb; email_address text;
 begin
@@ -94,6 +94,64 @@ begin
  if actor is null then raise exception 'MEMBER_NOT_FOUND' using errcode='42501'; end if;
  return actor;
 end $$;
+
+create or replace function public.freshy_validate_access_hours(policy jsonb) returns void
+language plpgsql immutable set search_path=pg_catalog,public as $$
+begin
+ if policy is null then return; end if;
+ if jsonb_typeof(policy)<>'object' or (policy-array['enabled','start','end','timeZone'])<>'{}'::jsonb or jsonb_typeof(policy->'enabled') is distinct from 'boolean'
+  or coalesce(policy->>'start','') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+  or coalesce(policy->>'end','') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+  or policy->>'start'=policy->>'end' or policy->>'timeZone' is distinct from 'Asia/Bangkok'
+ then raise exception 'INVALID_ACCESS_HOURS' using errcode='22023'; end if;
+end $$;
+
+create or replace function public.freshy_access_allowed(policy jsonb,at_time timestamptz default statement_timestamp()) returns boolean
+language plpgsql stable set search_path=pg_catalog,public as $$
+declare current_minute text:=to_char(at_time at time zone 'Asia/Bangkok','HH24:MI'); first_time text; last_time text;
+begin
+ perform public.freshy_validate_access_hours(policy);
+ if policy is null or policy->>'enabled'='false' then return true; end if;
+ first_time:=policy->>'start';last_time:=policy->>'end';
+ if first_time<last_time then return current_minute>=first_time and current_minute<last_time; end if;
+ return current_minute>=first_time or current_minute<last_time;
+end $$;
+
+create or replace function public.freshy_actor() returns jsonb
+language plpgsql stable security definer set search_path=pg_catalog,public as $$
+declare actor jsonb:=public.freshy_member(); policy jsonb;
+begin
+ if coalesce(actor->>'role','staff')<>'admin' then
+  select value->'accessHours' into policy from public.freshy_store where key='settings';
+  if not public.freshy_access_allowed(policy) then
+   raise exception 'ACCESS_HOURS_CLOSED' using errcode='PT403',detail=jsonb_build_object('accessHours',policy,'serverTime',statement_timestamp())::text;
+  end if;
+ end if;
+ return actor;
+end $$;
+
+create or replace function public.freshy_access_status() returns jsonb
+language plpgsql stable security definer set search_path=pg_catalog,public as $$
+declare actor jsonb:=public.freshy_member(); policy jsonb;
+begin
+ select value->'accessHours' into policy from public.freshy_store where key='settings';
+ return jsonb_build_object('version',1,'allowed',actor->>'role'='admin' or public.freshy_access_allowed(policy),'accessHours',policy,'serverTime',statement_timestamp());
+end $$;
+
+create or replace function public.freshy_access_hours_guard() returns trigger
+language plpgsql security definer set search_path=pg_catalog,public as $$
+begin
+ if new.key='settings' then perform public.freshy_validate_access_hours(new.value->'accessHours'); end if;
+ return new;
+end $$;
+drop trigger if exists freshy_access_hours_guard on public.freshy_store;
+create trigger freshy_access_hours_guard before insert or update of value on public.freshy_store for each row execute function public.freshy_access_hours_guard();
+revoke all on function public.freshy_member() from public,anon,authenticated;
+revoke all on function public.freshy_validate_access_hours(jsonb) from public,anon,authenticated;
+revoke all on function public.freshy_access_allowed(jsonb,timestamptz) from public,anon,authenticated;
+revoke all on function public.freshy_access_hours_guard() from public,anon,authenticated;
+revoke all on function public.freshy_access_status() from public,anon;
+grant execute on function public.freshy_access_status() to authenticated;
 
 create or replace function public.freshy_owns(v jsonb, actor_id text) returns boolean
 language sql immutable set search_path=pg_catalog as $$
@@ -132,7 +190,7 @@ begin
   result:=result||jsonb_build_object(r.key,v);
  end loop;
  select coalesce(jsonb_agg(jsonb_build_object('id',x->>'id','name',x->>'name')),'[]') into recorders from public.freshy_store s,jsonb_array_elements(s.value) x where s.key='employees';
- return jsonb_build_object('actor',actor,'data',result,'recorders',recorders);
+ return jsonb_build_object('actor',actor,'data',result,'recorders',recorders,'serverTime',statement_timestamp());
 end $$;
 revoke all on function public.freshy_read() from public,anon;
 grant execute on function public.freshy_read() to authenticated;
