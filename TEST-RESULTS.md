@@ -37,3 +37,5 @@ Run `npm run build` and `npm test`.
 - Build produces updated standalone HTML and dist assets from the same sources; no production seed upload or database deletion is part of deployment.
 
 These tests do not establish delivery to a real Gmail inbox or authenticated synchronization between two production devices. Those require the real account and server configuration. They are not a guarantee of zero defects.
+
+Final save/scroll regression: concurrent local edits during the access-hours read are retained and flushed before the settings update. Scroll deferral also waits for an event-loop turn when reconciliation outlasts the quiet interval, so queued touch/scroll events can extend it.
