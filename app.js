@@ -32,16 +32,16 @@ async function apiRequest(path,options={}){
  if(!authIdentity)throw Error('กรุณาเข้าสู่ระบบออนไลน์');const {data,error}=await authFor(supaCfg()).auth.getSession();if(error||!data.session)throw Error('เซสชันหมดอายุ');
  const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token,...options.headers},signal:AbortSignal.timeout(28000)});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'ดำเนินการไม่สำเร็จ');return j;
 }
-async function persistDocument(html,docNo){
+async function persistDocument(html,docNo,privateOnly=false){
  if(authIdentity&&!(await flushOnline()))throw Error('ยังมีข้อมูลรอส่ง กรุณาซิงก์ให้สำเร็จก่อนออก QR');
- const snapshot=FreshyFeatures.documentSnapshot(html,docNo,DB.settings.business,me(),document);const result=await apiRequest('/api/document',{method:'POST',body:JSON.stringify({snapshot})});
+ const snapshot=FreshyFeatures.documentSnapshot(html,docNo,DB.settings.business,me(),document);if(!authIdentity){if(DB.settings.db.mode!=='demo')throw Error('กรุณาเข้าสู่ระบบก่อนออกเอกสาร');const id=crypto.randomUUID().replaceAll('-','').padEnd(64,'0');DB.sentEmails.unshift({id:'document:'+id,type:'document',createdBy:me().id,ts:snapshot.issuedAt,document:snapshot});dbSave();return null;}const result=await apiRequest('/api/document',{method:'POST',body:JSON.stringify({snapshot,private:privateOnly})});
  return location.origin+'/document?id='+result.id+(result.access==='private'?'&access=private':'');
 }
 async function preparePrint(html,docNo,showQr){
  if(showQr===undefined){openModal('<div class="modal-head"><h3>ตัวเลือกเอกสาร A4</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><p>เอกสารพื้นขาว ตัวอักษรดำ พร้อมเลขอ้างอิงและช่องลงนาม</p><label class="perm-item"><input id="printDocumentQr" type="checkbox" checked> แสดง QR เอกสารตรงมุมบนขวา</label><p class="help-text">QR เปิดเอกสารฉบับนี้ตามสิทธิ์บัญชี ผู้สแกนต้องเข้าสู่ระบบ</p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button id="confirmDocumentPrint" class="btn btn-primary">พิมพ์ / บันทึก PDF</button></div>');$('#confirmDocumentPrint').onclick=()=>preparePrint(html,docNo,$('#printDocumentQr').checked);return;}
  const button=$('#confirmDocumentPrint')||$('#doPrint');if(button){button.disabled=true;button.textContent='กำลังเตรียมเอกสาร…';}
- try{let qrUrl;if(showQr)qrUrl=await persistDocument(html,docNo);$('#printArea').innerHTML='<div class="doc-page">'+html+'</div>';
- if(qrUrl){const control=$('#printArea .doc-control');const img=document.createElement('img');img.src=localQr(qrUrl);img.className='document-qr';img.alt='QR เอกสาร '+docNo;control.prepend(img);}
+ try{const qrUrl=await persistDocument(html,docNo,!showQr);$('#printArea').innerHTML='<div class="doc-page">'+html+'</div>';
+ if(showQr&&qrUrl){const control=$('#printArea .doc-control');const img=document.createElement('img');img.src=localQr(qrUrl);img.className='document-qr';img.alt='QR เอกสาร '+docNo;control.prepend(img);}
  closeModal();const previousTitle=document.title;document.title=docNo+' '+DB.settings.business.name;window.addEventListener('afterprint',()=>{document.title=previousTitle;},{once:true});if(document.fonts)await document.fonts.ready;await Promise.all([...$('#printArea').querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000);})));window.print();
  }catch(e){if(button&&button.isConnected){button.disabled=false;button.textContent='ลองเตรียมเอกสารอีกครั้ง';}toast(e.message,'error');}
 }
@@ -639,6 +639,7 @@ const PAGES=[
   {id:'cashsales',label:'รายงานลูกค้าจ่ายสด',icon:'receipt-text',group:'ข้อมูลลูกค้า'},
   {id:'approvals',label:'ตรวจสอบการรับชำระ',icon:'clipboard-check',group:'ประวัติรับชำระ'},
   {id:'employees',label:'จัดการพนักงาน',icon:'user-cog',group:'จัดการระบบ',admin:true},
+  {id:'documentHistory',label:'ประวัติเลขที่เอกสาร / การพิมพ์',icon:'files',group:'จัดการระบบ',admin:true},
   {id:'audit',label:'ประวัติการแก้ไข',icon:'history',group:'จัดการระบบ',admin:true},
   {id:'settings',label:'การตั้งค่า',icon:'settings',group:'จัดการระบบ',admin:true}
 ];
@@ -676,11 +677,38 @@ function renderPage(){
   const fn={dashboard:renderDashboard,debtorsNai:()=>renderDebtors('nai'),debtorsOther:()=>renderDebtors('other'),
     paymentsNai:()=>renderPayments('nai'),paymentsOther:()=>renderPayments('other'),
     customersNai:()=>renderCustomers('nai'),customersOther:()=>renderCustomers('other'),
-    cashsales:renderCashsales,approvals:renderApprovals,employees:renderEmployees,audit:renderAudit,settings:renderSettings};
+    documentHistory:renderDocumentHistory,cashsales:renderCashsales,approvals:renderApprovals,employees:renderEmployees,audit:renderAudit,settings:renderSettings};
   (fn[currentPage]||renderDashboard)();
   attachCsv();updateSyncNotice();
   renderIcons();
 }
+
+/* ---------- SAVED DOCUMENT HISTORY ---------- */
+let documentHistory={query:'',records:[],nextCursor:null,loaded:false,busy:false,error:'',request:0};
+async function loadDocumentHistory(more=false){
+ if(!isAdmin())return;
+ const request=++documentHistory.request,query=documentHistory.query;
+ documentHistory.busy=true;documentHistory.error='';renderDocumentHistory();
+ try{
+  let result;
+  if(authIdentity){const params=new URLSearchParams({q:query});if(more&&documentHistory.nextCursor)params.set('cursor',documentHistory.nextCursor);result=await apiRequest('/api/document-history?'+params);}
+  else{const needle=query.toLowerCase();result={records:DB.sentEmails.filter(r=>r.type==='document'&&r.document&&[r.document.docNo,r.document.title,r.document.author?.name].join(' ').toLowerCase().includes(needle)).map(r=>({id:r.id.slice(9),docNo:r.document.docNo,title:r.document.title,issuedAt:r.document.issuedAt,author:r.document.author?.name,access:'demo'})).sort((a,b)=>b.issuedAt.localeCompare(a.issuedAt)),nextCursor:null};}
+  if(request!==documentHistory.request)return;
+  documentHistory.records=more?[...new Map([...documentHistory.records,...result.records].map(r=>[r.id,r])).values()]:result.records;documentHistory.nextCursor=result.nextCursor;documentHistory.loaded=true;
+ }catch(e){if(request===documentHistory.request)documentHistory.error=e.message;}
+ finally{if(request===documentHistory.request){documentHistory.busy=false;if(currentPage==='documentHistory')renderDocumentHistory();}}
+}
+function renderDocumentHistory(){
+ if(!isAdmin())return;
+ const state=documentHistory;
+ $('#pageContent').innerHTML='<div class="page-head"><div><h2>ประวัติเลขที่เอกสาร / การพิมพ์</h2><p class="desc">เปิดข้อมูลที่บันทึกไว้ ณ ตอนออกเอกสาร และพิมพ์ซ้ำด้วยเลขเดิม</p></div><button class="btn btn-ghost" id="refreshDocumentHistory" '+(state.busy?'disabled':'')+'>โหลดข้อมูลล่าสุด</button></div><div class="panel"><div class="panel-body"><form id="documentHistorySearchForm" class="toolbar"><input id="documentHistorySearch" aria-label="ค้นหาเลขที่เอกสาร" placeholder="เลขที่เอกสาร ชื่อรายงาน หรือผู้ออกเอกสาร" value="'+esc(state.query)+'" style="flex:1;min-width:180px;padding:10px"><button class="btn btn-primary" '+(state.busy?'disabled':'')+'>ค้นหา</button></form><p class="help-text">รายการนี้บันทึกเมื่อระบบเตรียมเอกสารก่อนเปิดหน้าพิมพ์ รวมการบันทึกเป็น PDF เอกสารเก่าจะแสดงเฉพาะฉบับที่เคยบันทึกสำเนาไว้</p><p role="status">'+(state.busy?'กำลังโหลด…':esc(state.error))+'</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>เลขที่เอกสาร</th><th>ชื่อเอกสาร</th><th>วันที่ออกเอกสาร</th><th>ผู้ออกเอกสาร</th><th>ข้อมูลฉบับเดิม</th></tr></thead><tbody>'+state.records.map(r=>'<tr><td><b>'+esc(r.docNo)+'</b></td><td>'+esc(r.title)+'</td><td>'+esc(thDateTime(r.issuedAt))+'</td><td>'+esc(r.author||'-')+'</td><td>'+(r.access==='demo'?'<button class="btn btn-ghost btn-sm" data-demo-document="'+esc(r.id)+'">ดูเอกสาร</button>':'<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="/document?id='+encodeURIComponent(r.id)+'&access=private">ดูเอกสาร / พิมพ์ซ้ำ</a>')+'</td></tr>').join('')+'</tbody></table></div>'+(!state.busy&&!state.error&&!state.records.length?'<div class="empty-state">ไม่พบเอกสารที่บันทึกไว้'+(state.query?'ตามคำค้น':'')+'</div>':'')+(state.nextCursor?'<button class="btn btn-ghost" id="moreDocumentHistory" '+(state.busy?'disabled':'')+'>โหลดเอกสารก่อนหน้า</button>':'')+'</div></div>';
+ $('#refreshDocumentHistory').onclick=()=>loadDocumentHistory();
+ $('#documentHistorySearchForm').onsubmit=e=>{e.preventDefault();state.query=$('#documentHistorySearch').value.trim();loadDocumentHistory();};
+ $('#moreDocumentHistory')?.addEventListener('click',()=>loadDocumentHistory(true));
+ document.querySelectorAll('[data-demo-document]').forEach(button=>button.onclick=()=>{const d=DB.sentEmails.find(r=>r.id==='document:'+button.dataset.demoDocument)?.document;if(!d)return;openModal('<div class="modal-head"><h3>'+esc(d.docNo)+'</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><h4>'+esc(d.title)+'</h4>'+d.tables.map(t=>'<h4>'+esc(t.title)+'</h4><div class="tbl-wrap"><table class="tbl"><thead><tr>'+t.headers.map(v=>'<th>'+esc(v)+'</th>').join('')+'</tr></thead><tbody>'+t.rows.map(row=>'<tr>'+row.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>').join('')+'</div>');});
+ if(!state.loaded&&!state.busy&&!state.error)loadDocumentHistory();
+}
+
 
 /* ---------- DASHBOARD ---------- */
 function renderDashboard(){
@@ -692,7 +720,7 @@ function renderDashboard(){
  const empHtml='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>รหัสพนักงาน</th><th>ชื่อพนักงาน</th><th class="num">ยอดขายเงินสด</th><th class="num">ยอดลงลูกหนี้</th><th class="num">รวม</th></tr></thead><tbody>'+employees.map(r=>'<tr><td>'+esc(r.code)+'</td><td><b>'+esc(r.name)+'</b></td><td class="num" style="color:var(--green)">'+fmtN(r.cash)+'</td><td class="num" style="color:var(--red)">'+fmtN(r.debt)+'</td><td class="num"><b>'+fmtN(r.cash+r.debt)+'</b></td></tr>').join('')+'</tbody></table></div>';
  const card=(tone,icon,label,value,unit,sub='')=>'<div class="stat-card '+tone+'"><div class="label"><i data-lucide="'+icon+'"></i>'+label+'</div><div class="value">'+fmtN(value)+' <span style="font-size:13px;font-weight:500">'+unit+'</span></div><div class="sub">'+sub+'</div></div>';
  $('#pageContent').innerHTML='<div class="dashboard-hero"><div class="page-head"><p class="hero-eyebrow">FRESHY WATER · ภาพรวมการทำงาน</p><h2>ภาพรวมประจำวัน '+thDate(today)+'</h2><span class="desc">สวัสดี '+esc(me()?.name||'')+' · ติดตามยอดและผลงานของวันนี้</span></div><div class="hero-status"><i></i><div><b>'+(authIdentity?'เชื่อมต่อฐานข้อมูลกลาง':'ตัวอย่างข้อมูลสาธิต')+'</b><span id="syncLastUpdated"></span></div></div></div>'+
- '<div class="command-bar"><div><b><i data-lucide="zap"></i> เมนูทำงานด่วน</b><span>เลือกงานที่ใช้ประจำโดยไม่ต้องค้นหาเมนู</span></div><div class="command-actions"><button class="btn btn-primary btn-sm" id="quickDebt"><i data-lucide="plus-circle"></i> เพิ่มลูกหนี้</button><button class="btn btn-success btn-sm" id="quickCash"><i data-lucide="banknote"></i> ลงยอดเงินสด</button><button class="btn btn-ghost btn-sm" id="quickCustomer"><i data-lucide="user-plus"></i> เพิ่มลูกค้า</button></div></div>'+
+ '<div class="command-bar"><div><b><i data-lucide="zap"></i> เมนูทำงานด่วน</b><span>เลือกงานที่ใช้ประจำโดยไม่ต้องค้นหาเมนู</span></div><div class="command-actions"><button class="btn btn-primary btn-sm" id="quickDebt"><i data-lucide="plus-circle"></i> เพิ่มลูกหนี้</button><button class="btn btn-success btn-sm" id="quickCash"><i data-lucide="banknote"></i> ลงยอดเงินสด</button>'+(isAdmin()?'<button class="btn btn-ghost btn-sm" id="quickDocumentHistory"><i data-lucide="files"></i> เลขที่เอกสาร / ประวัติพิมพ์</button>':'')+'<button class="btn btn-ghost btn-sm" id="quickCustomer"><i data-lucide="user-plus"></i> เพิ่มลูกค้า</button></div></div>'+
  '<div class="stats-grid">'+card('green','banknote','ยอดขายเงินสดวันนี้',cashTotal,'บาท','จาก '+cash.length+' รายการ')+card('red','wallet','ลูกหนี้ค้างจ่ายวันนี้',debtToday,'บาท','ยอดค้างใหม่วันนี้')+card('orange','package','จำนวนถังที่ขายได้วันนี้',jugsToday,'ถัง','รวมทั้งเงินสดและลูกหนี้')+card('gold','clock-3','รับชำระรอตรวจสอบ',sum(debtRows.filter(d=>FreshyPayments.review(d)==='pending'),'total'),'บาท',debtRows.filter(d=>FreshyPayments.review(d)==='pending').length+' รายการ · ยังไม่รวมยอดอนุมัติ')+'</div>'+
  '<div class="analytics-grid"><div class="panel"><div class="panel-body"><div class="chart-toolbar"><div class="chart-title"><h3>แนวโน้มยอดบันทึกรายวัน</h3><p>เงินสดและยอดบันทึกลูกหนี้ · '+dashboardDays+' วันล่าสุด</p></div><div class="chart-ranges" aria-label="ช่วงวันที่กราฟ">'+[7,14,30].map(d=>'<button type="button" data-chart-days="'+d+'" aria-pressed="'+(d===dashboardDays)+'">'+d+' วัน</button>').join('')+'</div></div><div class="chart-legend"><span><i></i>เงินสด</span><span><i class="debt-key"></i>ยอดบันทึกลูกหนี้</span></div>'+FreshyDashboard.chart(days)+'<div class="chart-readout" id="chartReadout" aria-live="polite">เลือกจุดบนกราฟเพื่อดูยอดของแต่ละวัน</div></div></div>'+
  '<div class="panel"><div class="panel-head"><h3><i data-lucide="chart-pie"></i> เปรียบเทียบยอดรวมระบบ</h3></div><div class="panel-body"><div class="donut-wrap"><div class="debt-donut" role="img" aria-label="ชำระแล้ว '+paidPercent+' เปอร์เซ็นต์" style="background:conic-gradient(#12a878 0% '+paidPercent+'%,#e94d65 '+paidPercent+'% 100%)"><div><b>'+paidPercent+'%</b><span>สัดส่วนยอดชำระแล้ว</span></div></div></div><div class="donut-legend"><div><span>ยอดชำระแล้ว</span><b>'+fmtN(paidTotal)+' บาท</b></div><div><span class="unpaid">ยอดค้างชำระ</span><b>'+fmtN(unpaidTotal)+' บาท</b></div></div></div></div></div>'+
@@ -701,7 +729,7 @@ function renderDashboard(){
  '<div class="report-schedule"><div class="report-clock"><i data-lucide="clock-3"></i></div><div><b>รายงานอัตโนมัติสำหรับผู้บริหาร</b><p>เวลารายงาน '+(DB.settings.email.reportTimes||['08:00','18:00']).join(' / ')+' น. · '+(DB.settings.email.enabled&&DB.settings.email.reportsEnabled?'เปิดการส่งตามเวลา':'ยังไม่เปิดการส่งตามเวลา')+'</p></div></div>';
  const debtArea=canSee('debtorsNai')?'nai':canSee('debtorsOther')?'other':null,customerArea=canSee('customersNai')?'nai':canSee('customersOther')?'other':null;
  $('#quickDebt').hidden=!debtArea;$('#quickCash').hidden=!canSee('cashsales');$('#quickCustomer').hidden=!customerArea;
- $('#quickDebt').onclick=()=>{navigate(debtArea==='nai'?'debtorsNai':'debtorsOther');openAddDebtor(debtArea);};$('#quickCash').onclick=()=>{navigate('cashsales');openAddCash();};$('#quickCustomer').onclick=()=>{navigate(customerArea==='nai'?'customersNai':'customersOther');openAddCustomer(customerArea);};
+ $('#quickDocumentHistory')?.addEventListener('click',()=>navigate('documentHistory'));$('#quickDebt').onclick=()=>{navigate(debtArea==='nai'?'debtorsNai':'debtorsOther');openAddDebtor(debtArea);};$('#quickCash').onclick=()=>{navigate('cashsales');openAddCash();};$('#quickCustomer').onclick=()=>{navigate(customerArea==='nai'?'customersNai':'customersOther');openAddCustomer(customerArea);};
  document.querySelectorAll('[data-chart-days]').forEach(button=>button.onclick=()=>{dashboardDays=+button.dataset.chartDays;renderDashboard();updateSyncNotice();renderIcons();});
  document.querySelectorAll('[data-day]').forEach(point=>{const show=()=>{const day=days[+point.dataset.day];$('#chartReadout').textContent=thDate(day.date)+' · เงินสด '+fmtN(day.cash)+' บาท · ลูกหนี้ '+fmtN(day.debt)+' บาท · '+fmtN(day.jugs)+' ถัง';};point.addEventListener('mouseenter',show);point.addEventListener('focus',show);point.addEventListener('click',show);});updateSyncNotice();
 }
