@@ -601,7 +601,7 @@ function audit(action,detail){dbAdd('audit',{ts:new Date().toISOString(),userId:
 /* ---------- session / auth ---------- */
 function me(){if(!session)return null;return DB.employees.find(e=>e.id===session.empId)||null;}
 function isAdmin(){const u=me();return !!(u&&u.role==='admin');}
-function canSee(page){const u=me();if(!u)return false;if(u.role==='admin'||['dashboard','debtorsNai','debtorsOther','paymentsNai','paymentsOther','customersNai','customersOther','cashsales','approvals'].includes(page))return true;return !!(u.permissions&&u.permissions.pages&&u.permissions.pages[page]);}
+function canSee(page){const u=me();if(!u)return false;if(u.role==='admin'||['dailyDebts','dashboard','debtorsNai','debtorsOther','paymentsNai','paymentsOther','customersNai','customersOther','cashsales','approvals'].includes(page))return true;return !!(u.permissions&&u.permissions.pages&&u.permissions.pages[page]);}
 function canPrint(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.canPrint));}
 function canEmail(){const u=me();return !!(u&&(u.role==='admin'||u.permissions.canEmail));}
 function canManageRecord(row){const id=me()?.id;return !!row&&(isAdmin()||row.createdBy===id||row.responsibleBy===id||row.paidBy===id);}
@@ -629,6 +629,7 @@ async function sendAlert(type,subject,bodyHtml,toOverride,reportOptions={}){
    NAV / ROUTER
    ============================================================ */
 const PAGES=[
+  {id:'dailyDebts',label:'ข้อมูลลูกหนี้รายวัน',icon:'calendar-days',group:'หลัก'},
   {id:'dashboard',label:'ภาพรวมระบบ',icon:'layout-dashboard',group:'หลัก'},
   {id:'debtorsNai',label:'ลูกหนี้ค้างชำระ · บ้านนาไฮ',icon:'home',group:'ลูกหนี้ค้างชำระ'},
   {id:'debtorsOther',label:'ลูกหนี้ค้างชำระ · บ้านอื่น ๆ',icon:'map-pinned',group:'ลูกหนี้ค้างชำระ'},
@@ -676,13 +677,21 @@ function navigate(page){
    ============================================================ */
 function renderPage(){
   const c=$('#pageContent');
-  const fn={dashboard:renderDashboard,debtorsNai:()=>renderDebtors('nai'),debtorsOther:()=>renderDebtors('other'),
+  const fn={dailyDebts:renderDailyDebts,dashboard:renderDashboard,debtorsNai:()=>renderDebtors('nai'),debtorsOther:()=>renderDebtors('other'),
     paymentsNai:()=>renderPayments('nai'),paymentsOther:()=>renderPayments('other'),
     customersNai:()=>renderCustomers('nai'),customersOther:()=>renderCustomers('other'),
     deletedRecovery:renderDeletedRecovery,documentHistory:renderDocumentHistory,cashsales:renderCashsales,approvals:renderApprovals,employees:renderEmployees,audit:renderAudit,settings:renderSettings};
   (fn[currentPage]||renderDashboard)();
   attachCsv();updateSyncNotice();
   renderIcons();
+}
+
+let dailyDebtDate='';
+function renderDailyDebts(){
+ if(!dailyDebtDate)dailyDebtDate=todayStr();
+ const rows=FreshyDailyDebts.select(DB.debtors,dailyDebtDate),sum=key=>rows.reduce((n,r)=>n+(Number(r[key])||0),0);
+ $('#pageContent').innerHTML=`<div class="page-head"><div><h2>ข้อมูลลูกหนี้รายวัน</h2><p class="desc">รายการที่บันทึกเข้าระบบในวันที่เลือก · เวลาไทย · รวมทุกรูปแบบการชำระ</p></div></div><section class="panel"><div class="panel-body"><form id="dailyDebtForm" class="daily-date-form"><div class="field"><label for="dailyDebtDate">วันที่บันทึกเข้าระบบ</label><input id="dailyDebtDate" type="date" required value="${esc(dailyDebtDate)}"></div><button class="btn btn-primary" type="submit">ค้นหาวันที่</button></form><p role="status">วันที่ ${esc(thDate(dailyDebtDate))} · พบ ${rows.length} รายการ</p><div class="daily-summary"><span>รวมถัง <b>${fmtN(sum('jugs'))}</b></span><span>รวมแพ็ค <b>${fmtN(sum('packs'))}</b></span><span>ยอดที่บันทึก <b>${fmtN(sum('total'))} บาท</b></span></div><div class="daily-records">${rows.map(r=>`<article class="daily-record"><header><h3>${esc(r.customerName||'-')}</h3><span class="pill ${r.status==='unpaid'?'orange':'gray'}">${r.status==='unpaid'?'ค้างชำระ':r.status==='paid'?'รับชำระแล้ว':'รอตรวจสอบ'}</span></header><p>${esc(r.area==='nai'?'บ้านนาไฮ · หมู่ที่ '+(r.moo||'-'):r.village||'บ้านอื่น ๆ')}</p><dl><div><dt>บันทึกเข้าระบบ</dt><dd>${esc(FreshyDailyDebts.displayTime(r.createdAt))}</dd></div><div><dt>วันที่ค้าง</dt><dd>${esc(thDate(r.debtDate))}</dd></div><div><dt>ถัง / แพ็ค</dt><dd>${fmtN(r.jugs)} / ${fmtN(r.packs)}</dd></div><div><dt>เงินน้ำถัง / แพ็ค</dt><dd>${fmtN(r.jugAmount)} / ${fmtN(r.packAmount)} บาท</dd></div><div><dt>ผู้บันทึก</dt><dd>${esc(byName(r.createdBy))}</dd></div><div class="daily-total"><dt>ยอดรวม</dt><dd>${fmtN(r.total)} บาท</dd></div></dl></article>`).join('')||'<div class="empty-state"><p>ไม่พบข้อมูล</p><small>ไม่มีรายการลูกหนี้ที่บันทึกเข้าระบบในวันที่เลือก</small></div>'}</div><p class="help-text">อ้างอิงวันที่บันทึกเดิมของรายการ ไม่รวมรายการที่ลบแล้ว รายการเก่าที่ไม่มีวันที่บันทึกจะไม่ถูกคาดเดาวันที่</p></div></section>`;
+ $('#dailyDebtForm').onsubmit=e=>{e.preventDefault();const date=$('#dailyDebtDate').value;if(!date)return;dailyDebtDate=date;renderDailyDebts();renderIcons();};
 }
 
 /* ---------- SAVED DOCUMENT HISTORY ---------- */

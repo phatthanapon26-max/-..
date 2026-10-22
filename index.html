@@ -3,6 +3,7 @@
 <head><script>try{const t=localStorage.getItem('freshy_theme')||'auto';document.documentElement.dataset.theme=t==='auto'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t;}catch(e){}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="/brand-icon.png?v=2"><link rel="apple-touch-icon" href="/brand-icon.png?v=2"><meta property="og:image" content="https://acc.freshywater.in.th/brand-cover.png"><meta name="theme-color" content="#edf4fc">
 <title>ระบบสารสนเทศการจัดการลูกหนี้และรายงานการส่งน้ำ — โรงน้ำดื่ม เฟรชชี่ วอเตอร์</title>
 <script src="vendor/lucide.js"></script>
 <style>
@@ -522,7 +523,7 @@ table.tbl tr:hover td{background:#fafbfd}
 }
 
 </style>
-<link rel="stylesheet" href="ui.css?v=8.0.0"><link rel="stylesheet" href="modern.css?v=8.7.1-water-glass">
+<link rel="stylesheet" href="ui.css?v=8.0.0"><link rel="stylesheet" href="modern.css?v=8.8.0-mobile">
 <link rel="stylesheet" href="report.css?v=8.6.1"></head>
 <body>
 
@@ -530,7 +531,7 @@ table.tbl tr:hover td{background:#fafbfd}
 <div id="loginScreen">
   <div class="login-deco"><span></span><span></span><span></span><span></span><span></span></div>
   <div class="login-card">
-    <div class="login-logo"><i data-lucide="droplets"></i></div>
+    <div class="login-logo"><img src="/brand-icon.png" alt="โรงน้ำดื่มเฟรชชี่ วอเตอร์" width="64" height="64"></div>
     <h1 class="display-font">ระบบจัดการลูกหนี้<br><span class="login-brand-name">เฟรชชี่ วอเตอร์</span></h1>
     <p class="sub">โรงน้ำดื่ม เฟรชชี่ วอเตอร์</p>
     <div class="field" id="demoLoginField">
@@ -553,8 +554,8 @@ table.tbl tr:hover td{background:#fafbfd}
 <div id="appShell" class="hidden">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="logo"><i data-lucide="droplets"></i></div>
-      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้ v8.5.0</small></div>
+      <div class="logo"><img src="/brand-icon.png" alt="เฟรชชี่ วอเตอร์" width="42" height="42"></div>
+      <div class="name">เฟรชชี่ วอเตอร์<small>ระบบจัดการลูกหนี้</small></div>
     </div>
     <nav class="nav" id="navMenu"></nav>
     <div class="sidebar-foot">
@@ -606,7 +607,7 @@ table.tbl tr:hover td{background:#fafbfd}
 <script src="deploy-config.js"></script>
 <script src="database-config.js?v=8.5.0"></script>
 <script src="sync.js?v=8.4.0"></script>
-<script src="data-tools.js?v=8.1.0"></script><script src="features.js?v=8.5.0"></script><script src="payments.js?v=8.4.0"></script><script src="vendor/qrcode.js"></script><script src="dashboard.js?v=8.4.0"></script><script src="app.js?v=8.7.0-recovery"></script>
+<script src="data-tools.js?v=8.1.0"></script><script src="features.js?v=8.5.0"></script><script src="payments.js?v=8.4.0"></script><script src="vendor/qrcode.js"></script><script src="dashboard.js?v=8.4.0"></script><script src="daily-debts.js?v=8.8.0"></script><script src="app.js?v=8.8.0-daily"></script>
 </body>
 </html>
 
