@@ -772,9 +772,9 @@ function renderDebtors(area){
     const rowPager=rowPages>1?`<div class="debtor-row-pager"><button class="btn btn-ghost btn-sm debtRowsPrev" data-cid="${esc(cid)}" ${rowPage===0?'disabled':''} aria-label="รายการก่อนหน้าของ ${esc(list[0].customerName)}">ก่อนหน้า</button><span class="debt-row-range">รายการ ${rowPage*DEBT_ROWS_PER_PAGE+1}–${Math.min((rowPage+1)*DEBT_ROWS_PER_PAGE,list.length)} / ${list.length}</span><button class="btn btn-ghost btn-sm debtRowsNext" data-cid="${esc(cid)}" ${rowPage===rowPages-1?'disabled':''} aria-label="รายการถัดไปของ ${esc(list[0].customerName)}">ถัดไป</button></div>`:'';
     const meta=area==='nai'?('หมู่ที่ '+(c.moo||list[0].moo||'-')):(c.village||list[0].village||'-');
     cardsHtml+=`<div class="debtor-card" data-cid="${esc(cid)}" data-name="${esc(list[0].customerName)}">
-      <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · ค้าง ${list.length} ครั้ง</div></div>
+      <div class="dc-head"><div class="idx">${idx}</div><div><div class="cname">${esc(list[0].customerName)}</div><div class="cmeta">${esc(meta)} · เบอร์โทร: ${esc(customerPhone(c))} · ค้าง ${list.length} ครั้ง</div></div>
       ${list.every(d=>FreshyPayments.canReceive(d,me()))?`<button class="btn btn-gold btn-sm payAll" data-cid="${cid}"><i data-lucide="badge-check"></i> จ่ายทั้งหมด</button>`:''}
-      <button class="btn btn-ghost btn-sm debtorDocument" data-cid="${cid}" aria-label="เปิดเอกสารลูกหนี้ ${esc(list[0].customerName)}"><i data-lucide="file-text"></i> เอกสารลูกหนี้</button></div>
+      ${canEditCustomerPhone(c)?`<button class="btn btn-ghost btn-sm customerPhoneEdit" data-cid="${esc(cid)}">เบอร์โทร</button>`:''}<button class="btn btn-ghost btn-sm debtorDocument" data-cid="${cid}" aria-label="เปิดเอกสารลูกหนี้ ${esc(list[0].customerName)}"><i data-lucide="file-text"></i> เอกสารลูกหนี้</button></div>
       <div class="tbl-scroll"><table><thead><tr><th>วันที่ค้าง</th><th class="num">ถัง</th><th class="num">แพ็ค</th><th class="num">เงินน้ำถัง</th><th class="num">เงินน้ำแพ็ค</th><th class="num">ยอดรวม</th><th class="ce">จัดการ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       ${rowPager}<div class="dc-foot"><span>รวม <b>${tj}</b> ถัง</span><span><b>${tp}</b> แพ็ค</span><span class="total">ค้างทั้งหมด ${fmtN(tt)} บาท</span><span style="width:100%;font-size:11px;color:var(--muted);margin-top:4px;border-top:1px dashed var(--border);padding-top:6px">บันทึกล่าสุดโดย <b>${esc(creator)}</b> · ${thDateTimeSec(latest.createdAt)}</span></div>
     </div>`;
@@ -791,6 +791,7 @@ function renderDebtors(area){
     <div class="debtor-cards">${cardsHtml}</div><div class="pager"><button class="btn btn-ghost btn-sm" id="debtPrev" ${debtorPage[area]===0?'disabled':''}>ก่อนหน้า</button><span>หน้า ${debtorPage[area]+1} / ${pages} · ${ids.length} ลูกหนี้</span><button class="btn btn-ghost btn-sm" id="debtNext" ${debtorPage[area]>=pages-1?'disabled':''}>ถัดไป</button></div>
   </div>`;
   // events
+  $('#pageContent').querySelectorAll('.customerPhoneEdit').forEach(button=>button.onclick=()=>openCustomerPhone(button.dataset.cid));
   $('#pageContent').querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{debtorFilter[area]=b.dataset.f;debtorPage[area]=0;renderDebtors(area);}));
   const si=$('#debtorSearch'); const sug=$('#searchSuggest');
   bindSearch(si,value=>{debtorSearch=value;debtorPage[area]=0;},()=>renderDebtors(area));
@@ -1032,17 +1033,28 @@ function creditStatus(customerId){
   if(oldest<=100)return{cls:'gray',txt:'เครดิตสีเทา'};
   return{cls:'red',txt:'เครดิตไม่ดี'};
 }
+function customerPhone(customer){return String(customer?.phone||customer?.phoneNumber||customer?.telephone||customer?.tel||customer?.mobile||'').trim()||'-';}
+function canEditCustomerPhone(customer){return canManageRecord(customer)&&(isAdmin()||!!me()?.permissions?.pages?.[customer.area==='nai'?'customersNai':'customersOther']);}
+function openCustomerPhone(customerId){
+ const customer=DB.customers.find(c=>c.id===customerId);if(!customer||!canEditCustomerPhone(customer)){toast('ไม่มีสิทธิ์แก้ไขข้อมูลลูกค้ารายนี้','error');return;}
+ const phone=customerPhone(customer);
+ openModal('<div class="modal-head"><h3>เบอร์โทรลูกหนี้รายบุคคล</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-body"><div class="form-grid"><div class="field"><label>รหัสลูกค้า</label><input readonly value="'+esc(customer.code||'-')+'"></div><div class="field"><label>ชื่อลูกค้า</label><input readonly value="'+esc(customer.name)+'"></div><div class="field full"><label for="customerPhoneInput">เบอร์โทร</label><input id="customerPhoneInput" type="tel" inputmode="tel" autocomplete="tel" maxlength="60" placeholder="เว้นว่างหากไม่มีเบอร์โทร" value="'+esc(phone==='-'?'':phone)+'"><p class="help-text">เอกสารใหม่จะแสดงเบอร์โทรนี้ข้างรหัสลูกค้าและหมู่ที่ หากไม่มีจะแสดง เบอร์โทร: -</p></div></div><p id="customerPhoneStatus" role="status"></p></div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button id="saveCustomerPhone" class="btn btn-primary">บันทึกเบอร์โทร</button></div>');
+ $('#saveCustomerPhone').onclick=async()=>{const button=$('#saveCustomerPhone'),status=$('#customerPhoneStatus'),value=$('#customerPhoneInput').value.trim();if(value.length>60){status.textContent='เบอร์โทรต้องไม่เกิน 60 ตัวอักษร';return;}button.disabled=true;
+ try{const current=DB.customers.find(c=>c.id===customerId);if(!current||!canEditCustomerPhone(current))throw Error('ไม่พบข้อมูลลูกค้าหรือไม่มีสิทธิ์');const patch={phone:value};for(const key of ['phoneNumber','telephone','tel','mobile'])if(Object.hasOwn(current,key))patch[key]=value;dbUpdate('customers',customerId,patch);if(authIdentity&&!(await flushOnline()))throw Error('เบอร์โทรยังรอส่ง กรุณาตรวจการซิงก์แล้วลองอีกครั้ง');audit('แก้ไขเบอร์โทรลูกค้า',(current.code||'')+' · '+current.name);closeModal();renderPage();toast('บันทึกเบอร์โทรแล้ว','success');}catch(e){status.textContent=e.message;button.disabled=false;}};
+ $('#customerPhoneInput').focus();
+}
+
 function renderCustomers(area){
   const oldestByCustomer=new Map();for(const d of DB.debtors){if(d.status==='unpaid')oldestByCustomer.set(d.customerId,Math.max(oldestByCustomer.get(d.customerId)||0,dayDiff(d.debtDate)));}const creditFor=id=>{const days=oldestByCustomer.get(id);return days===undefined||days<=10?{cls:'green',txt:'เครดิตดีเยี่ยม'}:days<=30?{cls:'orange',txt:'เครดิตดี'}:days<=100?{cls:'gray',txt:'เครดิตสีเทา'}:{cls:'red',txt:'เครดิตไม่ดี'};};
   let rows=DB.customers.filter(c=>c.area===area);
   const q=custSearch[area];
   if(q)rows=rows.filter(c=>c.name.includes(q)||String(c.code||'').toLowerCase().includes(q.toLowerCase()));
   if(custCredit[area]!=='all')rows=rows.filter(c=>creditFor(c.id).txt===custCredit[area]);
-  let html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ลำดับ</th><th>รหัสลูกค้า</th><th>ชื่อลูกค้า</th>'+(area==='nai'?'<th>หมู่ที่</th>':'<th>หมู่บ้านที่อยู่</th>')+'<th>ที่อยู่</th><th>วันที่นำลงระบบ</th><th>ผู้นำลงระบบ</th><th>ผู้จัดการข้อมูล</th><th>ผู้รับผิดชอบ</th><th>ประวัติลูกหนี้</th></tr></thead><tbody>';
+  let html='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ลำดับ</th><th>รหัสลูกค้า</th><th>ชื่อลูกค้า</th>'+(area==='nai'?'<th>หมู่ที่</th>':'<th>หมู่บ้านที่อยู่</th>')+'<th>เบอร์โทร</th><th>ที่อยู่</th><th>วันที่นำลงระบบ</th><th>ผู้นำลงระบบ</th><th>ผู้จัดการข้อมูล</th><th>ผู้รับผิดชอบ</th><th>ประวัติลูกหนี้</th></tr></thead><tbody>';
   rows.forEach((c,i)=>{
     const cs=creditFor(c.id);
     const byName=recorderName;
-    html+=`<tr><td>${i+1}</td><td>${esc(c.code)}</td><td><b>${esc(c.name)}</b></td><td>${esc(area==='nai'?('หมู่ที่ '+c.moo):c.village)}</td><td>${esc(c.address||'-')}</td><td>${thDate(c.createdAt)}</td><td>${esc(byName(c.createdBy))}</td><td>${esc(byName(c.managedBy))}</td><td>${esc(byName(c.responsibleBy))}</td><td><span class="pill ${cs.cls}">${cs.txt}</span></td></tr>`;
+    html+=`<tr><td>${i+1}</td><td>${esc(c.code)}</td><td><b>${esc(c.name)}</b></td><td>${esc(area==='nai'?('หมู่ที่ '+c.moo):c.village)}</td><td><span>${esc(customerPhone(c))}</span>${canEditCustomerPhone(c)?'<button class="btn btn-ghost btn-sm customerPhoneEdit" data-cid="'+esc(c.id)+'">กรอก / แก้ไขเบอร์โทร</button>':''}</td><td>${esc(c.address||'-')}</td><td>${thDate(c.createdAt)}</td><td>${esc(byName(c.createdBy))}</td><td>${esc(byName(c.managedBy))}</td><td>${esc(byName(c.responsibleBy))}</td><td><span class="pill ${cs.cls}">${cs.txt}</span></td></tr>`;
   });
   html+='</tbody></table></div>';
   if(!rows.length)html='<div class="empty-state"><i data-lucide="users"></i><p>ไม่พบข้อมูลลูกค้าตามเงื่อนไข</p></div>';
@@ -1059,6 +1071,7 @@ function renderCustomers(area){
   <div class="panel"><div class="panel-body">${html}</div></div>`;
   bindSearch($('#custSearch'),value=>{custSearch[area]=value;},()=>renderCustomers(area));
   $('#pageContent').querySelectorAll('[data-cr]').forEach(b=>b.addEventListener('click',()=>{custCredit[area]=b.dataset.cr;renderCustomers(area);}));
+  $('#pageContent').querySelectorAll('.customerPhoneEdit').forEach(button=>button.onclick=()=>openCustomerPhone(button.dataset.cid));
   $('#addCustBtn').addEventListener('click',()=>openAddCustomer(area));
   attachCsv();
   if(printBtn)$('#custPrintBtn').addEventListener('click',()=>printCustomers(area));
@@ -1091,14 +1104,14 @@ function openAddCustomer(area){
     <div class="field"><label>รหัสลูกค้า</label><input id="c_code" placeholder="ระบบออกรหัสอัตโนมัติเมื่อบันทึก"></div>
     <div class="field"><label>ชื่อลูกค้า</label><input id="c_name"></div>
     ${area==='nai'?'<div class="field"><label>หมู่ที่</label><select id="c_moo" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="7">หมู่ที่ 7</option><option value="16">หมู่ที่ 16</option></select></div>':'<div class="field"><label>หมู่บ้าน</label><select id="c_village" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px">'+villageOpts+'</select></div>'}
-    <div class="field full"><label>ที่อยู่</label><input id="c_addr"></div>
+    <div class="field"><label for="c_phone">เบอร์โทร</label><input id="c_phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="60" placeholder="ไม่มีเบอร์โทร เว้นว่างได้"></div><div class="field full"><label>ที่อยู่</label><input id="c_addr"></div>
   </div></div>
   <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="saveCust"><i data-lucide="save"></i> บันทึก</button></div>`);
   $('#saveCust').addEventListener('click',async()=>{
     const name=$('#c_name').value.trim(); if(!name){toast('กรุณากรอกชื่อลูกค้า','error');return;}
     const saveButton=$('#saveCust');saveButton.disabled=true;let code;try{code=$('#c_code').value.trim()||await reserveCustomerCode();}catch(error){saveButton.disabled=false;toast(syncErrorText(error.message),'error');return;}
     dbAdd('customers',{code,name,area,
-      moo:area==='nai'?$('#c_moo').value:'',village:area==='other'?$('#c_village').value:'',address:$('#c_addr').value.trim(),
+      moo:area==='nai'?$('#c_moo').value:'',village:area==='other'?$('#c_village').value:'',address:$('#c_addr').value.trim(),phone:$('#c_phone').value.trim(),
       createdAt:todayStr(),createdBy:me().id,managedBy:me().id,responsibleBy:me().id});
     audit('เพิ่มลูกค้า',name);closeModal();toast('เพิ่มลูกค้าแล้ว','success');renderPage();
   });
@@ -1270,7 +1283,7 @@ function renderPublicQrReport(cid,payload){
   const c=payload?.customer||DB.customers.find(x=>x.id===cid);if(!c){document.body.innerHTML='<main class="document-screen"><h1>ไม่พบข้อมูลลูกหนี้</h1></main>';return;}
   const debts=(payload?.debtors||DB.debtors.filter(d=>d.customerId===cid&&d.status==='unpaid')).sort((a,b)=>String(a.debtDate).localeCompare(String(b.debtDate))),first=debts[0]||{},emp=payload?.recorder||DB.employees.find(e=>e.id===first.createdBy)||{name:'-'},biz=payload?.business||DB.settings.business,docNo=new URLSearchParams(location.search).get('doc')||'QR-'+String(c.code||cid).toUpperCase();
   let html=docHeader('ทะเบียนติดตามลูกหนี้ค้างชำระ',docNo,{business:biz,author:emp});
-  html+='<section class="doc-customer-block"><table class="doc-table"><caption>ลูกหนี้: '+esc(c.name)+' · รหัส '+esc(c.code||'-')+' · '+esc(c.village||'บ้านนาไฮ')+(c.moo?' · หมู่ที่ '+esc(c.moo):'')+'</caption><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>';
+  html+='<section class="doc-customer-block"><table class="doc-table"><caption>ลูกหนี้: '+esc(c.name)+' · รหัส '+esc(c.code||'-')+' · '+esc(c.village||'บ้านนาไฮ')+(c.moo?' · หมู่ที่ '+esc(c.moo):'')+' · เบอร์โทร: '+esc(customerPhone(c))+'</caption><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>';
   html+=debts.map((d,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(thDate(d.debtDate))+'</td><td>'+Number(d.jugs||0)+'</td><td>'+Number(d.packs||0)+'</td><td class="r">'+fmtN(d.jugAmount)+'</td><td class="r">'+fmtN(d.packAmount)+'</td><td class="r">'+fmtN(d.total)+'</td></tr>').join('')||'<tr><td colspan="7">ไม่มีรายการค้างชำระ</td></tr>';
   html+='</tbody></table></section><div class="doc-summary">ยอดค้างชำระรวม '+fmtN(debts.reduce((sum,d)=>sum+Number(d.total||0),0))+' บาท · '+debts.length+' รายการ</div>'+docFooter(docNo,emp);
   document.body.innerHTML='<div class="document-toolbar"><p>เอกสารเลขที่ '+esc(docNo)+'</p><button id="printLegacyDocument" type="button">พิมพ์ / บันทึก PDF</button></div><main id="printArea" class="document-screen"><div class="doc-page">'+html+'</div></main>';
@@ -1487,7 +1500,7 @@ function buildDebtorReportHtml(area,filter,mode,customerId){
     for(const cid of customerIds){
       const dl=[...list[cid]].sort((a,b)=>a.debtDate.localeCompare(b.debtDate));
       const customer=DB.customers.find(c=>c.id===cid)||{},first=dl[0],village=area==='nai'?'บ้านนาไฮ · หมู่ที่ '+first.moo:(first.village||'-');
-      h+=`<section class="doc-customer-block${dl.length<=12?' doc-customer-compact':''}"><table class="doc-table debtor-report-table"><caption>ลูกหนี้: ${esc(first.customerName)}${customer.code?' · รหัส '+esc(customer.code):''} · ${esc(village)}</caption><colgroup><col style="width:7%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:20%"></colgroup><thead><tr class="doc-customer-heading"><th colspan="7">ลูกหนี้: ${esc(first.customerName)}${customer.code?' · รหัส '+esc(customer.code):''} · ${esc(village)}</th></tr><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>`;
+      h+=`<section class="doc-customer-block${dl.length<=12?' doc-customer-compact':''}"><table class="doc-table debtor-report-table"><caption>ลูกหนี้: ${esc(first.customerName)} · รหัส ${esc(customer.code||'-')} · ${esc(village)} · เบอร์โทร: ${esc(customerPhone(customer))}</caption><colgroup><col style="width:7%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:18%"><col style="width:20%"></colgroup><thead><tr class="doc-customer-heading"><th colspan="7"><div class="debtor-identity-name">ลูกหนี้: ${esc(first.customerName)}</div><div class="debtor-identity-details"><span>รหัส ${esc(customer.code||'-')}</span><span>${esc(village)}</span><span>เบอร์โทร: ${esc(customerPhone(customer))}</span></div></th></tr><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>ถัง</th><th>แพ็ค</th><th>เงินน้ำถัง</th><th>เงินน้ำแพ็ค</th><th>ยอดรวม (บาท)</th></tr></thead><tbody>`;
       dl.forEach((d,i)=>{h+=`<tr><td>${i+1}</td><td>${thDate(d.debtDate)}</td><td>${d.jugs||0}</td><td>${d.packs||0}</td><td class="r">${fmtN(d.jugAmount)}</td><td class="r">${fmtN(d.packAmount)}</td><td class="r">${fmtN(d.total)}</td></tr>`;});
       const sum=key=>dl.reduce((n,d)=>n+Number(d[key]||0),0);h+=`<tr class="doc-customer-total"><td colspan="2" class="l">รวม ${esc(first.customerName)}</td><td>${sum('jugs')}</td><td>${sum('packs')}</td><td class="r">${fmtN(sum('jugAmount'))}</td><td class="r">${fmtN(sum('packAmount'))}</td><td class="r">${fmtN(sum('total'))}</td></tr></tbody></table></section>`;
     }

@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+(async()=>{const d=new JSDOM(fs.readFileSync('index.html','utf8'),{url:'https://fixture.test/design-preview',runScripts:'outside-only'}),w=d.window;
+Object.assign(w,{FRESHY_PREVIEW:true,FRESHY_CONFIG:{mode:'demo'},structuredClone,scrollTo(){},print(){},setInterval:()=>0,matchMedia:()=>({matches:false,addEventListener(){}})});
+for(const f of ['sync.js','features.js','payments.js','data-tools.js','vendor/qrcode.js','dashboard.js'])w.eval(fs.readFileSync(f,'utf8'));
+let source=fs.readFileSync('app.js','utf8'),end=source.lastIndexOf('})();');w.eval(source.slice(0,end)+'window.phoneTest={db:()=>DB,build:buildDebtorReportHtml,open:openCustomerPhone};'+source.slice(end));
+const $=s=>w.document.querySelector(s);$('#loginCode').value='7716';$('#loginBtn').click();const db=w.phoneTest.db();
+const customer=db.customers.find(c=>db.debtors.some(x=>x.customerId===c.id&&x.status==='unpaid')),other=db.customers.find(c=>c.id!==customer.id);
+customer.phone='0812345678';other.phone='0899999999';const debtBefore=JSON.stringify(db.debtors),customerBefore=structuredClone(customer);
+let report=w.phoneTest.build(customer.area,'all','combined',customer.id);assert(report.html.includes('เบอร์โทร: 0812345678'));assert(!report.html.includes('0899999999'));const snap=w.FreshyFeatures.documentSnapshot(report.html,report.docNo,db.settings.business,db.employees[0],w.document);assert(snap.tables[0].title.includes('0812345678'));
+w.phoneTest.open(customer.id);assert.equal($('#customerPhoneInput').value,'0812345678');$('#customerPhoneInput').value='020123456';$('#saveCustomerPhone').click();await new Promise(r=>setTimeout(r,30));assert.equal(db.customers.find(c=>c.id===customer.id).phone,'020123456');assert.equal(JSON.stringify(db.debtors),debtBefore);for(const k of Object.keys(customerBefore).filter(k=>k!=='phone'))assert.deepEqual(db.customers.find(c=>c.id===customer.id)[k],customerBefore[k]);assert(snap.tables[0].title.includes('0812345678'),'Saved historical document must retain its original phone');
+w.phoneTest.open(customer.id);$('#customerPhoneInput').value='';$('#saveCustomerPhone').click();await new Promise(r=>setTimeout(r,30));report=w.phoneTest.build(customer.area,'all','combined',customer.id);assert(report.html.includes('เบอร์โทร: -'));
+customer.phone='<script>alert(1)</script>';report=w.phoneTest.build(customer.area,'all','combined',customer.id);assert(!report.html.includes('<script>'));assert(report.html.includes('&lt;script&gt;'));customer.phone='0812345678';
+$('[data-page="customersNai"]').click();$('#addCustBtn').click();assert($('#c_phone'));w.closeModal();$('[data-page="debtorsNai"]').click();assert($('.customerPhoneEdit'));
+// Export a layout fixture with the actual print CSS and long identity values.
+customer.name='ลูกค้าตัวอย่างสำหรับตรวจเอกสารชื่อยาว';db.debtors.filter(x=>x.customerId===customer.id).forEach(x=>x.customerName=customer.name);report=w.phoneTest.build(customer.area,'all','combined',customer.id);
+fs.mkdirSync('tmp/phone-layout',{recursive:true});const css=[...w.document.querySelectorAll('style')].map(e=>e.textContent).join('\n')+'\n'+['ui.css','modern.css','report.css'].map(f=>fs.readFileSync(f,'utf8')).join('\n');fs.writeFileSync('tmp/phone-layout/report.html','<!doctype html><html lang="th"><meta charset="utf-8"><style>'+css+'</style><body><main id="printArea"><div class="doc-page">'+report.html+'</div></main></body></html>');
+d.window.close();console.log('Passed: phone save/clear, per-customer isolation, unchanged debt values, missing-phone dash, safe escaping, existing snapshot immutability and phone entry controls.');})().catch(e=>{console.error(e);process.exitCode=1;});

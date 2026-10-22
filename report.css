@@ -53,3 +53,16 @@
 @media screen and (max-width:600px){.doc-page .doc-head{grid-template-columns:45px minmax(0,1fr) 90px!important;gap:8px!important}.doc-page .doc-title .factory{font-size:19px!important}.doc-page .doc-title .report-name{font-size:16px!important}.doc-page .sign-row{column-gap:20px!important}}
 
 @media print{.doc-page .doc-customer-compact{break-inside:avoid!important}}
+
+
+/* Customer identity: formal, compact and readable on white paper. */
+.doc-page .debtor-identity-name{font-weight:700;font-size:16px;line-height:1.55}
+.doc-page .debtor-identity-details{display:flex;flex-wrap:wrap;gap:2px 18px;font-weight:400;font-size:14px;line-height:1.65}
+.doc-page .debtor-identity-details span{overflow-wrap:anywhere}
+.doc-page .debtor-report-table th{color:#111!important;background:#fff!important}
+.doc-page .debtor-report-table .doc-customer-total td{font-weight:700;color:#000!important;background:#fff!important}
+@media print{
+ .doc-page .debtor-identity-name{font-size:12pt;line-height:1.45}
+ .doc-page .debtor-identity-details{font-size:10.5pt;gap:1mm 5mm;line-height:1.5}
+ .doc-page .doc-table .doc-customer-heading th{padding:2mm 1.8mm!important}
+}
