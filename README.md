@@ -73,3 +73,10 @@ Vercel cron ตรวจงานวันละหนึ่งครั้ง�
 `npm ci` → `npm test` → `npm run build` · รายละเอียดใน TEST-RESULTS.md
 
 `/design-preview` เป็นหน้าทดลองออกแบบด้วยข้อมูลจำลอง ใช้ที่เก็บแยกจาก production และไม่มีเซสชันออนไลน์
+
+
+## 8.7 — Admin corrections and deleted-data recovery
+
+The debtor and receipt screens provide admin-only correction and deletion actions through `/api/debt-admin`. Deletion atomically removes the active debtor and saves an AES-GCM-encrypted snapshot in the existing store. Recovery requires the current administrator's account password, uses a five-minute HttpOnly session bound to the authenticated token, and restores the original record ID and payment state without duplicating it. `FRESHY_RECOVERY_SECRET` is server-only and must remain stable for archived records to stay recoverable. No existing financial records are rewritten during deployment.
+
+Existing databases must also apply `supabase/migrations/20261022044706_admin_debtor_corrections.sql` to prevent older/direct database clients from correcting existing debtor dates, customer references, quantities or amounts as staff. This additive trigger does not alter existing rows or normal payment transitions. Its production application requires access to the debtor database project; publishing the web application alone does not apply this database migration.
