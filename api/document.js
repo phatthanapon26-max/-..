@@ -9,6 +9,7 @@ function validate(snapshot){
  const clean={schema:1,docNo:snapshot.docNo,title:snapshot.title,issuedAt:new Date().toISOString(),business:{},author:{},tables:snapshot.tables.map(t=>({title:String(t.title||'').slice(0,2000),headers:t.headers,rows:t.rows,widths:Array.isArray(t.widths)&&t.widths.length===t.headers.length&&t.widths.every(n=>Number.isFinite(n)&&n>0&&n<=100)?t.widths:undefined,alignments:Array.isArray(t.alignments)&&t.alignments.length===t.headers.length?t.alignments.map(a=>['left','center','right'].includes(a)?a:'left'):undefined})),metadata:String(snapshot.metadata||'').slice(0,12000),summaries:[],signatures:(Array.isArray(snapshot.signatures)?snapshot.signatures:[]).slice(0,4).map(s=>({name:String(s.name||'').trim().slice(0,200),role:String(s.role||'').slice(0,200)}))};
  for(const k of ['name','address','phone','taxId'])clean.business[k]=String(snapshot.business?.[k]||'').slice(0,2000);
  for(const k of ['name','role'])clean.author[k]=String(snapshot.author?.[k]||'').slice(0,300);
+ if(snapshot.invoice&&typeof snapshot.invoice==='object'){clean.invoice={};for(const key of ['customerName','customerCode','address','village','phone','dueDate','note'])clean.invoice[key]=String(snapshot.invoice[key]||'').slice(0,key==='note'?1000:2000);}
  clean.summaries=(Array.isArray(snapshot.summaries)?snapshot.summaries:[]).slice(0,2000).map(v=>String(v).slice(0,12000));return clean;
 }
 module.exports=async(req,res)=>{C.noStore(res);res.setHeader('Referrer-Policy','no-referrer');try{

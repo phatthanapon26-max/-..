@@ -845,7 +845,7 @@ function renderDebtors(area){
   $('#pageContent').querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{debtorFilter[area]=b.dataset.f;debtorPage[area]=0;renderDebtors(area);}));
   const si=$('#debtorSearch'); const sug=$('#searchSuggest');
   bindSearch(si,value=>{debtorSearch=value;debtorPage[area]=0;},()=>renderDebtors(area));
-  $('#pageContent').querySelectorAll('.debtorDocument').forEach(button=>button.onclick=async()=>{button.disabled=true;try{const report=buildDebtorReportHtml(area,'all','combined',button.dataset.cid);if(!authIdentity){preparePrint(report.html,report.docNo,false);return;}const url=await persistDocument(report.html,report.docNo);location.assign(url);}catch(e){toast(e.message,'error');}finally{button.disabled=false;}});
+  $('#pageContent').querySelectorAll('.debtorDocument').forEach(button=>button.onclick=()=>openPrintOptions(area,button.dataset.cid));
   $('#debtPrev').onclick=()=>{debtorPage[area]--;renderDebtors(area);attachCsv();};$('#debtNext').onclick=()=>{debtorPage[area]++;renderDebtors(area);attachCsv();};
   $('#addDebtorBtn').addEventListener('click',()=>openAddDebtor(area));
   $('#pageContent .debtor-cards').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.classList.contains('mobileDebtActions')){openMobileDebtActions(b.dataset.id);return;}if(b.classList.contains('editAdminDebt')){openEditAdminDebt(b.dataset.id);return;}if(b.classList.contains('deleteAdminDebt')){openDeleteAdminDebt(b.dataset.id);return;}if(b.classList.contains('payOne')){markPaid(b.dataset.id);return;}if(!b.matches('.debtRowsPrev,.debtRowsNext')||b.disabled)return;const cid=b.dataset.cid,list=groups[cid],card=b.closest('.debtor-card'),pages=Math.ceil(list.length/DEBT_ROWS_PER_PAGE);const page=Math.max(0,Math.min(pages-1,debtorRowPages[cid]+(b.classList.contains('debtRowsNext')?1:-1)));debtorRowPages[cid]=page;card.querySelector('tbody').innerHTML=debtorRowsHtml(list.slice(page*DEBT_ROWS_PER_PAGE,(page+1)*DEBT_ROWS_PER_PAGE));card.querySelector('.debt-row-range').textContent='รายการ '+(page*DEBT_ROWS_PER_PAGE+1)+'–'+Math.min((page+1)*DEBT_ROWS_PER_PAGE,list.length)+' / '+list.length;card.querySelector('.debtRowsPrev').disabled=page===0;card.querySelector('.debtRowsNext').disabled=page===pages-1;renderIcons();};
@@ -1569,15 +1569,39 @@ function buildDebtorReportHtml(area,filter,mode,customerId){
   body+=docFooter(docNo);
   return {html:body,docNo};
 }
-function openPrintOptions(area){
-  openModal(`<div class="modal-head"><h3><i data-lucide="printer"></i> ตัวเลือกการปริ้นรายงาน</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
+function buildDebtorInvoiceHtml(area,customerId,options={}){
+  if(!customerId)throw Error('กรุณาเลือกลูกค้าสำหรับใบแจ้งหนี้');
+  const rows=scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='unpaid'&&d.customerId===customerId).sort((a,b)=>a.debtDate.localeCompare(b.debtDate));
+  if(!rows.length)throw Error('ไม่พบยอดค้างชำระของลูกค้ารายนี้');
+  const customer=DB.customers.find(c=>c.id===customerId)||{},first=rows[0],docNo=nextDocNo('INV');
+  const invoice={customerName:first.customerName,customerCode:customer.code||'-',address:customer.address||'-',village:area==='nai'?'บ้านนาไฮ · หมู่ที่ '+first.moo:(first.village||'-'),phone:customerPhone(customer),dueDate:options.dueDate?thDate(options.dueDate):'ไม่ได้ระบุ',note:options.note||'-'};
+  let body=docHeader('ใบแจ้งหนี้',docNo)+'<section class="invoice-customer" data-invoice="'+esc(JSON.stringify(invoice))+'"><h3>เรียกเก็บเงินจาก</h3><div class="invoice-buyer-name">'+esc(invoice.customerName)+'</div><div>รหัสลูกค้า '+esc(invoice.customerCode)+' · '+esc(invoice.village)+'</div><div>ที่อยู่ '+esc(invoice.address)+'</div><div>เบอร์โทร '+esc(invoice.phone)+'</div><div class="invoice-due">กำหนดชำระ '+esc(invoice.dueDate)+'</div></section>';
+  body+='<table class="doc-table invoice-table"><colgroup><col style="width:7%"><col style="width:18%"><col style="width:25%"><col style="width:10%"><col style="width:10%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>ลำดับ</th><th>วันที่ค้าง</th><th>รายการ</th><th>จำนวน</th><th>หน่วย</th><th>ราคา/หน่วย</th><th>จำนวนเงิน (บาท)</th></tr></thead><tbody>';
+  let index=0;
+  for(const d of rows){
+    const items=[['น้ำดื่มชนิดถัง',Number(d.jugs||0),'ถัง',Number(d.jugAmount||0)],['น้ำดื่มชนิดแพ็ค',Number(d.packs||0),'แพ็ค',Number(d.packAmount||0)]];
+    // Keep the original recorded total even if a legacy record has a different component sum.
+    const difference=Math.round((Number(d.total||0)-items.reduce((sum,item)=>sum+item[3],0))*100)/100;if(difference)items.push(['ส่วนต่างตามยอดที่บันทึก',0,'-',difference]);
+    for(const [name,quantity,unit,amount] of items){if(!quantity&&!amount)continue;const price=quantity?(amount/quantity).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:4}):'-';body+='<tr><td>'+(++index)+'</td><td>'+esc(thDate(d.debtDate))+'</td><td class="l">'+esc(name)+'</td><td>'+esc(quantity||'-')+'</td><td>'+unit+'</td><td class="r">'+esc(price)+'</td><td class="r">'+amount.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td></tr>';}
+  }
+  const total=rows.reduce((sum,d)=>sum+Number(d.total||0),0);
+  body+='</tbody></table><div class="doc-summary invoice-total">ยอดเงินที่ต้องชำระทั้งสิ้น '+total.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+' บาท</div><div class="doc-summary invoice-note">หมายเหตุ: '+esc(invoice.note)+'<br>เอกสารนี้เป็นใบแจ้งหนี้ ไม่ใช่ใบเสร็จรับเงินหรือใบกำกับภาษี</div><div class="sign-row"><div class="sign-box"><div class="line">('+esc(me()?.name||'........................................')+')</div><div class="role">ผู้วางบิล</div><div class="sign-date">วันที่ .... / .... / ........</div></div><div class="sign-box"><div class="line">(........................................)</div><div class="role">ผู้รับใบแจ้งหนี้</div><div class="sign-date">วันที่ .... / .... / ........</div></div></div><div class="doc-foot">เลขที่เอกสาร '+esc(docNo)+' · '+esc(DB.settings.business.name)+'</div>';
+  return {html:body,docNo};
+}
+function openPrintOptions(area,customerId=''){
+  if(!canPrint()){toast('ไม่มีสิทธิ์ออกเอกสาร','error');return;}
+  const available=new Map();scopeRows(DB.debtors).filter(d=>d.area===area&&d.status==='unpaid').forEach(d=>available.set(d.customerId,d.customerName));
+  openModal(`<div class="modal-head"><h3><i data-lucide="printer"></i> เลือกเอกสาร A4</h3><button class="x" onclick="closeModal()"><i data-lucide="x"></i></button></div>
   <div class="modal-body">
-    <div class="field"><label>รูปแบบการปริ้น</label><select id="po_mode" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="combined">ปริ้นรวม (ทุกหมู่ในรายงานเดียว)</option><option value="split">ปริ้นแยก (แยกตามหมู่/หมู่บ้าน)</option></select></div>
-    <div class="field"><label>กรองข้อมูล</label><select id="po_filter" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px"><option value="all">ทั้งหมด</option>${area==='nai'?'<option value="7">เฉพาะหมู่ที่ 7</option><option value="16">เฉพาะหมู่ที่ 16</option>':DB.villages.map(v=>'<option value="'+esc(v.name)+'">'+esc(v.name)+'</option>').join('')}</select></div>
-    <label class="perm-item"><input type="checkbox" id="po_qr" checked> แสดง QR เอกสารตรงมุมบนขวา</label><p style="font-size:12px;color:var(--muted)">ระบบจะเปิดหน้าพิมพ์ A4 ให้เลือกบันทึกเป็น PDF หรือส่งไปเครื่องพิมพ์ เลขที่เอกสารไม่ซ้ำกันอัตโนมัติ</p>
-  </div>
-  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="doPrint"><i data-lucide="printer"></i> ปริ้น / ส่งออก PDF</button></div>`);
-  $('#doPrint').addEventListener('click',()=>{const r=buildDebtorReportHtml(area,$('#po_filter').value,$('#po_mode').value),showQr=$('#po_qr').checked;preparePrint(r.html,r.docNo,showQr);});
+    <div class="field"><label for="po_type">ชนิดเอกสาร</label><select id="po_type"><option value="report">รายงานลูกหนี้ค้างชำระ (รูปแบบเดิม)</option><option value="invoice">ใบแจ้งหนี้รายบุคคล</option></select></div>
+    <div class="field"><label for="po_customer">ลูกค้า</label><select id="po_customer"><option value="">ทั้งหมด (สำหรับรายงาน)</option>${[...available].map(([id,name])=>'<option value="'+esc(id)+'"'+(id===customerId?' selected':'')+'>'+esc(name)+'</option>').join('')}</select></div>
+    <div id="po_report_fields"><div class="field"><label>รูปแบบรายงาน</label><select id="po_mode"><option value="combined">พิมพ์รวม</option><option value="split">แยกตามหมู่/หมู่บ้าน</option></select></div>
+    <div class="field"><label>กรองข้อมูล</label><select id="po_filter"><option value="all">ทั้งหมด</option>${area==='nai'?'<option value="7">เฉพาะหมู่ที่ 7</option><option value="16">เฉพาะหมู่ที่ 16</option>':DB.villages.map(v=>'<option value="'+esc(v.name)+'">'+esc(v.name)+'</option>').join('')}</select></div></div>
+    <div id="po_invoice_fields" hidden><div class="field"><label for="po_due">กำหนดชำระ (ถ้ามี)</label><input id="po_due" type="date"></div><div class="field"><label for="po_note">หมายเหตุในใบแจ้งหนี้</label><textarea id="po_note" maxlength="1000" rows="2" placeholder="เช่น ช่องทางติดต่อหรือรายละเอียดการชำระ"></textarea></div></div>
+    <label class="perm-item"><input type="checkbox" id="po_qr" checked> แสดง QR เอกสารตรงมุมบนขวา</label><p class="help-text">ใบแจ้งหนี้ใช้ยอดค้างชำระที่มีอยู่ ข้อมูลชื่อ ที่อยู่ และเบอร์โทรโรงน้ำใช้จากการตั้งค่าสถานประกอบการ</p>
+  </div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary" id="doPrint"><i data-lucide="printer"></i> พิมพ์ / บันทึก PDF</button></div>`);
+  $('#po_type').onchange=()=>{const invoice=$('#po_type').value==='invoice';$('#po_report_fields').hidden=invoice;$('#po_invoice_fields').hidden=!invoice;};
+  $('#doPrint').onclick=()=>{try{const cid=$('#po_customer').value,r=$('#po_type').value==='invoice'?buildDebtorInvoiceHtml(area,cid,{dueDate:$('#po_due').value,note:$('#po_note').value.trim()}):buildDebtorReportHtml(area,cid?'all':$('#po_filter').value,$('#po_mode').value,cid||undefined);preparePrint(r.html,r.docNo,$('#po_qr').checked);}catch(e){toast(e.message,'error');}};
 }
 function buildCashReportHtml(date){
   const rows=scopeRows(DB.cashsales).filter(r=>!date||r.deliveryDate===date);

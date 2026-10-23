@@ -18,11 +18,15 @@ function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
  const nextPage=()=>{doc.addPage();y=42;text(snapshot.title,left,y,width-150,10,true);text(snapshot.docNo,left+width-150,y,150,9,false,'right');y+=Math.max(height(snapshot.title,width-150,10,true),18)+8;line(y);y+=12;};
  const ensure=h=>{if(y+h>bottom)nextPage();};
  const paragraph=(value,size=11,bold=false,align='left')=>{const h=height(value,width,size,bold);ensure(h+6);text(value,left,y,width,size,bold,align);y+=h+6;};
- paragraph(snapshot.business.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',19,true,'center');
- const contact=[snapshot.business.address,snapshot.business.phone?'โทรศัพท์ '+snapshot.business.phone:'',snapshot.business.taxId?'เลข อย. '+snapshot.business.taxId:''].filter(Boolean).join(' · ');
- if(contact)paragraph(contact,10,false,'center');y+=5;paragraph(snapshot.title,15,true,'center');line(y);y+=10;
+ const headerTop=y,headerLeft=left+92,headerWidth=width-92;
+ doc.image(path.join(process.cwd(),'brand-icon.png'),left,headerTop,{fit:[76,76]});
+ const headerLine=(value,size,bold=false)=>{const h=height(value,headerWidth,size,bold);text(value,headerLeft,y,headerWidth,size,bold,'center');y+=h+5;};
+ headerLine(snapshot.business.name||'โรงน้ำดื่ม เฟรชชี่ วอเตอร์',19,true);
+ const contact=['ที่ตั้ง '+(snapshot.business.address||'ยังไม่ได้ระบุที่อยู่โรงน้ำ'),snapshot.business.phone?'โทรศัพท์ '+snapshot.business.phone:'',snapshot.business.taxId?'เลข อย. '+snapshot.business.taxId:''].filter(Boolean).join(' · ');
+ headerLine(contact,10);headerLine(snapshot.title,15,true);y=Math.max(y,headerTop+82);line(y);y+=10;
  paragraph('เลขที่เอกสาร '+snapshot.docNo+'    วันที่ออก '+date(snapshot.issuedAt)+' น.',10);
- if(snapshot.metadata)paragraph(snapshot.metadata,10);y+=6;
+ if(snapshot.metadata&&!snapshot.metadata.startsWith('วันที่ออกเอกสาร'))paragraph(snapshot.metadata,10);else paragraph('ผู้จัดทำ '+snapshot.author.name,10);y+=6;
+ if(snapshot.invoice){const c=snapshot.invoice;paragraph('เรียกเก็บเงินจาก '+c.customerName,12,true);paragraph('รหัสลูกค้า '+c.customerCode+' · '+c.village+' · เบอร์โทร '+c.phone,10);paragraph('ที่อยู่ '+c.address,10);paragraph('กำหนดชำระ '+c.dueDate,10,true);}
  for(const table of snapshot.tables){
   const count=Math.max(1,table.headers.length),size=count>9?9:11;
   let weights=table.widths?.length===count?table.widths:table.headers.map((h,i)=>{const cells=table.rows.slice(0,100).map(r=>r[i]||'');return Math.max(5,Math.min(24,Math.max(String(h).length,...cells.map(s=>s.length))));});
@@ -49,3 +53,4 @@ function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
  }catch(e){reject(e);doc.destroy();}
 });}
 module.exports={pdfDocument,notificationHtml};
+

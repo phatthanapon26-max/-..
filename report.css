@@ -67,3 +67,14 @@
  .doc-page .doc-table .doc-customer-heading th{padding:2mm 1.8mm!important}
 }
 .doc-page .doc-logo img{width:52px!important;height:60px!important;object-fit:contain}.doc-page .factory-sub{line-height:1.6!important;white-space:normal;overflow-wrap:anywhere}
+
+/* Sized for the A4 header, with intrinsic logo proportions on every document. */
+.doc-page .doc-logo{width:100%!important;height:auto!important;min-width:0;padding-top:0;align-self:center;display:flex;align-items:center;justify-content:center}
+.doc-page .doc-logo img,.doc-page .doc-logo svg{width:112px!important;height:112px!important;max-width:100%!important;max-height:112px!important;object-fit:contain!important}
+.doc-page .invoice-customer{border:1px solid #333;padding:12px 16px;margin:16px 0;line-height:1.7;break-inside:avoid}
+.doc-page .invoice-customer h3{font-size:13px;margin:0 0 4px;font-weight:400}
+.doc-page .invoice-buyer-name{font-size:18px;font-weight:700}.doc-page .invoice-due{border-top:1px solid #aaa;margin-top:8px;padding-top:6px;font-weight:700}
+.doc-page .invoice-note{font-size:12px!important;font-weight:400!important;text-align:left!important;white-space:pre-line}
+.doc-page .invoice-total{font-size:17px!important}
+@media screen and (max-width:600px){.doc-page .doc-head{grid-template-columns:72px minmax(0,1fr) 90px!important}.doc-page .doc-logo img,.doc-page .doc-logo svg{width:72px!important;height:82px!important;max-height:82px!important}}
+@media print{.doc-page .doc-logo img,.doc-page .doc-logo svg{width:29mm!important;height:29mm!important;max-height:29mm!important}.doc-page .invoice-customer{padding:3mm 4mm;font-size:11pt}.doc-page .invoice-buyer-name{font-size:13pt}.doc-page .invoice-total{font-size:13pt!important}.doc-page .invoice-note{font-size:10pt!important}}
