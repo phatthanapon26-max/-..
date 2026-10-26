@@ -5,8 +5,9 @@ module.exports=async(req,res)=>{C.noStore(res);try{
  const body=req.body||{};if(Buffer.byteLength(JSON.stringify(body.invoice||{}),'utf8')>2000000)throw new C.HttpError(400,'ฉบับร่างมีขนาดใหญ่เกินไป');if(String(body.expectedRevision||'')!==String(p.data.settings?._resetRevision||''))throw new C.HttpError(409,'ข้อมูลเปลี่ยน กรุณาโหลดใหม่');
  if(body.operationId&&!/^[a-f0-9-]{36}$/.test(body.operationId))throw new C.HttpError(400,'รหัสคำขอไม่ถูกต้อง');
  const requestedId=body.id||(body.operationId?'invoice-draft:'+body.operationId:null);
- const old=requestedId?(p.data.sentEmails||[]).find(x=>x.id===requestedId&&x.type==='invoice-draft'):null;if(body.id&&!old)throw new C.HttpError(404,'ไม่พบฉบับร่าง');
- let invoice;try{invoice=I.normalize(body.invoice);}catch(e){throw new C.HttpError(400,e.message);}if(!invoice.customerName.trim()||!invoice.docNo.trim()||!invoice.items.length)throw new C.HttpError(400,'กรอกชื่อลูกค้า เลขที่เอกสาร และรายการสินค้า');
+ const old=requestedId?(p.data.sentEmails||[]).find(x=>x.id===requestedId&&x.type==='invoice-draft')||null:null;if(body.id&&!old)throw new C.HttpError(404,'ไม่พบฉบับร่าง');
+ let invoice;try{invoice=I.lockedFromData(body.invoice,p.data);}catch(e){throw new C.HttpError(400,e.message);}if(!invoice.customerName.trim()||!invoice.docNo.trim()||!invoice.items.length)throw new C.HttpError(400,'กรอกชื่อลูกค้า เลขที่เอกสาร และรายการสินค้า');
+ if(old&&(['customerName','address','phone','issuer','payment','items','source','docNo','issuedAt','dueDate','reference','note'].some(k=>!S.equal(old.invoice[k],invoice[k]))))throw new C.HttpError(409,'ข้อมูลเอกสารถูกล็อก ไม่สามารถแก้ไขได้');
  const row={id:old?.id||requestedId||'invoice-draft:'+crypto.randomUUID(),type:'invoice-draft',createdBy:old?.createdBy||p.actor.id,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),invoice};
  if(old&&!body.id&&body.operationId&&S.equal(old.invoice,invoice))return res.json({ok:true,payload:p,id:old.id});
  const expected=body.expected||null;if(old&&!S.equal(expected,old))throw new C.HttpError(409,'มีการแก้ไขฉบับร่างจากอุปกรณ์อื่น กรุณาเปิดใหม่');

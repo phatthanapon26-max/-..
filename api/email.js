@@ -6,8 +6,9 @@ module.exports=async(req,res)=>{C.noStore(res);try{if(req.method!=='POST')throw 
  const now=Date.now();for(const [key,v]of attempts)if(now-v.start>60000)attempts.delete(key);const limit=attempts.get(actor.id)||{start:now,count:0};attempts.set(actor.id,limit);if(++limit.count>30)throw new C.HttpError(429,'ส่งถี่เกินไป กรุณารอสักครู่');let body=html,attachments=[];
  if(req.body.format==='formal'){
   if(type!=='report')throw new C.HttpError(400,'รูปแบบ PDF ใช้กับรายงานเท่านั้น');
-  const d=require('./document').validate(req.body.snapshot);d.business={...payload.data.settings.business};d.author={name:actor.name,role:actor.role};if(d.signatures.length)d.signatures[0].name=actor.name;
+  let input=req.body.snapshot;if(input?.invoice?.version===2){try{input={...input,invoice:require('../invoice').lockedFromData(input.invoice,payload.data)};}catch(e){throw new C.HttpError(409,e.message);}}const d=require('./document').validate(input);if(d.invoice?.version!==2)d.business={...payload.data.settings.business};d.author={name:actor.name,role:actor.role};if(d.signatures.length)d.signatures[0].name=actor.name;
   const report=require('./_lib/document-report');const pdf=await report.pdfDocument(d);if(pdf.length>15000000)throw new C.HttpError(413,'ไฟล์รายงานใหญ่เกินไป กรุณาแยกส่งเป็นรายงานย่อย');body=report.notificationHtml(d);attachments=[{filename:d.docNo.replace(/[^A-Za-z0-9_-]/g,'_')+'.pdf',content:pdf,contentType:'application/pdf'}];
  }
  const sent=await mail.send(em,{to:recipients,subject,html:body,attachments});return res.json({ok:true,id:sent.id,attachedPdf:attachments.length>0});
  }catch(e){return C.fail(res,e);}};
+
