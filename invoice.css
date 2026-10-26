@@ -49,3 +49,5 @@
 .invoice-sheet .invoice-remarks small{display:block;font-size:.87em;margin-top:2mm;line-height:1.5}.invoice-sheet .invoice-payment-instructions{margin-top:3mm;font-size:.9em;line-height:1.55}.invoice-sheet .invoice-payment-instructions p+p{margin-top:2mm}
 
 .invoice-sheet .invoice-footer>.invoice-page-note{text-align:left}
+
+.invoice-sheet .invoice-customer-code{display:block;font-size:.82em;line-height:1.35;margin-top:1mm;overflow-wrap:anywhere}
