@@ -1,5 +1,5 @@
 'use strict';
-const assert=require('node:assert/strict'),C=require('./api/_lib/core'),handler=require('./api/invoices'),I=require('./invoice');
+const assert=require('node:assert/strict'),C=require('./api/_lib/core'),documentHandler=require('./api/document'),handler=(req,res)=>documentHandler({...req,query:{...req.query,action:'invoice-draft'}},res),I=require('./invoice');
 (async()=>{const original={authenticate:C.authenticate,json:C.json},data={settings:{_resetRevision:'r1'},debtors:[{id:'unchanged',total:55}],customers:[{id:'c1',name:'เดิม'}],sentEmails:[]};let role='staff',writes=[];
  C.authenticate=async(req,admin)=>{if(!req.headers.authorization)throw new C.HttpError(401,'login');if(admin&&role!=='admin')throw new C.HttpError(403,'admin');return {actor:{id:'admin1',role,name:'ผู้ทดสอบ'},data};};C.json=async(path,options)=>{const changes=JSON.parse(options.body).changes;writes.push(changes);for(const change of changes){assert.equal(change.collection,'sentEmails');const index=data.sentEmails.findIndex(x=>x.id===change.id);if(index<0)data.sentEmails.push(change.value);else data.sentEmails[index]=change.value;}return {actor:{id:'admin1',role:'admin'},data};};
  const invoice=I.normalize({docNo:'INV-T',customerName:'ลูกค้าทดสอบ',issuer:{},items:[{code:'W1',description:'น้ำดื่ม',quantity:1,unit:'ถัง',unitPrice:15,amount:15}]});

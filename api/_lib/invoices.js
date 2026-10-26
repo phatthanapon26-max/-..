@@ -1,5 +1,5 @@
 'use strict';
-const crypto=require('node:crypto'),C=require('./_lib/core'),I=require('../invoice'),S=require('../sync');
+const crypto=require('node:crypto'),C=require('./core'),I=require('../../invoice'),S=require('../../sync');
 module.exports=async(req,res)=>{C.noStore(res);try{
  const p=await C.authenticate(req,true);if(req.method!=='POST')throw new C.HttpError(405,'ใช้ POST');
  const body=req.body||{};if(Buffer.byteLength(JSON.stringify(body.invoice||{}),'utf8')>2000000)throw new C.HttpError(400,'ฉบับร่างมีขนาดใหญ่เกินไป');if(String(body.expectedRevision||'')!==String(p.data.settings?._resetRevision||''))throw new C.HttpError(409,'ข้อมูลเปลี่ยน กรุณาโหลดใหม่');
