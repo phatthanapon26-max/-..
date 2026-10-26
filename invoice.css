@@ -9,3 +9,5 @@
 
 .doc-page .invoice-sheet .invoice-reference{margin-top:8px;line-height:1.45}.invoice-sheet .invoice-reference>div{margin:1px 0}.invoice-sheet .invoice-party{line-height:1.45}.invoice-sheet .invoice-party-grid p{margin:1px 0}.invoice-sheet .invoice-customer-v2 dl>div{margin:1px 0}
 @media print{.invoice-sheet .invoice-party{padding:1.8mm 0}.invoice-sheet .invoice-party h2{margin-bottom:2px}}
+
+@media screen{#modalBox:has(.invoice-sheet-scroll){max-width:900px;display:flex;flex-direction:column;overflow:hidden}#modalBox:has(.invoice-sheet-scroll)>.modal-body{overflow:auto;min-height:0}#modalBox:has(.invoice-sheet-scroll) .invoice-sheet-scroll{max-height:none;margin-top:0}#modalBox:has(.invoice-sheet-scroll)>.modal-head,#modalBox:has(.invoice-sheet-scroll)>.modal-foot{flex-shrink:0}}
