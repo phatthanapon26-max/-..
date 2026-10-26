@@ -1,36 +1,36 @@
 'use strict';
 const PDFDocument=require('pdfkit'),path=require('node:path'),I=require('../../invoice');
+const mm=n=>n*72/25.4;
 function pdfInvoice(snapshot){return new Promise((resolve,reject)=>{
- const model=I.normalize({...snapshot.invoice,docNo:snapshot.docNo,issuedAt:snapshot.issuedAt}),t=model.template,doc=new PDFDocument({size:'A4',margins:{top:38,left:38,right:38,bottom:35},bufferPages:true,info:{Title:'ใบแจ้งหนี้',Subject:model.docNo,Author:model.issuer.name}}),chunks=[];
- doc.on('data',x=>chunks.push(x));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);
+ const m=I.normalize({...snapshot.invoice,docNo:snapshot.docNo,issuedAt:snapshot.issuedAt}),t=m.template,font=t.fontSize*.75,L=mm(12.6),W=mm(184.4),top=mm(12),tableY=top+mm(69.8),headH=mm(14.2),bodyH=t.bodyHeight*.75,summaryY=tableY+headH+bodyH,settleY=summaryY+mm(51.5),doc=new PDFDocument({size:'A4',margins:{top:0,left:0,right:0,bottom:0},bufferPages:true,info:{Title:'ใบแจ้งหนี้',Subject:m.docNo,Author:m.issuer.name}}),chunks=[];
+ doc.on('data',v=>chunks.push(v));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject);
  try{
  doc.registerFont('Thai',path.join(process.cwd(),'vendor/fonts/Sarabun-Regular.ttf')).registerFont('ThaiBold',path.join(process.cwd(),'vendor/fonts/Sarabun-Bold.ttf'));
- const left=38,width=doc.page.width-76,bottom=doc.page.height-55,font=t.fontSize*.75;let y=38;
- const text=(value,x,top,w,size=font,bold=false,align='left')=>doc.font(bold?'ThaiBold':'Thai').fontSize(size).fillColor('#111').text(String(value??''),x,top,{width:w,align,lineGap:1});
- const height=(value,w,size=font,bold=false)=>doc.font(bold?'ThaiBold':'Thai').fontSize(size).heightOfString(String(value??''),{width:w,lineGap:1});
- const line=(top,x=left,w=width)=>doc.strokeColor('#777').lineWidth(.5).moveTo(x,top).lineTo(x+w,top).stroke();
- const nextPage=()=>{doc.addPage();y=38;text('ใบแจ้งหนี้ · '+model.docNo,left,y,width,9,true,'right');y+=22;};const ensure=h=>{if(y+h>bottom)nextPage();};
- const fieldRows=(fields,x,top,w,labelW)=>{let yy=top;for(const [label,value] of fields){const h=Math.max(height(label,labelW,font-1),height(value||'-',w-labelW-7,font-1));text(label,x,yy,labelW,font-1);text(value||'-',x+labelW+7,yy,w-labelW-7,font-1);yy+=h+4;}return yy;};
- const heading=()=>{const logo=t.logoSize*.75;ensure(logo+14);doc.image(path.join(process.cwd(),'brand-icon.png'),left,y,{fit:[logo,logo]});text('ใบแจ้งหนี้',left+width*.52,y+2,width*.48,t.titleSize*.75,false,'right');text('Invoice',left+width*.52,y+35,width*.48,18,false,'right');y+=logo+14;};
- const issuer=()=>{const top=y,w=width*.61;ensure(84);const a=fieldRows([['ผู้ออก / Issuer',model.issuer.name],['ที่อยู่ / Address',model.issuer.address],['เลขผู้เสียภาษี / Tax ID',model.issuer.taxId],['โทรศัพท์ / Tel.',model.issuer.phone]],left,top,w,90);const b=fieldRows([['เลขที่ / No.',model.docNo],['วันที่ / Issue',I.date(model.issuedAt)],['ครบกำหนด / Due Date',I.date(model.dueDate)],['อ้างอิง / Ref.',model.reference]],left+w+20,top,width-w-20,80);y=Math.max(a,b)+6;};
- const customer=()=>{const fields=[['ลูกค้า / Customer',model.customerName],['ที่อยู่ / Address',model.address],['เลขผู้เสียภาษี / Tax ID','-'],['ผู้ติดต่อ / Attention',model.phone]];const h=fields.reduce((n,[label,value])=>n+Math.max(height(label,112,font-1),height(value,width-120,font-1))+4,0)+18;ensure(h);line(y);y+=9;y=fieldRows(fields,left,y,width,112)+9;};
- const items=()=>{
- const data=I.tableData(model),sum=t.columns.reduce((n,c)=>n+c.width,0),widths=t.columns.map(c=>width*c.width/sum),english={code:'ID no.',description:'Item',quantity:'Quantity',unit:'Unit',unitPrice:'Unit Price',amount:'Amount'};
- const rowHeight=row=>Math.max(t.rowHeight*.75,...row.map((cell,i)=>height(cell,widths[i]-10)+10));
- const draw=(row,forcedHeight=null)=>{const h=forcedHeight??rowHeight(row);let x=left;row.forEach((value,i)=>{if(i)doc.strokeColor('#999').lineWidth(.4).moveTo(x,y).lineTo(x,y+h).stroke();text(value,x+5,y+5,widths[i]-10,font,false,t.columns[i].align);x+=widths[i];});y+=h;};
- const header=()=>{line(y);const row=t.columns.map(c=>c.label+'\n'+english[c.key]);draw(row);line(y);};
- ensure(80);header();const bodyStart=y;let pageBodyStart=y;
- for(const row of data.rows){const h=rowHeight(row);if(y+h>bottom){line(y);nextPage();header();pageBodyStart=y;}draw(row);}
- const filler=Math.max(0,t.bodyHeight*.75-(y-(pageBodyStart===bodyStart?bodyStart:pageBodyStart)));if(filler&&y+filler<bottom){let x=left;for(let i=1;i<widths.length;i++){x+=widths[i-1];doc.strokeColor('#999').lineWidth(.4).moveTo(x,y).lineTo(x,y+filler).stroke();}y+=filler;}line(y);
+ const text=(value,x,y,width,size=font,align='left')=>doc.font('Thai').fontSize(size).fillColor('#333').text(String(value??''),x,y,{width,align,lineGap:0,features:['kern'],lineBreak:true});
+ const height=(value,width,size=font)=>doc.font('Thai').fontSize(size).heightOfString(String(value??''),{width,lineGap:0});
+ const line=(y,x=L,width=W)=>doc.strokeColor('#999').lineWidth(.4).moveTo(x,y).lineTo(x+width,y).stroke();
+ const fields=(rows,x,y,labelW,width,step=mm(5.7))=>rows.forEach(([label,value],i)=>{text(label,x,y+i*step,labelW,font);text(value||'-',x+labelW,y+i*step,width-labelW,font);});
+ const header=()=>{
+  const logo=t.logoSize*.75;doc.image(path.join(process.cwd(),'brand-icon.png'),L-mm(3.5),top-mm(2),{fit:[logo,logo]});text('ใบแจ้งหนี้',L+W*.65,top+mm(2),W*.35,t.titleSize*.75,'right');text('Invoice',L+W*.65,top+mm(10.7),W*.35,t.titleSize*.75*.78,'right');
+  const iy=top+mm(25.6);fields([['ผู้ออก / Issuer',m.issuer.name],['ที่อยู่ / Address',m.issuer.address],['เลขผู้เสียภาษี/ Tax ID',m.issuer.taxId],['โทรศัพท์ / Tel.',m.issuer.phone]],L,iy,mm(28.9),mm(123.8));
+  const rx=L+mm(132.8),rw=mm(51.6);for(const [i,label,value] of [[0,'เลขที่ / No.',m.docNo],[1,'วันที่ / Issue',I.date(m.issuedAt)],[2,'ครบกำหนด / Due Date',I.date(m.dueDate)],[3,'อ้างอิง / Ref.',m.reference||'-']]){text(label,rx,iy+i*mm(5.7),mm(24.6),i===2?font*.8:font);text(value,rx+mm(24.6),iy+i*mm(5.7),rw-mm(24.6),font*.96);}
+  const cy=top+mm(48.7);line(cy);text('ลูกค้า\nCustomer',L,cy+mm(4),mm(21.7));text(m.customerName,L+mm(21.7),cy+mm(4),mm(78.5));text(m.address,L+mm(21.7),cy+mm(10.8),mm(78.5));fields([['เลขผู้เสียภาษี / Tax ID','-'],['ผู้ติดต่อ / Tel.',m.phone]],L+mm(105.2),cy+mm(4),mm(41.1),mm(79.2),mm(6.8));
  };
- const summary=()=>{const leftW=width*.38,rightX=left+width*.43,rightW=width*.57,remarks='หมายเหตุ / Remarks\n'+(model.note||'-'),h=Math.max(height(remarks,leftW),78);ensure(h+6);const top=y;text(remarks,left,y+7,leftW,font);const rows=[['จำนวนเงินรวมทั้งสิ้น / Grand Total',I.money(model.total)],['จำนวนเงินรวมทั้งสิ้น',I.bahtText(model.total)],['จำนวนเงินที่ต้องชำระ / Net to Pay',I.money(model.total)]];for(let i=0;i<rows.length;i++){const [label,value]=rows[i],h=Math.max(25,height(value,rightW*.48,font-1)+10);if(i===1)doc.save().rect(rightX,y,rightW,h).fill('#e8e8e8').restore();text(label,rightX+4,y+7,rightW*.52-8,font-1);text(value,rightX+rightW*.52,y+7,rightW*.48-4,font-1,false,'right');y+=h;line(y,rightX,rightW);}y=Math.max(y,top+h);};
- const signatures=()=>{
- const gap=t.signatureGap*.75,h=gap+65;ensure(h+24);y+=15;line(y);line(y+2);y+=12;const top=y,payW=width*.46,signX=left+width*.51,signW=width*.49,w=(signW-20)/2;
- text('ข้อมูลการชำระเงิน / Payment',left,top,payW,font);const widths=[payW*.24,payW*.4,payW*.36],headers=['ธนาคาร','ชื่อบัญชี','เลขที่บัญชี'],values=[model.payment.bank,model.payment.accountName,model.payment.accountNo];let x=left;for(let i=0;i<3;i++){text(headers[i],x,top+22,widths[i]-5,font-1);text(values[i],x,top+43,widths[i]-5,font-1);x+=widths[i];}line(top+39,left,payW);line(top+65,left,payW);
- for(const [index,name,role] of [[0,t.signerName,t.signerRole],[1,t.receiverName,t.receiverRole]]){const x=signX+index*(w+20);text(role,x,top,w,font-1,false,'center');doc.strokeColor('#777').dash(1,{space:2}).moveTo(x,top+gap+15).lineTo(x+w,top+gap+15).stroke().undash();text('('+(name||'................................')+')',x,top+gap+26,w,font-1,false,'center');text('วันที่ .... / .... / ........',x,top+gap+45,w,font-2,false,'center');}y=top+h;
- };
- const footer=()=>{ensure(34);y+=14;text('เลขที่เอกสาร '+model.docNo,left,y,width*.38,7);text('ออกเอกสารโดย ระบบสารสนเทศจัดการลูกหนี้\nโรงน้ำดื่ม เฟรชชี่ วอเตอร์',left+width*.4,y,width*.6,7,false,'right');y+=20;};
- const blocks={heading,issuer,customer,items,summary,signatures,footer};for(const id of t.sections)blocks[id]();const range=doc.bufferedPageRange();for(let i=0;i<range.count;i++){doc.switchToPage(i);text('หน้า '+(i+1)+' / '+range.count,left,doc.page.height-65,width,8,false,'center');}doc.end();
+ const cols=t.columns,weights=cols.reduce((n,c)=>n+c.width,0),widths=cols.map(c=>W*c.width/weights),english={code:'ID no.',description:'Description',quantity:'Quantity',unit:'Unit',unitPrice:'Unit Price',amount:'Amount'},data=I.tableData(m),rowH=row=>Math.max(t.rowHeight*.75,...row.map((v,i)=>height(v,widths[i]-mm(4.4))+mm(2)));
+ const pages=[];let rows=[],used=0;for(const row of data.rows){const h=rowH(row);if(rows.length&&used+h>bodyH){pages.push(rows);rows=[];used=0;}rows.push(row);used+=h;}if(rows.length||!pages.length)pages.push(rows);
+ pages.forEach((rows,pageIndex)=>{
+  if(pageIndex)doc.addPage();header();let x=L;line(tableY);for(let i=0;i<cols.length;i++){text(cols[i].label,x+mm(2.2),tableY+mm(2),widths[i]-mm(4.4));text(english[cols[i].key],x+mm(2.2),tableY+mm(8),widths[i]-mm(4.4));x+=widths[i];if(i<cols.length-1)doc.strokeColor('#999').lineWidth(.4).moveTo(x,tableY).lineTo(x,summaryY).stroke();}line(tableY+headH);let y=tableY+headH;for(const row of rows){const h=rowH(row);x=L;row.forEach((value,i)=>{text(value,x+mm(2.2),y+mm(1),widths[i]-mm(4.4),font,cols[i].align);x+=widths[i];});y+=h;}line(summaryY);
+  if(pageIndex===pages.length-1){
+   text('หมายเหตุ / Remarks',L,summaryY+mm(2),W*.38);text(m.note||'-',L,summaryY+mm(8),W*.38);
+   const sx=L+W*.399,sw=W*.601,divider=L+W*(1-cols[cols.length-1].width/weights),step=mm(8.58);doc.strokeColor('#999').lineWidth(.4).moveTo(divider,summaryY).lineTo(divider,settleY).stroke();
+   const totalRow=(label,value,slot,shade=false)=>{const yy=summaryY+slot*step;if(shade){doc.save().rect(sx,yy,sw,step).fill('#dedede').restore();text(label,sx+mm(2.5),yy+mm(2),sw*.36-mm(2.5));text(value,sx+sw*.36,yy+mm(2),sw*.64-mm(2.3),font,'right');}else{text(label,sx,yy+mm(2),divider-sx-mm(3),font,'right');text(value,divider+mm(1),yy+mm(2),L+W-divider-mm(3.3),font,'right');}line(yy+step,sx,sw);};
+   totalRow('จำนวนเงินรวมทั้งสิ้น (บาท) / Grand Total',I.money(m.total),2);totalRow('จำนวนเงินรวมทั้งสิ้น',I.bahtText(m.total),3,true);totalRow('จำนวนเงินที่ต้องชำระ (บาท) / Net to Pay',I.money(m.total),5);
+   line(settleY);line(settleY+mm(.8));const py=settleY+mm(4.4),pw=mm(92.2);text('การชำระเงิน / Payment',L,py,pw);const cw=[pw*.22,pw*.51,pw*.27],labels=['ธนาคาร','ชื่อบัญชี','เลขที่บัญชี'],values=[m.payment.bank,m.payment.accountName,m.payment.accountNo];let px=L;for(let i=0;i<3;i++){text(labels[i],px+mm(1),py+mm(6),cw[i]-mm(2));text(values[i],px+mm(1),py+mm(13),cw[i]-mm(2),font*.92);px+=cw[i];}line(py+mm(11.3),L,pw);line(py+mm(19.7),L,pw);
+   const signX=L+mm(100.2),signW=mm(84.2),gap=mm(4),one=(signW-gap)/2;for(const [i,name,role] of [[0,t.signerName,t.signerRole],[1,t.receiverName,t.receiverRole]]){const xx=signX+i*(one+gap),sy=py+mm(4)+t.signatureGap*.75;text(role,xx,py,one);doc.strokeColor('#777').lineWidth(.4).dash(.6,{space:1.5}).moveTo(xx,sy).lineTo(xx+one,sy).stroke().undash();if(name)text('('+name+')',xx,sy+mm(2.5),one,font*.9,'center');text('วันที่ ........ / ........ / ................',xx,sy+mm(name?9:3.7),one,font*.92);}
+   text('ออกเอกสารโดย ระบบสารสนเทศจัดการลูกหนี้\nโรงน้ำดื่ม เฟรชชี่ วอเตอร์',L+W*.48,top+mm(255.8),W*.52,font*.88,'right');
+  }else text('รายการต่อหน้าถัดไป',L+W*.5,summaryY+mm(5),W*.5,font,'right');
+  text('หน้า '+(pageIndex+1)+'/'+pages.length,L,mm(273),W,8,'center');
+ });doc.end();
  }catch(e){reject(e);doc.destroy();}
  });}
 module.exports={pdfInvoice};
