@@ -29,7 +29,7 @@ function lockedFromData(value,data){
  const rows=(data.debtors||[]).filter(r=>ids.includes(r.id)&&r.customerId===input.source.customerId&&r.area===input.source.area&&r.status==='unpaid').sort((a,b)=>String(a.debtDate).localeCompare(String(b.debtDate)));
  if(rows.length!==ids.length)throw Error('ข้อมูลลูกหนี้เปลี่ยน กรุณาสร้างใบแจ้งหนี้ใหม่');
  const customer=(data.customers||[]).find(c=>c.id===input.source.customerId)||{},cfg=data.settings?.header?.invoice||{},model=fromDebts(rows,customer,data.products||[],{...cfg,template:input.template},{docNo:input.docNo,issuedAt:input.issuedAt,dueDate:input.dueDate,reference:input.reference,note:input.note});model.template.signerName=input.template.signerName;
- if(value.customerCode!=null&&input.customerCode!==model.customerCode)throw Error('รหัสลูกค้าต้องตรงกับข้อมูลต้นทางในระบบ');
+ if(value.customerCode!=null&&input.customerCode!=='-'&&input.customerCode!==model.customerCode)throw Error('รหัสลูกค้าต้องตรงกับข้อมูลต้นทางในระบบ');
  for(const key of ['customerName','address','phone','issuer','payment','items','total'])if(JSON.stringify(input[key])!==JSON.stringify(model[key]))throw Error('ข้อมูลใบแจ้งหนี้ถูกล็อก ต้องตรงกับข้อมูลต้นทางในระบบ');
  if(!/^INV-\d{8}$/.test(input.docNo))throw Error('เลขใบแจ้งหนี้ต้องเป็น INV ตามด้วยตัวเลข 8 หลัก');return model;
 }
