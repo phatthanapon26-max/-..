@@ -6,7 +6,7 @@
   "functions": {
     "api/*.js": {
       "maxDuration": 30,
-      "includeFiles": "{deploy-config.js,features.js,payments.js,brand-icon.png,vendor/fonts/*.ttf}"
+      "includeFiles": "{deploy-config.js,features.js,payments.js,invoice.js,sync.js,brand-icon.png,vendor/fonts/*.ttf}"
     }
   },
   "crons": [
@@ -108,4 +108,5 @@
     }
   ]
 }
+
 

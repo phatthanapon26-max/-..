@@ -6,7 +6,7 @@ function notificationHtml(d){
  const line=(label,value)=>`<tr><td style="padding:8px 12px;border-bottom:1px solid #d6dbe1;width:120px;color:#425063">${label}</td><td style="padding:8px 12px;border-bottom:1px solid #d6dbe1">${escape(value)}</td></tr>`;
  return `<div style="background:#edf1f5;padding:24px 12px;font-family:Sarabun,Arial,sans-serif;color:#172332;line-height:1.7"><div style="max-width:720px;margin:auto;background:#fff;border:1px solid #c6ced8"><div style="border-top:4px solid #18354f;padding:24px 28px;border-bottom:1px solid #c6ced8"><p style="margin:0;font-weight:bold;font-size:20px">${escape(d.business.name)}</p><p style="margin:8px 0 0;font-size:16px">แจ้งนำส่งเอกสารรายงาน</p></div><div style="padding:24px 28px"><p>เรียน ผู้บริหารและผู้เกี่ยวข้อง</p><p>ขอนำส่ง${escape(d.title)} เพื่อทราบและตรวจสอบรายละเอียด โดยแนบเอกสารฉบับ PDF พร้อมอีเมลนี้</p><table style="width:100%;border-collapse:collapse;font-size:14px">${line('เลขที่เอกสาร',d.docNo)}${line('วันที่ออก',date(d.issuedAt)+' น.')}${line('ผู้จัดทำ',d.author.name)}${line('เอกสารแนบ',d.docNo+'.pdf')}</table>${d.summaries.map(s=>'<p style="border:1px solid #c6ced8;padding:12px;font-weight:bold">'+escape(s)+'</p>').join('')}<p>จึงเรียนมาเพื่อทราบและดำเนินการในส่วนที่เกี่ยวข้อง</p><p>ระบบสารสนเทศจัดการลูกหนี้<br>${escape(d.business.name)}</p></div><div style="padding:14px 28px;border-top:1px solid #c6ced8;font-size:12px;color:#425063">อีเมลแจ้งเตือนจากระบบอัตโนมัติ · ใช้เลขที่เอกสารข้างต้นสำหรับตรวจสอบอ้างอิง</div></div></div>`;
 }
-function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
+function pdfDocument(snapshot){if(snapshot.invoice?.version===2)return require('./invoice-report').pdfInvoice(snapshot);return new Promise((resolve,reject)=>{
  const doc=new PDFDocument({size:'A4',margins:{top:42,bottom:30,left:42,right:42},bufferPages:true,info:{Title:snapshot.title,Author:snapshot.author.name,Subject:snapshot.docNo}}),parts=[];
  doc.on('data',x=>parts.push(x));doc.on('end',()=>resolve(Buffer.concat(parts)));doc.on('error',reject);
  try{
@@ -53,4 +53,5 @@ function pdfDocument(snapshot){return new Promise((resolve,reject)=>{
  }catch(e){reject(e);doc.destroy();}
 });}
 module.exports={pdfDocument,notificationHtml};
+
 
